@@ -22,9 +22,16 @@ py -3.11 -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-The eventual CLI entry point is `huhac-media`. Current command availability is
-reported by `huhac-media --help`.
+The CLI can perform a read-only preflight now:
+
+```powershell
+huhac-media ingest --input 'D:\Huhac\media' --dry-run
+huhac-media ingest --config .\huhac.toml --dry-run
+```
+
+Dry-run recursively discovers media, calculates content hashes, reads an
+existing catalog in read-only mode, and reports known, new, changed, duplicate,
+and previously failed assets. It never creates WORK or writes a log.
 
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), and
 [development](docs/development.md) for project internals.
-

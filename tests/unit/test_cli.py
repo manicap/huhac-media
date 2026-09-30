@@ -9,4 +9,3 @@ def test_ingest_requires_input() -> None:
 def test_non_interactive_alias_is_accepted(tmp_path) -> None:
     result = main(["ingest", "--input", str(tmp_path), "--non-interactive"])
     assert result == ExitCode.FATAL
-

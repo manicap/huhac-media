@@ -26,3 +26,8 @@ Detection uses binary signatures where available and a maintained candidate
 extension list for formats such as RAW and transport streams. Metadata probing
 later validates and enriches the formal format. Every supported candidate is
 hashed in full; a size or mtime change during hashing yields `UNSTABLE_SOURCE`.
+
+The pure planner compares scan results with an immutable catalog snapshot. The
+same planner drives dry-run and real ingest. `known`, `new`, and `changed` are
+exclusive classifications; exact duplicate and previous failure are additional
+flags and may overlap those classifications.
