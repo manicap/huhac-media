@@ -37,5 +37,15 @@ M1 image previews use a configurable maximum dimension (768 pixels by default),
 apply EXIF orientation, preserve aspect ratio, and never upscale unless
 explicitly configured. Transparent pixels are composited on black by default.
 
+Run an unattended ingest with:
+
+```powershell
+huhac-media ingest --input 'D:\Huhac\media' --non-interactive
+```
+
+Without `--yes`/`--non-interactive`, the CLI asks for confirmation after the
+read-only preflight and before creating or changing WORK. Existing workspaces
+are reused and successful metadata/preview stages are skipped.
+
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), and
 [development](docs/development.md) for project internals.

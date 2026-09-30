@@ -95,3 +95,24 @@ def validate_config(config: AppConfig) -> None:
     if config.image.transparent_background not in {"black", "white"}:
         raise ConfigError("image.transparent_background must be black or white")
 
+
+def config_as_dict(config: AppConfig) -> dict[str, Any]:
+    return {
+        "input": str(config.input) if config.input else None,
+        "work": str(config.work) if config.work else None,
+        "interactive": config.interactive,
+        "warn_existing_workdir": config.warn_existing_workdir,
+        "changed_source_policy": config.changed_source_policy,
+        "image": {
+            "max_dimension": config.image.max_dimension,
+            "format": config.image.format,
+            "quality": config.image.quality,
+            "allow_upscale": config.image.allow_upscale,
+            "transparent_background": config.image.transparent_background,
+        },
+        "tools": {
+            "exiftool": config.tools.exiftool,
+            "ffprobe": config.tools.ffprobe,
+            "ffmpeg": config.tools.ffmpeg,
+        },
+    }

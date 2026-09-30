@@ -48,3 +48,13 @@ default, composites transparency on the configured black or white background,
 and writes a non-progressive JPEG. FFmpeg is an optional decoder fallback.
 Preview identity includes the asset SHA-256 plus a fingerprint of processor
 version and image settings. Output is validated before an atomic replace.
+
+## Ingest and resume
+
+After confirmation, the application initializes a versioned workspace and
+takes a non-blocking OS file lock. Discovery is committed before content stages.
+Each stage is marked `processing`, writes and validates its artifact, and only
+then becomes `success`. On the next invocation, unfinished runs become
+`interrupted` and processing stages become retryable. A successful stage is
+skipped only when its matching artifact still exists. Media-stage errors are
+recorded and isolated; remaining assets continue.

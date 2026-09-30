@@ -112,6 +112,122 @@ class CatalogStore:
                 (status, _now(), json.dumps(summary or {}, sort_keys=True), run_id),
             )
 
+    def recover_interrupted(self) -> None:
+        timestamp = _now()
+        with self.database.transaction() as connection:
+            connection.execute(
+                "UPDATE runs SET status = 'interrupted', finished_at = ? WHERE status = 'running'",
+                (timestamp,),
+            )
+            connection.execute(
+                """
+                UPDATE asset_stages SET status = 'pending', finished_at = ?,
+                       error_code = 'INTERRUPTED', error_message = 'Recovered after interrupted run'
+                WHERE status = 'processing'
+                """,
+                (timestamp,),
+            )
+
+    def stage_needs_run(
+        self, asset_id: str, stage: str, version: str, fingerprint: str, output: Path | None
+    ) -> bool:
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT status, output_path FROM asset_stages
+                WHERE asset_id = ? AND stage = ? AND processor_version = ?
+                      AND config_fingerprint = ?
+                """,
+                (asset_id, stage, version, fingerprint),
+            ).fetchone()
+        if row is None or row["status"] != "success":
+            return True
+        recorded = Path(row["output_path"]) if row["output_path"] else output
+        return recorded is None or not recorded.is_file()
+
+    def start_stage(self, asset_id: str, stage: str, version: str, fingerprint: str) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                INSERT INTO asset_stages(asset_id, stage, processor_version,
+                    config_fingerprint, status, attempts, started_at)
+                VALUES (?, ?, ?, ?, 'processing', 1, ?)
+                ON CONFLICT(asset_id, stage, processor_version, config_fingerprint)
+                DO UPDATE SET status = 'processing', attempts = attempts + 1,
+                    started_at = excluded.started_at, finished_at = NULL,
+                    error_code = NULL, error_message = NULL
+                """,
+                (asset_id, stage, version, fingerprint, _now()),
+            )
+
+    def complete_stage(
+        self, asset_id: str, stage: str, version: str, fingerprint: str, output: Path
+    ) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE asset_stages SET status = 'success', finished_at = ?, output_path = ?,
+                       error_code = NULL, error_message = NULL
+                WHERE asset_id = ? AND stage = ? AND processor_version = ?
+                      AND config_fingerprint = ?
+                """,
+                (_now(), str(output), asset_id, stage, version, fingerprint),
+            )
+
+    def fail_stage(
+        self,
+        run_id: str,
+        relative_path: str,
+        asset_id: str,
+        stage: str,
+        version: str,
+        fingerprint: str,
+        code: str,
+        message: str,
+        diagnostics: dict | None = None,
+    ) -> None:
+        timestamp = _now()
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE asset_stages SET status = 'failed', finished_at = ?, error_code = ?,
+                       error_message = ?
+                WHERE asset_id = ? AND stage = ? AND processor_version = ?
+                      AND config_fingerprint = ?
+                """,
+                (timestamp, code, message, asset_id, stage, version, fingerprint),
+            )
+            connection.execute(
+                """
+                INSERT INTO errors(run_id, relative_path, asset_id, phase, code,
+                                   message, diagnostics_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    relative_path,
+                    asset_id,
+                    stage,
+                    code,
+                    message,
+                    json.dumps(diagnostics or {}, ensure_ascii=False),
+                    timestamp,
+                ),
+            )
+
+    def update_asset_metadata(self, asset_id: str, metadata: dict) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(
+                "UPDATE assets SET metadata_json = ? WHERE asset_id = ?",
+                (json.dumps(metadata, ensure_ascii=False, sort_keys=True), asset_id),
+            )
+
+    def error_count(self, run_id: str) -> int:
+        with self.database.transaction() as connection:
+            return connection.execute(
+                "SELECT COUNT(*) FROM errors WHERE run_id = ?", (run_id,)
+            ).fetchone()[0]
+
     @staticmethod
     def _record_item(
         connection: sqlite3.Connection,

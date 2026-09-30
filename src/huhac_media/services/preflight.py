@@ -16,7 +16,14 @@ def _size(value: int) -> str:
     return f"{size:.1f} TB"
 
 
-def render_preflight(input_path: Path, work_path: Path, plan: IngestPlan, *, exists: bool) -> str:
+def render_preflight(
+    input_path: Path,
+    work_path: Path,
+    plan: IngestPlan,
+    *,
+    exists: bool,
+    show_workspace_status: bool = True,
+) -> str:
     images = [item for item in plan.items if item.scanned.media_type == MediaType.IMAGE]
     videos = [item for item in plan.items if item.scanned.media_type == MediaType.VIDEO]
     formats = Counter(item.scanned.format or "UNKNOWN" for item in plan.items)
@@ -26,7 +33,6 @@ def render_preflight(input_path: Path, work_path: Path, plan: IngestPlan, *, exi
         "",
         f"INPUT: {input_path}",
         f"WORK:  {work_path}",
-        f"WORKSPACE: {'existing (will be reused)' if exists else 'new'}",
         "",
         "Found:",
         f"  Images ................. {len(images)}",
@@ -36,6 +42,8 @@ def render_preflight(input_path: Path, work_path: Path, plan: IngestPlan, *, exi
         "",
         "Formats:",
     ]
+    if show_workspace_status:
+        lines.insert(4, f"WORKSPACE: {'existing (will be reused)' if exists else 'new'}")
     lines.extend(f"  {name:<22} {count}" for name, count in sorted(formats.items()))
     lines.extend(
         [
@@ -51,4 +59,3 @@ def render_preflight(input_path: Path, work_path: Path, plan: IngestPlan, *, exi
         ]
     )
     return "\n".join(lines)
-
