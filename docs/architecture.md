@@ -31,3 +31,12 @@ The pure planner compares scan results with an immutable catalog snapshot. The
 same planner drives dry-run and real ingest. `known`, `new`, and `changed` are
 exclusive classifications; exact duplicate and previous failure are additional
 flags and may overlap those classifications.
+
+## Metadata adapters
+
+External commands run without a shell, with explicit argument arrays, UTF-8
+replacement decoding, bounded diagnostics, timeouts, and checked exit codes.
+ExifTool supplies grouped raw metadata for all media; ffprobe adds video format
+and stream data. Absolute source filenames are removed from raw artifacts.
+Normalization is tolerant of missing fields and always stores capture-time
+provenance, including an explicit filesystem fallback marker.

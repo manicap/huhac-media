@@ -32,3 +32,10 @@ results from being presented as current, but records a processing error.
 After a complete scan, unseen current paths become `absent`; unsuccessful or
 interrupted scans never apply this transition. Records are retained rather than
 deleted.
+
+Asset metadata contains separate `capture` and `technical` objects. Capture
+stores the normalized ISO timestamp, source tag, timezone offset when known, and
+whether filesystem mtime was used. Image technical data includes dimensions,
+orientation, camera/lens/exposure data and optional GPS. Video data includes
+container, duration, dimensions, frame rate, codec, bitrate, rotation, and audio
+stream facts. Missing source fields remain null and are never inferred.
