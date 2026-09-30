@@ -1,0 +1,19 @@
+input = 'D:\Huhac\media'
+work = 'D:\Huhac\media\_processing'
+
+interactive = true
+warn_existing_workdir = true
+changed_source_policy = "reprocess"
+
+[image]
+max_dimension = 768
+format = "jpeg"
+quality = 90
+allow_upscale = false
+transparent_background = "black"
+
+[tools]
+exiftool = "exiftool"
+ffprobe = "ffprobe"
+ffmpeg = "ffmpeg"
+
