@@ -21,3 +21,14 @@ synchronous writes. Stage identity is `(asset_id, stage, processor_version,
 config_fingerprint)`, so completed work is reused only when its recipe matches.
 
 Portable source and asset sidecars are separate from this transactional state.
+
+Discovery is idempotent: an unchanged path updates `last_seen` data but does not
+create another source version. A new path sharing an existing SHA-256 creates a
+new source path/version linked to the existing asset. Changed content creates or
+reactivates a version for the new asset and supersedes the formerly current
+version. The `error` policy still records the new identity, preventing old
+results from being presented as current, but records a processing error.
+
+After a complete scan, unseen current paths become `absent`; unsuccessful or
+interrupted scans never apply this transition. Records are retained rather than
+deleted.
