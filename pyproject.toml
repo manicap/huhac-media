@@ -15,6 +15,7 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 huhac-media = "huhac_media.cli:main"
+session-grouper = "session_grouper.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -26,4 +27,3 @@ markers = [
   "integration: filesystem and database integration tests",
   "external: tests requiring ExifTool, FFmpeg, or ffprobe",
 ]
-

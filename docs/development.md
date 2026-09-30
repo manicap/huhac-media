@@ -21,6 +21,7 @@ always written to the selected workspace, never into package directories.
 pytest
 pytest -m integration
 pytest -m external
+pytest tests/session_grouper
 ```
 
 The default suite excludes integration and external tests. Run the nearest unit
@@ -29,6 +30,11 @@ that touch real tool integration or before completing M1.
 
 Never commit `.venv`, real user media, local configuration, credentials, or a
 runtime workspace.
+
+Session Grouper is a separate package under `src/session_grouper`. Its tests use
+only synthetic public-contract fixtures. Production code in this package must
+not import `huhac_media`, open ingest SQLite, or write outside its own
+`analysis/session-grouper/` namespace.
 
 Before each logical commit, run the nearest tests, the relevant wider suite,
 `git diff`, `git diff --cached`, and `git status`. Commit only source,
