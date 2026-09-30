@@ -7,7 +7,7 @@ from pathlib import Path
 from huhac_media import __version__
 from huhac_media.config import ConfigError, load_config
 from huhac_media.domain.enums import MediaType
-from huhac_media.domain.errors import FatalError
+from huhac_media.domain.errors import FatalError, HuhacMediaError
 from huhac_media.exit_codes import ExitCode
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PreviewGenerator
@@ -59,7 +59,9 @@ def main(argv: list[str] | None = None) -> int:
             return ExitCode.USAGE_OR_CONFIG
         try:
             input_path = config.input.resolve(strict=True)
-            work_path = select_work_path(input_path, config.work, args.new_workspace)
+            work_path = select_work_path(
+                input_path, None if args.new_workspace else config.work, args.new_workspace
+            )
             validate_paths(input_path, work_path)
             catalog_path = work_path / "state" / "catalog.sqlite3"
             catalog = (
@@ -126,13 +128,15 @@ def main(argv: list[str] | None = None) -> int:
                     tool_versions["ffprobe"] = ffprobe.version()
                 if ffmpeg.available():
                     tool_versions["ffmpeg"] = ffmpeg.version()
-                result = IngestService(database, extractor, preview, tool_versions).execute(
+                result = IngestService(
+                    database, extractor, preview, tool_versions, args.log_level
+                ).execute(
                     input_path, work_path, plan, effective
                 )
         except KeyboardInterrupt:
             print("\nInterrupted.")
             return ExitCode.INTERRUPTED
-        except (OSError, FatalError, ValueError) as exc:
+        except (OSError, HuhacMediaError, ValueError) as exc:
             print(f"\nFatal error: {exc}")
             return ExitCode.FATAL
         print(

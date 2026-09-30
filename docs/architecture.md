@@ -9,8 +9,6 @@ sidecars are portable metadata artifacts. Derived files are addressed by the
 asset SHA-256 and kept outside the source tree except for the explicitly
 excluded workspace directory.
 
-Details will be expanded alongside the corresponding implementation.
-
 ## Processing state
 
 Each asset stage has `pending`, `processing`, `success`, or `failed` state and
@@ -64,3 +62,13 @@ dedicated UTF-8 log. Normal completion replaces the report with `success` or
 `partial`; caught fatal errors and interrupts are recorded as `fatal` or
 `interrupted`. The next invocation also closes a prior report left in `running`
 state after an uncatchable process or machine failure.
+
+For safety, WORK may be inside INPUT (where it is excluded) or completely
+separate, but it may not equal or contain INPUT. A non-empty directory without a
+valid workspace manifest is not silently adopted. Existing recognized
+workspaces and empty target directories are reusable.
+
+Future processor artifacts belong under
+`analysis/<processor>/<processor-version>/...`. They use the same content
+address and provenance pattern but remain independent of source evidence and of
+each other; removing or recomputing one processor cannot damage ingest state.

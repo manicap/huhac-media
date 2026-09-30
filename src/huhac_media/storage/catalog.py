@@ -23,13 +23,20 @@ def read_catalog(database: Database) -> CatalogSnapshot:
                 relative_path=row["relative_path"],
                 asset_id=row["asset_id"],
                 stage_failures=row["stage_failures"],
+                change_blocked=bool(row["change_blocked"]),
             )
             for row in connection.execute(
                 """
                 SELECT sp.id AS source_path_id, sv.id AS source_version_id,
                        sp.relative_path, sv.asset_id,
                        (SELECT COUNT(*) FROM asset_stages ast
-                        WHERE ast.asset_id = sv.asset_id AND ast.status = 'failed') AS stage_failures
+                        WHERE ast.asset_id = sv.asset_id AND ast.status = 'failed') AS stage_failures,
+                       COALESCE((
+                         SELECT ri.result_status = 'error'
+                         FROM run_items ri JOIN runs r ON r.id = ri.run_id
+                         WHERE ri.relative_path = sp.relative_path
+                         ORDER BY r.started_at DESC LIMIT 1
+                       ), 0) AS change_blocked
                 FROM source_paths sp
                 JOIN source_versions sv ON sv.id = sp.current_source_version_id
                 """
@@ -79,6 +86,17 @@ class CatalogStore:
             )
         return run_id
 
+    def ensure_workspace(self, workspace_id: str) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                INSERT INTO workspace(id, schema_version, created_at)
+                VALUES (?, 1, ?)
+                ON CONFLICT(id) DO NOTHING
+                """,
+                (workspace_id, _now()),
+            )
+
     def record_discovery(
         self,
         run_id: str,
@@ -86,7 +104,7 @@ class CatalogStore:
         *,
         changed_source_policy: str = "reprocess",
         scan_complete: bool = True,
-    ) -> None:
+    ) -> set[str]:
         if changed_source_policy not in {"reprocess", "error"}:
             raise ValueError("Unsupported changed source policy")
         timestamp = _now()
@@ -102,8 +120,12 @@ class CatalogStore:
                     changed_source_policy=changed_source_policy,
                     timestamp=timestamp,
                 )
-            if scan_complete:
+            absent_paths = (
                 self._mark_absent(connection, observed_paths, timestamp)
+                if scan_complete
+                else set()
+            )
+        return absent_paths
 
     def finish_run(self, run_id: str, status: str, summary: dict | None = None) -> None:
         with self.database.transaction() as connection:
@@ -221,10 +243,20 @@ class CatalogStore:
             )
 
     def update_asset_metadata(self, asset_id: str, metadata: dict) -> None:
+        detected = metadata.get("detected", {})
         with self.database.transaction() as connection:
             connection.execute(
-                "UPDATE assets SET metadata_json = ? WHERE asset_id = ?",
-                (json.dumps(metadata, ensure_ascii=False, sort_keys=True), asset_id),
+                """
+                UPDATE assets SET metadata_json = ?,
+                    format = COALESCE(?, format), mime_type = COALESCE(?, mime_type)
+                WHERE asset_id = ?
+                """,
+                (
+                    json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+                    detected.get("format"),
+                    detected.get("mime_type"),
+                    asset_id,
+                ),
             )
 
     def error_count(self, run_id: str) -> int:
@@ -416,12 +448,13 @@ class CatalogStore:
             )
 
     @staticmethod
-    def _mark_absent(connection: sqlite3.Connection, observed: set[str], timestamp: str) -> None:
+    def _mark_absent(connection: sqlite3.Connection, observed: set[str], timestamp: str) -> set[str]:
+        changed: set[str] = set()
         rows = connection.execute(
-            "SELECT id, relative_path, current_source_version_id FROM source_paths"
+            "SELECT id, relative_path, current_source_version_id, absent_since FROM source_paths"
         ).fetchall()
         for row in rows:
-            if row["relative_path"] in observed:
+            if row["relative_path"] in observed or row["absent_since"] is not None:
                 continue
             connection.execute(
                 "UPDATE source_paths SET absent_since = ? WHERE id = ?",
@@ -431,3 +464,5 @@ class CatalogStore:
                 "UPDATE source_versions SET status = 'absent' WHERE id = ?",
                 (row["current_source_version_id"],),
             )
+            changed.add(row["relative_path"])
+        return changed

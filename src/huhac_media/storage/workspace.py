@@ -32,6 +32,8 @@ def validate_paths(input_path: Path, work_path: Path) -> None:
     resolved_work = work_path.resolve(strict=False)
     if resolved_work == resolved_input:
         raise ValueError("WORK must not be the same directory as INPUT")
+    if resolved_work in resolved_input.parents:
+        raise ValueError("WORK must not contain INPUT")
 
 
 WORKSPACE_DIRECTORIES = (
@@ -49,10 +51,12 @@ WORKSPACE_DIRECTORIES = (
 
 
 def initialize_workspace(work_path: Path) -> dict:
+    manifest = work_path / "workspace.json"
+    if work_path.exists() and not manifest.exists() and any(work_path.iterdir()):
+        raise FatalError(f"Refusing to use non-empty unrecognized workspace: {work_path}")
     work_path.mkdir(parents=True, exist_ok=True)
     for relative in WORKSPACE_DIRECTORIES:
         (work_path / relative).mkdir(parents=True, exist_ok=True)
-    manifest = work_path / "workspace.json"
     if manifest.exists():
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))

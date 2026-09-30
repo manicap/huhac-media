@@ -56,11 +56,17 @@ def test_ingest_writes_sidecars_preview_and_reuses_success(tmp_path: Path) -> No
     assert len(list((work / "metadata" / "sources").glob("*.json"))) == 1
     assert len(list((work / "metadata" / "assets").rglob("*.json"))) == 1
     assert len(list((work / "metadata" / "raw").rglob("*.exiftool.json"))) == 1
-    report_path = next((work / "runs").rglob("report.json"))
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["status"] == "success"
-    assert report["plan"]["new"] == 1
+    reports = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in (work / "runs").rglob("report.json")
+    ]
+    assert len(reports) == 2
+    assert all(report["status"] == "success" for report in reports)
+    assert {report["plan"]["new"] for report in reports} == {0, 1}
+    assert {report["plan"]["known"] for report in reports} == {0, 1}
     assert list((work / "logs").glob("*.log"))
+    with database.transaction() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM workspace").fetchone()[0] == 1
 
 
 def test_preview_failure_does_not_discard_metadata_or_stop_batch(tmp_path: Path) -> None:
@@ -134,3 +140,32 @@ def test_previous_running_report_is_recovered(tmp_path: Path) -> None:
     execute(input_path, work, database)
 
     assert json.loads(old_path.read_text(encoding="utf-8"))["status"] == "interrupted"
+
+
+def test_video_metadata_is_ingested_without_preview(tmp_path: Path) -> None:
+    input_path = tmp_path / "input"
+    input_path.mkdir()
+    video = input_path / "clip.mp4"
+    video.write_bytes(b"\x00\x00\x00\x18ftypisom" + b"synthetic")
+    work = input_path / "_processing"
+    initialize_workspace(work)
+    database = Database(work / "state" / "catalog.sqlite3")
+    plan = Planner().plan(Scanner().scan(input_path, work), read_catalog(database))
+    config = AppConfig(input=input_path, work=work, interactive=False)
+    ffprobe = FakeProbe()
+    service = IngestService(database, MetadataExtractor(FakeProbe(), ffprobe), PreviewGenerator(config.image))
+    result = service.execute(input_path, work, plan, config)
+    assert result.status == "success"
+    with database.transaction() as connection:
+        stages = [row[0] for row in connection.execute("SELECT stage FROM asset_stages")]
+    assert stages == ["metadata"]
+
+
+def test_zero_length_candidate_is_isolated_as_preview_failure(tmp_path: Path) -> None:
+    input_path = tmp_path / "input"
+    input_path.mkdir()
+    (input_path / "zero.jpg").write_bytes(b"")
+    work = input_path / "_processing"
+    initialize_workspace(work)
+    result = execute(input_path, work, Database(work / "state" / "catalog.sqlite3"))
+    assert result.status == "partial"

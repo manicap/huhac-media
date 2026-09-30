@@ -33,6 +33,7 @@ class ExistingSource:
     relative_path: str
     asset_id: str
     stage_failures: int = 0
+    change_blocked: bool = False
 
 
 @dataclass(frozen=True)
@@ -78,4 +79,3 @@ class MetadataResult:
     normalized: dict[str, Any]
     raw_exiftool: dict[str, Any] | None = None
     raw_ffprobe: dict[str, Any] | None = None
-

@@ -26,7 +26,7 @@ class Planner:
             existing = catalog.sources_by_path.get(path_key)
             if existing is None:
                 kind = PlanKind.NEW
-            elif existing.asset_id == item.asset_id:
+            elif existing.asset_id == item.asset_id and not existing.change_blocked:
                 kind = PlanKind.KNOWN
             else:
                 kind = PlanKind.CHANGED

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import json
 
 from huhac_media.config import AppConfig, config_as_dict
 from huhac_media.domain.enums import MediaType, PlanKind
@@ -35,23 +36,27 @@ class IngestService:
         metadata: MetadataExtractor,
         preview: PreviewGenerator,
         tool_versions: dict[str, str] | None = None,
+        log_level: str = "INFO",
     ):
         self.database = database
         self.store = CatalogStore(database)
         self.metadata = metadata
         self.preview = preview
         self.tool_versions = tool_versions or {}
+        self.log_level = log_level
 
     def execute(self, input_path: Path, work_path: Path, plan: IngestPlan, config: AppConfig) -> IngestResult:
+        manifest = json.loads((work_path / "workspace.json").read_text(encoding="utf-8"))
+        self.store.ensure_workspace(manifest["workspace_id"])
         for interrupted_id in self.store.recover_interrupted():
             mark_report_interrupted(work_path, interrupted_id)
         run_id = self.store.start_run(input_path, work_path, config_as_dict(config))
         reporter = RunReporter(
-            work_path, run_id, input_path, plan, config, self.tool_versions
+            work_path, run_id, input_path, plan, config, self.tool_versions, self.log_level
         )
         reporter.logger.info("Run started input=%s work=%s", input_path, work_path)
         try:
-            self.store.record_discovery(
+            absent_paths = self.store.record_discovery(
                 run_id, plan, changed_source_policy=config.changed_source_policy, scan_complete=True
             )
             for item in plan.unsupported:
@@ -66,7 +71,7 @@ class IngestService:
             export_sources(
                 self.database,
                 work_path,
-                {item.scanned.relative_path.as_posix() for item in plan.items},
+                {item.scanned.relative_path.as_posix() for item in plan.items} | absent_paths,
             )
             eligible: dict[str, object] = {}
             for item in plan.items:
@@ -95,6 +100,11 @@ class IngestService:
                 "failed_stages": failed,
             }
             errors = self.store.errors(run_id)
+            for error in errors:
+                reporter.logger.error(
+                    "phase=%s code=%s source=%s message=%s",
+                    error["phase"], error["code"], error["relative_path"], error["message"],
+                )
             self.store.finish_run(run_id, status, summary)
             reporter.finish(status, summary, errors)
             return IngestResult(run_id, status, processed, skipped, failed)

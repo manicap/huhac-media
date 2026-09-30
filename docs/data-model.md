@@ -39,3 +39,9 @@ whether filesystem mtime was used. Image technical data includes dimensions,
 orientation, camera/lens/exposure data and optional GPS. Video data includes
 container, duration, dimensions, frame rate, codec, bitrate, rotation, and audio
 stream facts. Missing source fields remain null and are never inferred.
+
+ExifTool's `FileType` and `MIMEType` replace extension-based candidates when
+available. Raw ExifTool and ffprobe documents are stored by asset under
+`metadata/raw/<shard>/`; normalized asset documents and source-version documents
+are separate. Neither source identity nor asset identity depends on an absolute
+path or filename.

@@ -44,3 +44,11 @@ def test_unstable_source_is_reported_and_batch_continues(tmp_path: Path) -> None
     assert items[0].error_code == "UNSTABLE_SOURCE"
     assert items[1].sha256 == "b" * 64
 
+
+def test_same_filename_in_different_directories_remains_distinct(tmp_path: Path) -> None:
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a" / "photo.jpg").write_bytes(b"\xff\xd8\xffone")
+    (tmp_path / "b" / "photo.jpg").write_bytes(b"\xff\xd8\xfftwo")
+    items = Scanner().scan(tmp_path)
+    assert {item.relative_path.as_posix() for item in items} == {"a/photo.jpg", "b/photo.jpg"}

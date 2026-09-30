@@ -25,6 +25,13 @@ def test_missing_exif_is_not_an_error() -> None:
     assert result.normalized["technical"]["camera_model"] is None
 
 
+def test_reliable_exiftool_format_is_preserved() -> None:
+    result = MetadataExtractor(
+        FakeProbe({"File:FileType": "JPEG", "File:MIMEType": "image/jpeg"})
+    ).extract(scanned(MediaType.IMAGE))
+    assert result.normalized["detected"] == {"format": "JPEG", "mime_type": "image/jpeg"}
+
+
 def test_video_streams_are_normalized() -> None:
     ffdata = {
         "format": {"format_name": "mov,mp4", "duration": "2.5", "bit_rate": "1000"},
@@ -38,4 +45,3 @@ def test_video_streams_are_normalized() -> None:
     assert technical["video_codec"] == "h264"
     assert technical["audio_present"] is True
     assert technical["sample_rate"] == 48000
-

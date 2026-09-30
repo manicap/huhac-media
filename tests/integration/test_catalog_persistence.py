@@ -87,3 +87,13 @@ def test_changed_error_records_new_identity_and_error(tmp_path: Path) -> None:
             "SELECT code FROM errors"
         ).fetchone()["code"] == "CHANGED_SOURCE_REJECTED"
 
+    snapshot = read_catalog(database)
+    blocked_plan = Planner().plan(Scanner().scan(input_path), snapshot)
+    assert blocked_plan.items[0].kind.value == "changed"
+
+    store = CatalogStore(database)
+    run_id = store.start_run(input_path, input_path / "_processing", {})
+    store.record_discovery(run_id, blocked_plan, changed_source_policy="reprocess")
+    store.finish_run(run_id, "success")
+    unlocked = Planner().plan(Scanner().scan(input_path), read_catalog(database))
+    assert unlocked.items[0].kind.value == "known"

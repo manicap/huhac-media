@@ -44,6 +44,10 @@ class MetadataExtractor:
             scanned.filesystem_mtime_ns / 1_000_000_000, tz=timezone.utc
         ).isoformat()
         normalized = {
+            "detected": {
+                "format": _first(exif, "File:FileType"),
+                "mime_type": _first(exif, "File:MIMEType"),
+            },
             "capture": select_capture_datetime(exif, ffdata, filesystem_mtime),
             "technical": self._technical(scanned.media_type, exif, ffdata),
         }

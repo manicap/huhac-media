@@ -26,6 +26,7 @@ class RunReporter:
         plan: IngestPlan,
         config: AppConfig,
         tool_versions: dict[str, str] | None = None,
+        log_level: str = "INFO",
     ):
         self.work_path = work_path
         self.run_id = run_id
@@ -75,8 +76,11 @@ class RunReporter:
         self.logger.propagate = False
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.handler = logging.FileHandler(self.log_path, encoding="utf-8")
+        self.handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
         self.handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
         self.logger.addHandler(self.handler)
+        self.logger.info("Effective configuration: %s", config_as_dict(config))
+        self.logger.info("Scan: %s Plan: %s", self.payload["scan"], self.payload["plan"])
 
     def finish(self, status: str, result: dict, errors: list[dict]) -> None:
         self.payload.update(

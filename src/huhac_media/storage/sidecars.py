@@ -75,7 +75,7 @@ def export_sources(database: Database, work: Path, relative_paths: set[str]) -> 
                    sv.created_at, sv.last_seen_run_id, a.sha256, a.media_type,
                    a.format, a.mime_type
             FROM source_paths sp
-            JOIN source_versions sv ON sv.id = sp.current_source_version_id
+            JOIN source_versions sv ON sv.source_path_id = sp.id
             JOIN assets a ON a.asset_id = sv.asset_id
             """
         ).fetchall()

@@ -3,7 +3,7 @@
 Huháč Media Pipeline is a local Windows-oriented tool for read-only discovery,
 cataloguing, metadata extraction, and preprocessing of photo and video archives.
 
-Milestone M1 is under active development. AI analysis, OCR, face recognition,
+Milestone M1 is implemented. AI analysis, OCR, face recognition,
 similarity search, video scene detection, and audio analysis are planned work and
 are not part of M1.
 
@@ -46,6 +46,17 @@ huhac-media ingest --input 'D:\Huhac\media' --non-interactive
 Without `--yes`/`--non-interactive`, the CLI asks for confirmation after the
 read-only preflight and before creating or changing WORK. Existing workspaces
 are reused and successful metadata/preview stages are skipped.
+
+## Configuration
+
+Copy `config.example.toml` and adjust `input`, optional `work`, interaction
+policy, changed-source policy, image preview settings, and tool executable
+names. Relative paths are resolved from the config file directory. Explicit CLI
+values override config values. Do not commit machine-specific local configs.
+
+Use `--new-workspace` to explicitly allocate `_processing_001`, `_002`, and so
+on. It overrides a WORK path from config. Use `--no-warn-existing-workdir` to
+suppress the workspace reuse notice.
 
 ## Exit codes
 
