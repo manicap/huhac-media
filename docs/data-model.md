@@ -2,10 +2,26 @@
 
 The core model distinguishes a stable source path, a version of the content
 observed at that path, and an asset identified by SHA-256. A single asset can be
-referenced by multiple source versions. Runs and independently versioned stages
-record resumable processing state.
+referenced by multiple source versions. Consumers process assets, not source
+paths: duplicates and renames therefore do not repeat analysis for unchanged
+content, while changed bytes produce a different asset identity. Runs and
+independently versioned ingest stages record resumable producer state.
 
-## SQLite tables
+## Public projection
+
+`metadata/catalog.json` is the public projection of this model. It contains one
+entry per asset, regardless of source count, together with all source-version
+references and their `active`, `superseded`, or `absent` status. An asset is
+`available` when at least one source reference is active in the latest published
+catalog; otherwise it is retained as `unavailable` for history and existing
+derived artifacts.
+
+Each catalog entry points to its normalized asset metadata document and, when
+one exists, its image preview. Videos legitimately have a null preview. Files
+that scan as unsupported never receive an asset ID and do not appear in the
+catalog.
+
+## Internal SQLite tables
 
 - `workspace` identifies a workspace and its schema version.
 - `assets` stores content-addressed media identified as `sha256:<hex>`.
@@ -18,9 +34,13 @@ record resumable processing state.
 
 SQLite enables foreign keys, WAL mode, a five-second busy timeout, and FULL
 synchronous writes. Stage identity is `(asset_id, stage, processor_version,
-config_fingerprint)`, so completed work is reused only when its recipe matches.
+config_fingerprint)`, so completed ingest work is reused only when its recipe
+matches. Table names, columns, migrations, and SQLite itself are private ingest
+implementation details, not a compatibility surface for consumers.
 
 Portable source and asset sidecars are separate from this transactional state.
+Only the artifacts explicitly named by the workspace contract are consumer API;
+source sidecars remain producer-owned supporting evidence.
 
 Discovery is idempotent: an unchanged path updates `last_seen` data but does not
 create another source version. A new path sharing an existing SHA-256 creates a

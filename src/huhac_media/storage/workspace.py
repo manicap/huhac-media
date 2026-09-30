@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from huhac_media.domain.errors import FatalError
 from huhac_media.storage.atomic import write_json_atomic
+from huhac_media.storage.contract import ASSET_CATALOG, WORKSPACE_CONTRACT_VERSION
 
 
 def select_work_path(input_path: Path, configured: Path | None, new_workspace: bool) -> Path:
@@ -64,8 +65,23 @@ def initialize_workspace(work_path: Path) -> dict:
             raise FatalError(f"Invalid workspace manifest: {manifest}") from exc
         if payload.get("schema_version") != 1:
             raise FatalError("Unsupported workspace schema version")
+        contract_version = payload.get("workspace_contract_version")
+        if contract_version not in (None, WORKSPACE_CONTRACT_VERSION):
+            raise FatalError("Unsupported workspace contract version")
+        catalog = payload.get("asset_catalog")
+        if catalog not in (None, ASSET_CATALOG.as_posix()):
+            raise FatalError("Unsupported asset catalog location")
+        if contract_version is None or catalog is None:
+            payload["workspace_contract_version"] = WORKSPACE_CONTRACT_VERSION
+            payload["asset_catalog"] = ASSET_CATALOG.as_posix()
+            write_json_atomic(manifest, payload)
         return payload
-    payload = {"schema_version": 1, "workspace_id": str(uuid4())}
+    payload = {
+        "schema_version": 1,
+        "workspace_contract_version": WORKSPACE_CONTRACT_VERSION,
+        "workspace_id": str(uuid4()),
+        "asset_catalog": ASSET_CATALOG.as_posix(),
+    }
     write_json_atomic(manifest, payload)
     return payload
 

@@ -1,11 +1,13 @@
-# Huháč Media Pipeline
+# Huháč Media Ingest
 
-Huháč Media Pipeline is a local Windows-oriented tool for read-only discovery,
-cataloguing, metadata extraction, and preprocessing of photo and video archives.
+Huháč Media Ingest is a local Windows-oriented producer of standardized media
+workspaces. It performs read-only discovery, cataloguing, metadata extraction,
+and deterministic preprocessing of photo and video archives.
 
-Milestone M1 is implemented. AI analysis, OCR, face recognition,
-similarity search, video scene detection, and audio analysis are planned work and
-are not part of M1.
+Its responsibility ends at a versioned workspace containing content-addressed
+assets, provenance, normalized metadata, and image previews. AI analysis, OCR,
+face recognition, similarity search, video scene detection, audio analysis, and
+domain interpretation are independent consumers and are not part of this tool.
 
 ## Requirements
 
@@ -70,5 +72,12 @@ suppress the workspace reuse notice.
 Every started ingest writes a machine-readable `runs/<timestamp>_<run-id>/report.json`,
 an effective configuration snapshot, and a detailed UTF-8 log under `logs/`.
 
+After an ingest, external processors discover assets through the public
+`workspace.json` -> `metadata/catalog.json` contract. They must not read or
+write ingest's SQLite database. Processor-owned results belong under
+`analysis/<processor>/`; see the workspace contract for the required path and
+provenance envelope.
+
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), and
-[development](docs/development.md) for project internals.
+[workspace contract](docs/workspace-contract.md). The
+[development guide](docs/development.md) covers project internals.

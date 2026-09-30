@@ -1,13 +1,32 @@
 # Architecture
 
-The M1 pipeline is layered as CLI, application services, domain model, media
-adapters, and persistence. The intended flow is `scan -> plan -> confirm ->
-ingest -> report`. Originals are always opened read-only.
+The system boundary is producer/consumer. Huháč Media Ingest is a general media
+workspace producer. Vision, faces, OCR, quality, audio, indexing, and future
+domain-specific interpretation are independent consumers. Ingest neither knows
+their models nor schedules or stores their processing state.
 
-SQLite is the authoritative transactional state. Atomically written JSON
-sidecars are portable metadata artifacts. Derived files are addressed by the
+Within the producer, M1 is layered as CLI, application services, domain model,
+media adapters, and persistence. The flow is `scan -> plan -> confirm -> ingest
+-> publish contract -> report`. Originals are always opened read-only.
+
+SQLite is authoritative transactional state for ingest, but it is a private
+implementation detail. At the end of an actual run, ingest atomically publishes
+a portable JSON asset catalog. Consumers start at `workspace.json`, validate
+`workspace_contract_version`, and follow `asset_catalog`; they do not query the
+database or import ingest's Python classes. Derived files are addressed by the
 asset SHA-256 and kept outside the source tree except for the explicitly
 excluded workspace directory.
+
+```text
+MEDIA INGEST (producer)
+  -> workspace.json
+  -> metadata/catalog.json
+  -> asset metadata and previews
+
+VISION / FACES / OCR / QUALITY / AUDIO / INDEX (consumers)
+  <- read producer-owned contract files
+  -> write only their namespace under analysis/
+```
 
 ## Processing state
 
@@ -68,7 +87,20 @@ separate, but it may not equal or contain INPUT. A non-empty directory without a
 valid workspace manifest is not silently adopted. Existing recognized
 workspaces and empty target directories are reusable.
 
-Future processor artifacts belong under
-`analysis/<processor>/<processor-version>/...`. They use the same content
-address and provenance pattern but remain independent of source evidence and of
-each other; removing or recomputing one processor cannot damage ingest state.
+## Ownership boundary
+
+Ingest exclusively owns `workspace.json`, `state/`, `metadata/`, `previews/`,
+`runs/`, `logs/`, `tmp/`, and `locks/`. Consumers may read the documented public
+subset but must not change producer-owned files. `state/catalog.sqlite3`, run
+reports, logs, locks, temporary files, source sidecars, and Python APIs are not
+the consumer API.
+
+Consumers exclusively own their namespace under
+`analysis/<processor>/<processor-version>/<configuration-fingerprint>/...`.
+Ingest reserves the top-level directory but never creates synthetic analysis
+results or interprets consumer data. Processor results use asset content
+identity and a provenance envelope, so changing a model, prompt, or
+configuration can be recomputed independently without changing ingest.
+
+The complete public/private file boundary and processor result schema are in
+[workspace-contract.md](workspace-contract.md).

@@ -12,6 +12,7 @@ from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PREVIEW_PROCESSOR_VERSION, PreviewGenerator, preview_fingerprint, preview_path
 from huhac_media.services.reporting import RunReporter, mark_report_interrupted
 from huhac_media.storage.catalog import CatalogStore
+from huhac_media.storage.contract import export_asset_catalog
 from huhac_media.storage.database import Database
 from huhac_media.storage.sidecars import asset_path, export_asset, export_sources, write_raw_sidecars
 
@@ -91,6 +92,14 @@ class IngestService:
                 else:
                     skipped += 1
                 export_asset(self.database, work_path, scanned.asset_id)
+
+            export_asset_catalog(
+                self.database,
+                work_path,
+                input_path,
+                manifest["workspace_id"],
+                run_id,
+            )
 
             failed = self.store.error_count(run_id)
             status = "partial" if failed else "success"
