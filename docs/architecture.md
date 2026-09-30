@@ -11,3 +11,9 @@ excluded workspace directory.
 
 Details will be expanded alongside the corresponding implementation.
 
+## Processing state
+
+Each asset stage has `pending`, `processing`, `success`, or `failed` state and
+tracks its processor version and configuration fingerprint. A crash therefore
+cannot turn a partially written artifact into successful work. The schema also
+keeps source-path history instead of overwriting a previous asset association.
