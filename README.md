@@ -33,5 +33,9 @@ Dry-run recursively discovers media, calculates content hashes, reads an
 existing catalog in read-only mode, and reports known, new, changed, duplicate,
 and previously failed assets. It never creates WORK or writes a log.
 
+M1 image previews use a configurable maximum dimension (768 pixels by default),
+apply EXIF orientation, preserve aspect ratio, and never upscale unless
+explicitly configured. Transparent pixels are composited on black by default.
+
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), and
 [development](docs/development.md) for project internals.

@@ -40,3 +40,11 @@ ExifTool supplies grouped raw metadata for all media; ffprobe adds video format
 and stream data. Absolute source filenames are removed from raw artifacts.
 Normalization is tolerant of missing fields and always stores capture-time
 provenance, including an explicit filesystem fallback marker.
+
+## Image previews
+
+Pillow applies EXIF orientation, preserves aspect ratio, avoids upscaling by
+default, composites transparency on the configured black or white background,
+and writes a non-progressive JPEG. FFmpeg is an optional decoder fallback.
+Preview identity includes the asset SHA-256 plus a fingerprint of processor
+version and image settings. Output is validated before an atomic replace.
