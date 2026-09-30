@@ -1,7 +1,7 @@
 from pathlib import Path, PurePosixPath
 
 from huhac_media.domain.enums import MediaType, PlanKind
-from huhac_media.domain.models import ExistingSource, ScannedFile
+from huhac_media.domain.models import ExistingSource, PlanItem, ScannedFile
 from huhac_media.services.planner import CatalogSnapshot, Planner
 
 
@@ -28,12 +28,30 @@ def test_planner_classifies_known_changed_new_and_duplicates() -> None:
         failed_assets=frozenset({old.asset_id}),
     )
 
+    unsupported = ScannedFile(
+        absolute_path=Path("notes.txt"),
+        relative_path=PurePosixPath("notes.txt"),
+        filename="notes.txt",
+        size_bytes=2,
+        filesystem_mtime_ns=1,
+        media_type=MediaType.UNSUPPORTED,
+        format=None,
+        mime_type=None,
+        sha256=None,
+    )
     plan = Planner().plan(
-        [media("known.jpg", "a" * 64), media("changed.jpg", "c" * 64), media("new.jpg", "a" * 64)],
+        [
+            media("known.jpg", "a" * 64),
+            media("changed.jpg", "c" * 64),
+            media("new.jpg", "a" * 64),
+            unsupported,
+        ],
         catalog,
     )
 
     assert [item.kind for item in plan.items] == [PlanKind.KNOWN, PlanKind.CHANGED, PlanKind.NEW]
+    assert all(isinstance(item, PlanItem) for item in plan.items)
+    assert plan.unsupported == [unsupported]
+    assert isinstance(plan.unsupported[0], ScannedFile)
     assert plan.items[0].previous_failure
     assert plan.items[2].exact_duplicate
-

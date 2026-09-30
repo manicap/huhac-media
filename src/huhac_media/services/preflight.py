@@ -27,7 +27,7 @@ def render_preflight(
     images = [item for item in plan.items if item.scanned.media_type == MediaType.IMAGE]
     videos = [item for item in plan.items if item.scanned.media_type == MediaType.VIDEO]
     formats = Counter(item.scanned.format or "UNKNOWN" for item in plan.items)
-    total_size = sum(item.scanned.size_bytes for item in plan.items + plan.unsupported)
+    total_size = sum(item.size_bytes for item in plan.scanned_files())
     lines = [
         "HUHÁČ MEDIA INGEST",
         "",

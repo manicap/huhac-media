@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -53,6 +54,11 @@ class IngestPlan:
     @property
     def supported(self) -> list[PlanItem]:
         return self.items
+
+    def scanned_files(self) -> Iterator[ScannedFile]:
+        """Iterate over the scanned files represented by every plan entry."""
+        yield from (item.scanned for item in self.items)
+        yield from self.unsupported
 
     def count(self, kind: PlanKind) -> int:
         return sum(item.kind == kind for item in self.items)

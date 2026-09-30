@@ -5,11 +5,15 @@ import pytest
 from PIL import Image
 
 from huhac_media.config import AppConfig, ImageConfig
-from huhac_media.domain.models import MetadataResult
+from huhac_media.cli import main
+from huhac_media.domain.enums import PlanKind
+from huhac_media.domain.models import IngestPlan, MetadataResult
+from huhac_media.exit_codes import ExitCode
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PREVIEW_PROCESSOR_VERSION, PreviewGenerator, preview_fingerprint, preview_path
 from huhac_media.services.ingest import IngestService
 from huhac_media.services.planner import CatalogSnapshot, Planner
+from huhac_media.services.preflight import render_preflight
 from huhac_media.services.scanner import Scanner
 from huhac_media.storage.catalog import read_catalog
 from huhac_media.storage.database import Database
@@ -24,8 +28,11 @@ class FakeProbe:
         return {"EXIF:Make": "Synthetic"}
 
 
-def execute(input_path: Path, work: Path, database: Database):
-    plan = Planner().plan(Scanner().scan(input_path, work), read_catalog(database))
+def execute(
+    input_path: Path, work: Path, database: Database, plan: IngestPlan | None = None
+):
+    if plan is None:
+        plan = Planner().plan(Scanner().scan(input_path, work), read_catalog(database))
     config = AppConfig(input=input_path, work=work, interactive=False, image=ImageConfig(max_dimension=16))
     service = IngestService(
         database,
@@ -33,6 +40,57 @@ def execute(input_path: Path, work: Path, database: Database):
         PreviewGenerator(config.image),
     )
     return service.execute(input_path, work, plan, config)
+
+
+def test_second_ingest_preflight_reuses_successful_asset_stages(
+    tmp_path: Path, capsys
+) -> None:
+    input_path = tmp_path / "input"
+    input_path.mkdir()
+    Image.new("RGB", (32, 16), "green").save(input_path / "photo.jpg")
+    (input_path / "notes.txt").write_text("unsupported", encoding="utf-8")
+    work = input_path / "_processing"
+    initialize_workspace(work)
+    database = Database(work / "state" / "catalog.sqlite3")
+
+    first = execute(input_path, work, database)
+    with database.transaction() as connection:
+        stages_before = [
+            tuple(row)
+            for row in connection.execute(
+                "SELECT stage, status, attempts, output_path FROM asset_stages ORDER BY stage"
+            )
+        ]
+
+    second_plan = Planner().plan(Scanner().scan(input_path, work), read_catalog(database))
+    preflight = render_preflight(input_path, work, second_plan, exists=True)
+
+    assert first.status == "success"
+    assert second_plan.count(PlanKind.KNOWN) == 1
+    assert second_plan.count(PlanKind.NEW) == 0
+    assert len(second_plan.unsupported) == 1
+    assert "Already known .......... 1" in preflight
+    assert "Unsupported ............ 1" in preflight
+
+    dry_run_result = main(["ingest", "--input", str(input_path), "--dry-run"])
+    dry_run_output = capsys.readouterr().out
+    assert dry_run_result == ExitCode.SUCCESS
+    assert "WORKSPACE: existing (will be reused)" in dry_run_output
+    assert "Already known .......... 1" in dry_run_output
+
+    second = execute(input_path, work, database, second_plan)
+    with database.transaction() as connection:
+        stages_after = [
+            tuple(row)
+            for row in connection.execute(
+                "SELECT stage, status, attempts, output_path FROM asset_stages ORDER BY stage"
+            )
+        ]
+
+    assert second.status == "success"
+    assert second.processed_assets == 0
+    assert second.skipped_assets == 1
+    assert stages_after == stages_before
 
 
 def test_ingest_writes_sidecars_preview_and_reuses_success(tmp_path: Path) -> None:
