@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import pytest
 from PIL import Image
@@ -55,6 +56,11 @@ def test_ingest_writes_sidecars_preview_and_reuses_success(tmp_path: Path) -> No
     assert len(list((work / "metadata" / "sources").glob("*.json"))) == 1
     assert len(list((work / "metadata" / "assets").rglob("*.json"))) == 1
     assert len(list((work / "metadata" / "raw").rglob("*.exiftool.json"))) == 1
+    report_path = next((work / "runs").rglob("report.json"))
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["status"] == "success"
+    assert report["plan"]["new"] == 1
+    assert list((work / "logs").glob("*.log"))
 
 
 def test_preview_failure_does_not_discard_metadata_or_stop_batch(tmp_path: Path) -> None:
@@ -108,3 +114,23 @@ def test_processing_stage_is_retried_after_interruption(tmp_path: Path) -> None:
         assert row["status"] == "success"
         assert row["attempts"] == 2
     assert output.is_file()
+
+
+def test_previous_running_report_is_recovered(tmp_path: Path) -> None:
+    input_path = tmp_path / "input"
+    input_path.mkdir()
+    work = input_path / "_processing"
+    initialize_workspace(work)
+    database = Database(work / "state" / "catalog.sqlite3")
+    from huhac_media.config import config_as_dict
+    from huhac_media.services.reporting import RunReporter
+    from huhac_media.storage.catalog import CatalogStore
+    config = AppConfig(input=input_path, work=work, interactive=False)
+    old_id = CatalogStore(database).start_run(input_path, work, config_as_dict(config))
+    old_reporter = RunReporter(work, old_id, input_path, Planner().plan([], CatalogSnapshot()), config)
+    old_path = old_reporter.report_path
+    old_reporter.close()
+
+    execute(input_path, work, database)
+
+    assert json.loads(old_path.read_text(encoding="utf-8"))["status"] == "interrupted"

@@ -58,3 +58,9 @@ then becomes `success`. On the next invocation, unfinished runs become
 `interrupted` and processing stages become retryable. A successful stage is
 skipped only when its matching artifact still exists. Media-stage errors are
 recorded and isolated; remaining assets continue.
+
+Each actual run immediately creates an atomic report with `running` status and a
+dedicated UTF-8 log. Normal completion replaces the report with `success` or
+`partial`; caught fatal errors and interrupts are recorded as `fatal` or
+`interrupted`. The next invocation also closes a prior report left in `running`
+state after an uncatchable process or machine failure.

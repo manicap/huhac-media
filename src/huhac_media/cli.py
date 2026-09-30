@@ -119,7 +119,14 @@ def main(argv: list[str] | None = None) -> int:
                     ffprobe if any(item.scanned.media_type == MediaType.VIDEO for item in plan.items) else None,
                 )
                 preview = PreviewGenerator(effective.image, ffmpeg if ffmpeg.available() else None)
-                result = IngestService(database, extractor, preview).execute(
+                tool_versions = {}
+                if plan.items:
+                    tool_versions["exiftool"] = exiftool.version()
+                if any(item.scanned.media_type == MediaType.VIDEO for item in plan.items):
+                    tool_versions["ffprobe"] = ffprobe.version()
+                if ffmpeg.available():
+                    tool_versions["ffmpeg"] = ffmpeg.version()
+                result = IngestService(database, extractor, preview, tool_versions).execute(
                     input_path, work_path, plan, effective
                 )
         except KeyboardInterrupt:

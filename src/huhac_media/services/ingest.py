@@ -9,6 +9,7 @@ from huhac_media.domain.errors import MediaError
 from huhac_media.domain.models import IngestPlan
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PREVIEW_PROCESSOR_VERSION, PreviewGenerator, preview_fingerprint, preview_path
+from huhac_media.services.reporting import RunReporter, mark_report_interrupted
 from huhac_media.storage.catalog import CatalogStore
 from huhac_media.storage.database import Database
 from huhac_media.storage.sidecars import asset_path, export_asset, export_sources, write_raw_sidecars
@@ -33,49 +34,84 @@ class IngestService:
         database: Database,
         metadata: MetadataExtractor,
         preview: PreviewGenerator,
+        tool_versions: dict[str, str] | None = None,
     ):
         self.database = database
         self.store = CatalogStore(database)
         self.metadata = metadata
         self.preview = preview
+        self.tool_versions = tool_versions or {}
 
     def execute(self, input_path: Path, work_path: Path, plan: IngestPlan, config: AppConfig) -> IngestResult:
-        self.store.recover_interrupted()
+        for interrupted_id in self.store.recover_interrupted():
+            mark_report_interrupted(work_path, interrupted_id)
         run_id = self.store.start_run(input_path, work_path, config_as_dict(config))
-        self.store.record_discovery(
-            run_id, plan, changed_source_policy=config.changed_source_policy, scan_complete=True
+        reporter = RunReporter(
+            work_path, run_id, input_path, plan, config, self.tool_versions
         )
-        export_sources(
-            self.database,
-            work_path,
-            {item.scanned.relative_path.as_posix() for item in plan.items},
-        )
-        eligible: dict[str, object] = {}
-        for item in plan.items:
-            if item.kind == PlanKind.CHANGED and config.changed_source_policy == "error":
-                continue
-            assert item.scanned.asset_id is not None
-            eligible.setdefault(item.scanned.asset_id, item.scanned)
+        reporter.logger.info("Run started input=%s work=%s", input_path, work_path)
+        try:
+            self.store.record_discovery(
+                run_id, plan, changed_source_policy=config.changed_source_policy, scan_complete=True
+            )
+            for item in plan.unsupported:
+                if item.error_code:
+                    self.store.record_error(
+                        run_id,
+                        "scan",
+                        item.error_code,
+                        item.error_message or item.error_code,
+                        relative_path=item.relative_path.as_posix(),
+                    )
+            export_sources(
+                self.database,
+                work_path,
+                {item.scanned.relative_path.as_posix() for item in plan.items},
+            )
+            eligible: dict[str, object] = {}
+            for item in plan.items:
+                if item.kind == PlanKind.CHANGED and config.changed_source_policy == "error":
+                    continue
+                assert item.scanned.asset_id is not None
+                eligible.setdefault(item.scanned.asset_id, item.scanned)
 
-        processed = skipped = 0
-        for scanned in eligible.values():
-            ran = self._metadata(run_id, work_path, scanned)
-            if scanned.media_type == MediaType.IMAGE:
-                ran = self._preview(run_id, work_path, scanned, config) or ran
-            if ran:
-                processed += 1
-            else:
-                skipped += 1
-            export_asset(self.database, work_path, scanned.asset_id)
+            processed = skipped = 0
+            for scanned in eligible.values():
+                reporter.logger.info("Processing asset=%s source=%s", scanned.asset_id, scanned.relative_path)
+                ran = self._metadata(run_id, work_path, scanned)
+                if scanned.media_type == MediaType.IMAGE:
+                    ran = self._preview(run_id, work_path, scanned, config) or ran
+                if ran:
+                    processed += 1
+                else:
+                    skipped += 1
+                export_asset(self.database, work_path, scanned.asset_id)
 
-        failed = self.store.error_count(run_id)
-        status = "partial" if failed else "success"
-        self.store.finish_run(
-            run_id,
-            status,
-            {"processed_assets": processed, "skipped_assets": skipped, "failed_stages": failed},
-        )
-        return IngestResult(run_id, status, processed, skipped, failed)
+            failed = self.store.error_count(run_id)
+            status = "partial" if failed else "success"
+            summary = {
+                "processed_assets": processed,
+                "skipped_assets": skipped,
+                "failed_stages": failed,
+            }
+            errors = self.store.errors(run_id)
+            self.store.finish_run(run_id, status, summary)
+            reporter.finish(status, summary, errors)
+            return IngestResult(run_id, status, processed, skipped, failed)
+        except KeyboardInterrupt:
+            summary = {"processed_assets": 0, "skipped_assets": 0, "failed_stages": self.store.error_count(run_id)}
+            self.store.finish_run(run_id, "interrupted", summary)
+            reporter.finish("interrupted", summary, self.store.errors(run_id))
+            raise
+        except Exception as exc:
+            self.store.record_error(run_id, "application", type(exc).__name__.upper(), str(exc))
+            summary = {"processed_assets": 0, "skipped_assets": 0, "failed_stages": self.store.error_count(run_id)}
+            self.store.finish_run(run_id, "fatal", summary)
+            reporter.finish("fatal", summary, self.store.errors(run_id))
+            reporter.logger.exception("Fatal run error")
+            raise
+        finally:
+            reporter.close()
 
     def _metadata(self, run_id: str, work: Path, scanned) -> bool:
         output = asset_path(work, scanned.sha256)

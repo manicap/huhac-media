@@ -47,5 +47,17 @@ Without `--yes`/`--non-interactive`, the CLI asks for confirmation after the
 read-only preflight and before creating or changing WORK. Existing workspaces
 are reused and successful metadata/preview stages are skipped.
 
+## Exit codes
+
+- `0`: success, no-op, or successful dry-run
+- `1`: completed with one or more media failures
+- `2`: CLI usage or configuration error
+- `3`: fatal infrastructure error
+- `4`: interactive cancellation
+- `130`: interrupted with Ctrl+C
+
+Every started ingest writes a machine-readable `runs/<timestamp>_<run-id>/report.json`,
+an effective configuration snapshot, and a detailed UTF-8 log under `logs/`.
+
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), and
 [development](docs/development.md) for project internals.

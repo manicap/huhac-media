@@ -112,9 +112,13 @@ class CatalogStore:
                 (status, _now(), json.dumps(summary or {}, sort_keys=True), run_id),
             )
 
-    def recover_interrupted(self) -> None:
+    def recover_interrupted(self) -> list[str]:
         timestamp = _now()
         with self.database.transaction() as connection:
+            run_ids = [
+                row["id"]
+                for row in connection.execute("SELECT id FROM runs WHERE status = 'running'")
+            ]
             connection.execute(
                 "UPDATE runs SET status = 'interrupted', finished_at = ? WHERE status = 'running'",
                 (timestamp,),
@@ -127,6 +131,7 @@ class CatalogStore:
                 """,
                 (timestamp,),
             )
+        return run_ids
 
     def stage_needs_run(
         self, asset_id: str, stage: str, version: str, fingerprint: str, output: Path | None
@@ -227,6 +232,59 @@ class CatalogStore:
             return connection.execute(
                 "SELECT COUNT(*) FROM errors WHERE run_id = ?", (run_id,)
             ).fetchone()[0]
+
+    def record_error(
+        self,
+        run_id: str,
+        phase: str,
+        code: str,
+        message: str,
+        *,
+        relative_path: str | None = None,
+        asset_id: str | None = None,
+        diagnostics: dict | None = None,
+    ) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                INSERT INTO errors(run_id, relative_path, asset_id, phase, code,
+                                   message, diagnostics_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    relative_path,
+                    asset_id,
+                    phase,
+                    code,
+                    message,
+                    json.dumps(diagnostics or {}, ensure_ascii=False),
+                    _now(),
+                ),
+            )
+
+    def errors(self, run_id: str) -> list[dict]:
+        with self.database.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT relative_path, asset_id, phase, code, message,
+                       diagnostics_json, created_at
+                FROM errors WHERE run_id = ? ORDER BY id
+                """,
+                (run_id,),
+            ).fetchall()
+        return [
+            {
+                "relative_path": row["relative_path"],
+                "asset_id": row["asset_id"],
+                "phase": row["phase"],
+                "code": row["code"],
+                "message": row["message"],
+                "diagnostics": json.loads(row["diagnostics_json"] or "{}"),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
 
     @staticmethod
     def _record_item(
