@@ -81,3 +81,17 @@ provenance envelope.
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), and
 [workspace contract](docs/workspace-contract.md). The
 [development guide](docs/development.md) covers project internals.
+
+## Independent consumers
+
+The repository also contains Session Grouper v1, an independent consumer of the
+public workspace contract. It does not import ingest services or read ingest
+SQLite. Run it after a contract-aware ingest with:
+
+```powershell
+session-grouper analyze --workspace 'D:\Huhac\media\_processing'
+session-grouper analyze --workspace 'D:\Huhac\media\_processing' --dry-run
+```
+
+Its temporal heuristic, output schema, confidence model, and limitations are
+documented in [Session Grouper](docs/session-grouper.md).
