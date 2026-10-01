@@ -1,9 +1,10 @@
 # Architecture
 
-The system boundary is producer/consumer. Huháč Media Ingest is a general media
-workspace producer. Vision, faces, OCR, quality, audio, indexing, and future
-domain-specific interpretation are independent consumers. Ingest neither knows
-their models nor schedules or stores their processing state.
+The system boundary is producer/consumer. Media Ingest is a general media
+workspace producer. Session Grouper v1 is the only implemented consumer in this
+checkpoint. Vision, Faces, OCR, Quality, Audio, Similarity, indexing, and
+domain-specific interpretation are future, not implemented consumers. Ingest
+neither knows their models nor schedules or stores their processing state.
 
 Within the producer, M1 is layered as CLI, application services, domain model,
 media adapters, and persistence. The flow is `scan -> plan -> confirm -> ingest
@@ -18,12 +19,16 @@ asset SHA-256 and kept outside the source tree except for the explicitly
 excluded workspace directory.
 
 ```text
-MEDIA INGEST (producer)
+MEDIA INGEST (implemented producer)
   -> workspace.json
   -> metadata/catalog.json
   -> asset metadata and previews
 
-VISION / FACES / OCR / QUALITY / AUDIO / INDEX (consumers)
+SESSION GROUPER V1 (implemented consumer)
+  <- read producer-owned contract files
+  -> write only analysis/session-grouper/
+
+VISION / FACES / OCR / QUALITY / AUDIO / SIMILARITY (future, not implemented)
   <- read producer-owned contract files
   -> write only their namespace under analysis/
 ```

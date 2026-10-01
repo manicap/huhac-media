@@ -25,11 +25,15 @@ structure are rejected rather than guessed.
 
 The normalized asset `capture` object is preserved in output, including its
 timestamp, source tag, timezone offset, and filesystem-fallback flag. V1 maps it
-to four confidence levels:
+to four confidence levels using the exact published provenance string:
 
-- `strong`: `EXIF:DateTimeOriginal`, `QuickTime:CreateDate`, or
-  `ffprobe:format.tags.creation_time`;
-- `medium`: another parseable, non-filesystem capture/create source;
+- `strong`: the exact legacy sources `EXIF:DateTimeOriginal`,
+  `QuickTime:CreateDate`, or `ffprobe:format.tags.creation_time`;
+- `medium`: any other parseable, non-filesystem capture/create source. This
+  includes current grouped ExifTool provenance such as
+  `ExifIFD:DateTimeOriginal` and `Composite:SubSecDateTimeOriginal`, and combined
+  video provenance such as
+  `ffprobe:format.tags.creation_time; timezone=Keys:AndroidTimeZone`;
 - `low`: `filesystem:mtime` or `filesystem_fallback: true`;
 - `unusable`: absent, malformed, or outside the configured 1990–2100 range.
 
@@ -67,11 +71,12 @@ The shifted operational day means midnight is not a boundary. For example,
 operational day. An over-eight-hour gap still splits media within one
 operational day, avoiding unconditional grouping of a full 24-hour window.
 
-Timestamps are compared as recorded local wall-clock values. Timezone offset is
-retained as provenance but v1 does not estimate per-device clock corrections.
-This is intentionally transparent: small camera clock differences affect order
-but device identity never forces a split. Sophisticated cross-device clock
-alignment is deferred to a later version.
+Timestamps are compared as recorded local wall-clock values. Media Ingest v1
+normalizes explicit UTC video instants into a trustworthy separately published
+local offset when available, and preserves the combined provenance. Session
+Grouper retains that offset but does not perform additional timezone conversion
+or estimate per-device clock corrections. Small camera clock differences can
+therefore affect order, but device identity never forces a split.
 
 ## CLI
 
@@ -165,6 +170,13 @@ Each session contains:
 provenance when present, and a reason such as `filesystem_fallback_disabled`,
 `missing_capture_timestamp`, `suspicious_capture_timestamp`,
 `asset_unavailable`, or `ambiguous_filesystem_fallback`.
+
+The top-level `configuration` object contains `rollover_hour`, `max_gap_hours`,
+`assign_filesystem_fallback`, `fallback_attach_minutes`, `min_year`, and
+`max_year`. The summary contains `session_count`, `assigned_asset_count`, and
+`unassigned_asset_count`. Session `start` and `end` omit a timezone by design
+because they represent the local-wall-clock basis used by the v1 algorithm;
+each asset retains its original normalized timestamp and offset provenance.
 
 Downstream consumers read this JSON without importing Session Grouper Python
 internals. A changed result schema or grouping semantics requires a new result

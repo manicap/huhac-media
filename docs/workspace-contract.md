@@ -104,6 +104,62 @@ provenance but does not change the asset ID. Changing source bytes creates or
 reactivates the corresponding different asset ID. Unsupported files never
 appear in `assets`.
 
+### Normalized asset document
+
+A non-null `metadata_location` points to a document with this public shape:
+
+```json
+{
+  "schema_version": 1,
+  "asset": {
+    "asset_id": "sha256:<64 lowercase hex characters>",
+    "sha256": "<64 lowercase hex characters>",
+    "size_bytes": 123,
+    "media_type": "image",
+    "format": "JPEG",
+    "mime_type": "image/jpeg"
+  },
+  "detected": {
+    "format": "JPEG",
+    "mime_type": "image/jpeg"
+  },
+  "capture": {
+    "datetime": "2026-09-26T21:18:02.738+02:00",
+    "source": "Composite:SubSecDateTimeOriginal",
+    "timezone_offset": "+02:00",
+    "filesystem_fallback": false
+  },
+  "technical": {},
+  "raw_metadata": {
+    "exiftool": "metadata/raw/ab/ab...exiftool.json",
+    "ffprobe": "metadata/raw/ab/ab...ffprobe.json"
+  },
+  "stages": {
+    "metadata": {
+      "processor_version": "metadata-v2",
+      "config_fingerprint": "normalized-v1",
+      "status": "success",
+      "finished_at": "ISO-8601 UTC timestamp",
+      "output": "metadata/assets/ab/ab...json",
+      "error_code": null
+    }
+  }
+}
+```
+
+`detected` may refine the scanner candidate through ExifTool. `capture` always
+contains the four shown fields; filesystem mtime is explicitly marked rather
+than disguised as camera time. `technical` is media-specific: image documents
+publish dimensions, orientation, camera/lens/exposure facts and optional GPS;
+video documents publish container, duration, dimensions, frame rate, video and
+audio codec facts, bitrate, rotation, sample rate, and channels. Missing source
+facts are null.
+
+`raw_metadata` contains only tools that produced an artifact. Those documents
+are intentionally opaque tool output; consumers should use normalized fields
+unless raw evidence is specifically required. `stages` reports the published
+producer artifact state but is not a scheduling API for consumers.
+
 ## Internal implementation detail
 
 The following are owned by ingest and are not public APIs:
@@ -122,7 +178,19 @@ in-progress run, and prevent ingest from evolving its private schema.
 
 ## Processor-owned output
 
-Each processor writes only beneath this deterministic namespace:
+Every processor writes only beneath its versioned namespace:
+
+```text
+analysis/<processor>/<processor-version>/...
+```
+
+The remainder is processor-defined and documented by that processor because
+some results describe one asset while others describe a logical set of assets.
+All processor paths must include a configuration fingerprint and an immutable
+input identity. A new processor version, model, prompt, threshold, or relevant
+option must produce a distinct path rather than overwrite an older result.
+
+An asset-scoped processor uses this deterministic convention:
 
 ```text
 analysis/<processor>/<processor-version>/<configuration-fingerprint>/
@@ -171,6 +239,19 @@ configuration fingerprint, construct the exact path, then validate the
 envelope's asset ID, processor/model provenance, fingerprint, schema version,
 and status. A different model, model version, prompt, or configuration produces
 a different fingerprint/path and therefore needs independent processing.
+
+An aggregate processor may replace the per-asset suffix with a documented
+logical-input fingerprint. Session Grouper v1, for example, writes:
+
+```text
+analysis/session-grouper/session-grouper-v1/
+  <configuration-fingerprint>/<logical-input-fingerprint>.json
+```
+
+Its logical fingerprint covers workspace identity and every public asset fact
+that affects grouping. Its aggregate output contract is documented in
+[session-grouper.md](session-grouper.md). This remains processor-owned output;
+it does not extend or mutate the Media Ingest producer contract.
 
 Ingest may create the empty top-level `analysis/` directory, but it never owns,
 deletes, interprets, or fabricates processor results. Processors must likewise
