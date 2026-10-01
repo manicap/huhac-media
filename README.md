@@ -1,7 +1,7 @@
 # huhac-media
 
 `huhac-media` is a local, Windows-oriented media workspace pipeline. The stable
-checkpoint currently contains two implemented components:
+checkpoint currently contains three implemented components:
 
 - **Media Ingest Tool v1** scans immutable originals, tracks source history,
   deduplicates content by SHA-256, extracts metadata, creates image previews,
@@ -9,9 +9,13 @@ checkpoint currently contains two implemented components:
 - **Session Grouper v1** independently consumes that public contract and groups
   available assets into probable time-continuity sessions. A session is not an
   identified event.
+- **Video Keyframe Extractor v1** independently samples available video assets,
+  removes within-video visual redundancy with OpenCLIP, and publishes
+  standardized representative JPEG frames.
 
-Vision, Faces, OCR, Similarity, Quality, Audio, event interpretation, a Media
-Collector, and orchestration are future work and are not implemented.
+Vision, Faces, OCR, cross-asset Similarity, Quality, Audio, event
+interpretation, a Media Collector, and orchestration are future work and are
+not implemented.
 
 ## Quick start
 
@@ -50,6 +54,8 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
   previews, recovery, dependencies, and limitations.
 - [Session Grouper v1](docs/session-grouper.md): timestamp confidence,
   grouping algorithm, deterministic output, CLI, and limitations.
+- [Video Keyframe Extractor v1](docs/video-keyframes.md): timestamp sampling,
+  standardized frames, OpenCLIP coverage, per-asset output, and CLI.
 - [Media workspace contract](docs/workspace-contract.md): the public JSON
   compatibility boundary and processor ownership rules.
 - [System overview](docs/system-overview.md): implemented components, future
@@ -65,7 +71,7 @@ their own `analysis/<processor>/` namespace.
 
 ## Project status
 
-Media Ingest Tool v1 and Session Grouper v1 are implemented, tested, and
-accepted on the current real workspace. Development continues from `main` as
-the stable integrated state; future processors remain out of scope for this
-checkpoint.
+Media Ingest Tool v1 and Session Grouper v1 are stable and accepted on the
+current real workspace. Video Keyframe Extractor v1 is implemented as the next
+independent processor. Development continues from `main` as the stable
+integrated state; the remaining future processors stay out of scope.
