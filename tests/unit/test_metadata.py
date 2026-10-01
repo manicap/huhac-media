@@ -1,5 +1,7 @@
 from pathlib import Path, PurePosixPath
 
+import pytest
+
 from huhac_media.domain.enums import MediaType
 from huhac_media.domain.models import ScannedFile
 from huhac_media.media.metadata import MetadataExtractor
@@ -13,9 +15,9 @@ class FakeProbe:
         return self.result
 
 
-def scanned(media_type: MediaType) -> ScannedFile:
+def scanned(media_type: MediaType, media_format: str = "X") -> ScannedFile:
     return ScannedFile(
-        Path("x"), PurePosixPath("x"), "x", 1, 0, media_type, "X", None, "a" * 64
+        Path("x"), PurePosixPath("x"), "x", 1, 0, media_type, media_format, None, "a" * 64
     )
 
 
@@ -30,6 +32,28 @@ def test_reliable_exiftool_format_is_preserved() -> None:
         FakeProbe({"File:FileType": "JPEG", "File:MIMEType": "image/jpeg"})
     ).extract(scanned(MediaType.IMAGE))
     assert result.normalized["detected"] == {"format": "JPEG", "mime_type": "image/jpeg"}
+
+
+@pytest.mark.parametrize("media_format", ["JPEG", "HEIC"])
+def test_grouped_exif_capture_is_normalized_for_image_formats(media_format: str) -> None:
+    result = MetadataExtractor(
+        FakeProbe(
+            {
+                "File:FileType": media_format,
+                "File:MIMEType": "image/heic" if media_format == "HEIC" else "image/jpeg",
+                "ExifIFD:DateTimeOriginal": "2026:09:26 21:18:02",
+                "ExifIFD:OffsetTimeOriginal": "+02:00",
+                "ExifIFD:SubSecTimeOriginal": 738,
+            }
+        )
+    ).extract(scanned(MediaType.IMAGE, media_format))
+
+    assert result.normalized["capture"] == {
+        "datetime": "2026-09-26T21:18:02.738+02:00",
+        "source": "ExifIFD:DateTimeOriginal",
+        "timezone_offset": "+02:00",
+        "filesystem_fallback": False,
+    }
 
 
 def test_video_streams_are_normalized() -> None:

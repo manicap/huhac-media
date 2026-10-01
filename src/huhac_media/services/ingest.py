@@ -17,7 +17,7 @@ from huhac_media.storage.database import Database
 from huhac_media.storage.sidecars import asset_path, export_asset, export_sources, write_raw_sidecars
 
 
-METADATA_VERSION = "metadata-v1"
+METADATA_VERSION = "metadata-v2"
 METADATA_FINGERPRINT = "normalized-v1"
 
 
