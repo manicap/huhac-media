@@ -11,7 +11,7 @@ from huhac_media.domain.models import IngestPlan, MetadataResult
 from huhac_media.exit_codes import ExitCode
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PREVIEW_PROCESSOR_VERSION, PreviewGenerator, preview_fingerprint, preview_path
-from huhac_media.services.ingest import IngestService
+from huhac_media.services.ingest import IngestService, METADATA_VERSION
 from huhac_media.services.planner import CatalogSnapshot, Planner
 from huhac_media.services.preflight import render_preflight
 from huhac_media.services.scanner import Scanner
@@ -125,6 +125,45 @@ def test_ingest_writes_sidecars_preview_and_reuses_success(tmp_path: Path) -> No
     assert list((work / "logs").glob("*.log"))
     with database.transaction() as connection:
         assert connection.execute("SELECT COUNT(*) FROM workspace").fetchone()[0] == 1
+
+
+def test_metadata_version_change_reruns_only_metadata_stage(tmp_path: Path) -> None:
+    input_path = tmp_path / "input"
+    input_path.mkdir()
+    Image.new("RGB", (32, 16), "green").save(input_path / "photo.jpg")
+    work = input_path / "_processing"
+    initialize_workspace(work)
+    database = Database(work / "state" / "catalog.sqlite3")
+
+    execute(input_path, work, database)
+    preview = next((work / "previews").rglob("*.jpg"))
+    preview_time = preview.stat().st_mtime_ns
+    with database.transaction() as connection:
+        connection.execute(
+            "UPDATE asset_stages SET processor_version = 'metadata-v1' WHERE stage = 'metadata'"
+        )
+
+    result = execute(input_path, work, database)
+
+    with database.transaction() as connection:
+        metadata = dict(
+            connection.execute(
+                "SELECT stage, processor_version, attempts FROM asset_stages "
+                "WHERE stage = 'metadata' AND processor_version = ?",
+                (METADATA_VERSION,),
+            ).fetchone()
+        )
+        preview_attempts = connection.execute(
+            "SELECT attempts FROM asset_stages WHERE stage = 'preview'"
+        ).fetchone()[0]
+    assert result.processed_assets == 1
+    assert metadata == {
+        "stage": "metadata",
+        "processor_version": METADATA_VERSION,
+        "attempts": 1,
+    }
+    assert preview_attempts == 1
+    assert preview.stat().st_mtime_ns == preview_time
 
 
 def test_preview_failure_does_not_discard_metadata_or_stop_batch(tmp_path: Path) -> None:
