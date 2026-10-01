@@ -1,7 +1,8 @@
 # Media pipeline system overview
 
-The implemented system currently has two components: Media Ingest Tool v1 and
-Session Grouper v1. Everything else in this overview is explicitly future work.
+The implemented system currently has three components: Media Ingest Tool v1,
+Session Grouper v1, and Video Keyframe Extractor v1. Everything else in this
+overview is explicitly future work.
 
 ```text
 MEDIA SOURCES
@@ -20,6 +21,9 @@ Standardized media workspace -- IMPLEMENTED
     |
     +--> Session Grouper v1 -- IMPLEMENTED
     |      time-continuity grouping; session is not an event
+    |
+    +--> Video Keyframe Extractor v1 -- IMPLEMENTED
+    |      regular sampling -> OpenCLIP coverage -> representative JPEGs
     |
     +--> FUTURE independent processors -- NOT IMPLEMENTED
            Similarity | Vision | Faces | OCR | Quality | Audio
@@ -41,6 +45,11 @@ between components.
 Session Grouper is an independent consumer. It reads only the public JSON
 contract and writes only beneath `analysis/session-grouper/`. It groups media by
 time continuity but does not infer real-world events.
+
+Video Keyframe Extractor is another independent consumer. It resolves active
+video sources through public provenance, reads originals without modification,
+and writes only beneath `analysis/video-keyframes/`. It supplies factual image
+representations, not semantic interpretation.
 
 Each future processor is expected to read public artifacts and own a versioned
 namespace under `analysis/<processor>/`. A model, configuration, or processor
