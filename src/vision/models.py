@@ -8,6 +8,7 @@ from typing import Any, Literal
 @dataclass(frozen=True)
 class VisionConfig:
     model: str = "minicpm-v4.6:latest"
+    think: bool = False
     temperature: float = 0.0
     num_ctx: int = 8192
     num_predict: int = 1024
@@ -19,6 +20,8 @@ class VisionConfig:
     def validate(self) -> None:
         if not self.model.strip():
             raise ValueError("model must not be empty")
+        if not isinstance(self.think, bool):
+            raise ValueError("think must be a boolean")
         if self.temperature < 0:
             raise ValueError("temperature must be non-negative")
         if self.num_ctx < 1:

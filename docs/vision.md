@@ -28,6 +28,11 @@ that Ollama and the requested model are available before pending inference and
 never downloads a model automatically. The endpoint is an execution location,
 not part of the semantic configuration fingerprint.
 
+Vision v1 explicitly sends `think: false`. This setting is stored in the
+configuration and fingerprinted because thinking can change or consume the
+generated response. `keep_alive` remains unset, so Ollama server lifecycle
+configuration applies.
+
 The versioned neutral prompt requests only objective visual evidence. It
 prohibits identification of people, venue, band, event, or inferred location;
 reading, transcribing, quoting, interpreting, or using visible text, letters,
@@ -107,10 +112,10 @@ semantic input and is therefore not part of the configuration fingerprint.
 
 The Vision fingerprint is canonical SHA-256 over processor and prompt recipes,
 result schema version, model name, generation parameters (`temperature`,
-`num_ctx`, `num_predict`), and `max_repair_attempts`. A result is reused only
-when the complete success envelope, exact input provenance, configuration, and
-canonical schema validate. Failed, malformed, or incomplete results are
-retried. Reuse does not contact Ollama.
+`num_ctx`, `num_predict`, and `think`), and `max_repair_attempts`. A result is
+reused only when the complete success envelope, exact input provenance,
+configuration, and canonical schema validate. Failed, malformed, or incomplete
+results are retried. Reuse does not contact Ollama.
 
 ## CLI
 

@@ -31,6 +31,13 @@ def test_prompt_recipe_v2_changes_fingerprint_from_v1():
     assert configuration_fingerprint(current) != configuration_fingerprint(previous)
 
 
+def test_think_setting_changes_configuration_fingerprint():
+    assert VisionConfig().think is False
+    assert configuration_fingerprint(VisionConfig()) != configuration_fingerprint(
+        VisionConfig(think=True)
+    )
+
+
 def test_result_layout_distinguishes_image_and_upstream_keyframe(workspace_factory):
     prepared = prepare_workspace(workspace_factory(), VisionConfig())
     image = next(plan for plan in prepared.plans if plan.visual_input.kind == "image_preview")

@@ -86,6 +86,7 @@ class OllamaClient:
                 "model": self.config.model,
                 "messages": [{"role": "user", "content": prompt, "images": [image]}],
                 "stream": False,
+                "think": self.config.think,
                 "format": VISION_JSON_SCHEMA,
                 "options": {
                     "temperature": self.config.temperature,
@@ -94,8 +95,58 @@ class OllamaClient:
                 },
             },
         )
+        diagnostics = _response_diagnostics(response)
+        if "error" in response:
+            raise OllamaError(
+                "OLLAMA_RESPONSE_ERROR",
+                "Ollama returned an error in an HTTP 200 response",
+                diagnostics,
+            )
+        if response.get("done") is not True:
+            raise OllamaError(
+                "OLLAMA_INCOMPLETE_RESPONSE",
+                "Ollama response did not complete",
+                diagnostics,
+            )
+        done_reason = response.get("done_reason")
+        if done_reason is not None and not isinstance(done_reason, str):
+            raise OllamaError(
+                "OLLAMA_INVALID_RESPONSE",
+                "Ollama response has an invalid done_reason",
+                diagnostics,
+            )
         message = response.get("message")
         content = message.get("content") if isinstance(message, dict) else None
         if not isinstance(content, str) or not content.strip():
-            raise OllamaError("OLLAMA_INVALID_RESPONSE", "Ollama response has no message content")
+            raise OllamaError(
+                "OLLAMA_INVALID_RESPONSE",
+                "Ollama response has no message content",
+                diagnostics,
+            )
         return content
+
+
+def _response_diagnostics(response: dict[str, Any]) -> dict[str, Any]:
+    diagnostics: dict[str, Any] = {}
+    done = response.get("done")
+    if isinstance(done, bool):
+        diagnostics["done"] = done
+    done_reason = response.get("done_reason")
+    if isinstance(done_reason, str):
+        diagnostics["done_reason"] = done_reason
+    message = response.get("message")
+    thinking = message.get("thinking") if isinstance(message, dict) else None
+    if isinstance(thinking, str):
+        diagnostics["thinking_length"] = len(thinking)
+    for source, target in (
+        ("total_duration", "total_duration_ns"),
+        ("load_duration", "load_duration_ns"),
+        ("prompt_eval_duration", "prompt_eval_duration_ns"),
+        ("eval_duration", "eval_duration_ns"),
+        ("prompt_eval_count", "prompt_eval_count"),
+        ("eval_count", "eval_count"),
+    ):
+        value = response.get(source)
+        if not isinstance(value, bool) and isinstance(value, int) and value >= 0:
+            diagnostics[target] = value
+    return diagnostics
