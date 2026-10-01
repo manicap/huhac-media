@@ -1,8 +1,8 @@
 # Media pipeline system overview
 
-The implemented system currently has three components: Media Ingest Tool v1,
-Session Grouper v1, and Video Keyframe Extractor v1. Everything else in this
-overview is explicitly future work.
+The implemented system currently has four components: Media Ingest Tool v1,
+Session Grouper v1, Video Keyframe Extractor v1, and Vision Processor v1.
+Everything else in this overview is explicitly future work.
 
 ```text
 MEDIA SOURCES
@@ -25,8 +25,11 @@ Standardized media workspace -- IMPLEMENTED
     +--> Video Keyframe Extractor v1 -- IMPLEMENTED
     |      regular sampling -> OpenCLIP coverage -> representative JPEGs
     |
+    +--> Vision Processor v1 -- IMPLEMENTED
+    |      image previews + video keyframes -> validated visual facts
+    |
     +--> FUTURE independent processors -- NOT IMPLEMENTED
-           Similarity | Vision | Faces | OCR | Quality | Audio
+           Similarity | Faces | OCR | Quality | Audio | Normalizer
               |
               v
            FUTURE Knowledge layer -- NOT IMPLEMENTED
@@ -50,6 +53,12 @@ Video Keyframe Extractor is another independent consumer. It resolves active
 video sources through public provenance, reads originals without modification,
 and writes only beneath `analysis/video-keyframes/`. It supplies factual image
 representations, not semantic interpretation.
+
+Vision Processor is an independent consumer of public image previews and
+completed Video Keyframe v1 artifacts. It writes one auditable, validated
+result per visual input beneath `analysis/vision/`. It does not read originals
+for image analysis, decode video, or normalize descriptive values into an
+ontology.
 
 Each future processor is expected to read public artifacts and own a versioned
 namespace under `analysis/<processor>/`. A model, configuration, or processor

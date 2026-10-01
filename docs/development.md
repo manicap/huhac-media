@@ -23,6 +23,7 @@ pytest -m integration
 pytest -m external
 pytest tests/session_grouper
 pytest tests/video_keyframes
+pytest tests/vision
 ```
 
 The default suite excludes integration and external tests. Run the nearest unit
@@ -42,6 +43,11 @@ Production code must not import `huhac_media`, read ingest SQLite, or write
 outside `analysis/video-keyframes/`. Unit and integration tests use fake
 ffprobe, FFmpeg, and embedding adapters; external tests must not download the
 OpenCLIP model.
+
+Vision Processor is a separate package under `src/vision`. Production code
+reads only public image previews and completed Video Keyframe v1 results and
+writes only below `analysis/vision/`. Tests use fake Ollama responses and must
+not download a vision model or contact Ollama in the normal FAST suite.
 
 Before each logical commit, run the nearest tests, the relevant wider suite,
 `git diff`, `git diff --cached`, and `git status`. Commit only source,

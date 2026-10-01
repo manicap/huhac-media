@@ -1,7 +1,7 @@
 # huhac-media
 
 `huhac-media` is a local, Windows-oriented media workspace pipeline. The stable
-checkpoint currently contains three implemented components:
+checkpoint currently contains four implemented components:
 
 - **Media Ingest Tool v1** scans immutable originals, tracks source history,
   deduplicates content by SHA-256, extracts metadata, creates image previews,
@@ -12,10 +12,13 @@ checkpoint currently contains three implemented components:
 - **Video Keyframe Extractor v1** independently samples available video assets,
   removes within-video visual redundancy with OpenCLIP, and publishes
   standardized representative JPEG frames.
+- **Vision Processor v1** analyzes public image previews and persistent video
+  keyframes through a configurable Ollama vision model, preserving raw model
+  output and a strictly validated canonical result.
 
-Vision, Faces, OCR, cross-asset Similarity, Quality, Audio, event
-interpretation, a Media Collector, and orchestration are future work and are
-not implemented.
+The semantic Normalizer, Faces, OCR, cross-asset Similarity, Quality, Audio,
+event interpretation, a Media Collector, and orchestration are future work and
+are not implemented.
 
 ## Quick start
 
@@ -56,6 +59,8 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
   grouping algorithm, deterministic output, CLI, and limitations.
 - [Video Keyframe Extractor v1](docs/video-keyframes.md): timestamp sampling,
   standardized frames, OpenCLIP coverage, per-asset output, and CLI.
+- [Vision Processor v1](docs/vision.md): preview/keyframe inputs, Ollama,
+  canonical schema, repair, provenance, and reuse.
 - [Media workspace contract](docs/workspace-contract.md): the public JSON
   compatibility boundary and processor ownership rules.
 - [System overview](docs/system-overview.md): implemented components, future
@@ -71,7 +76,7 @@ their own `analysis/<processor>/` namespace.
 
 ## Project status
 
-Media Ingest Tool v1 and Session Grouper v1 are stable and accepted on the
-current real workspace. Video Keyframe Extractor v1 is implemented as the next
-independent processor. Development continues from `main` as the stable
-integrated state; the remaining future processors stay out of scope.
+Media Ingest Tool v1, Session Grouper v1, and Video Keyframe Extractor v1 are
+stable and accepted on the current real workspace. Vision Processor v1 is
+implemented as the next independent processor. The remaining future
+processors stay out of scope.

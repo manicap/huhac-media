@@ -1,11 +1,11 @@
 # Architecture
 
 The system boundary is producer/consumer. Media Ingest is a general media
-workspace producer. Session Grouper v1 and Video Keyframe Extractor v1 are the
-implemented consumers in this checkpoint. Vision, Faces, OCR, Quality, Audio,
-cross-asset Similarity, indexing, and domain-specific interpretation are future,
-not implemented consumers. Ingest neither knows their models nor schedules or
-stores their processing state.
+workspace producer. Session Grouper v1, Video Keyframe Extractor v1, and Vision
+Processor v1 are the implemented consumers in this checkpoint. Faces, OCR,
+Quality, Audio, cross-asset Similarity, semantic normalization, indexing, and
+domain-specific interpretation are future, not implemented consumers. Ingest
+neither knows their models nor schedules or stores their processing state.
 
 Within the producer, M1 is layered as CLI, application services, domain model,
 media adapters, and persistence. The flow is `scan -> plan -> confirm -> ingest
@@ -33,7 +33,11 @@ VIDEO KEYFRAME EXTRACTOR V1 (implemented consumer)
   <- read public contract plus active original video read-only
   -> write only analysis/video-keyframes/
 
-VISION / FACES / OCR / QUALITY / AUDIO / SIMILARITY (future, not implemented)
+VISION PROCESSOR V1 (implemented consumer)
+  <- read public image previews and completed Video Keyframe v1 results
+  -> write only analysis/vision/
+
+FACES / OCR / QUALITY / AUDIO / SIMILARITY / NORMALIZER (future, not implemented)
   <- read producer-owned contract files
   -> write only their namespace under analysis/
 ```

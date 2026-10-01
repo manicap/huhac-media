@@ -18,6 +18,7 @@ video-keyframes = ["numpy", "open_clip_torch", "torch"]
 huhac-media = "huhac_media.cli:main"
 session-grouper = "session_grouper.cli:main"
 video-keyframes = "video_keyframes.cli:main"
+vision = "vision.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
