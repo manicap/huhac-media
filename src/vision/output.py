@@ -71,6 +71,29 @@ def _valid_attempts(value: object) -> bool:
     return value[0]["kind"] == "initial"
 
 
+def _valid_timing(value: object) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "total_seconds",
+        "model_seconds",
+        "attempts",
+    }:
+        return False
+    total = value["total_seconds"]
+    model = value["model_seconds"]
+    attempts = value["attempts"]
+    return (
+        not isinstance(total, bool)
+        and isinstance(total, (int, float))
+        and total >= 0
+        and not isinstance(model, bool)
+        and isinstance(model, (int, float))
+        and 0 <= model <= total
+        and not isinstance(attempts, bool)
+        and isinstance(attempts, int)
+        and attempts >= 1
+    )
+
+
 def read_reusable_result(
     workspace: WorkspaceInput,
     target: Path,
@@ -99,6 +122,7 @@ def read_reusable_result(
         and payload.get("configuration_fingerprint") == fingerprint
         and payload.get("input_kind") == visual_input.kind
         and payload.get("input") == visual_input.provenance
+        and _valid_timing(payload.get("timing"))
         and payload.get("status") == "success"
         and isinstance(result, dict)
         and _valid_attempts(result.get("attempts"))
@@ -140,6 +164,7 @@ def _envelope(
     status: str,
     error: dict[str, Any] | None,
     result: dict[str, Any] | None,
+    timing: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "result_schema_version": RESULT_SCHEMA_VERSION,
@@ -154,6 +179,7 @@ def _envelope(
         "input_kind": visual_input.kind,
         "input": visual_input.provenance,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "timing": timing,
         "status": status,
         "error": error,
         "result": result,
@@ -167,6 +193,7 @@ def success_payload(
     visual_input: VisualInput,
     attempts: list[dict[str, Any]],
     canonical: dict[str, Any],
+    timing: dict[str, Any],
 ) -> dict[str, Any]:
     return _envelope(
         workspace,
@@ -176,6 +203,7 @@ def success_payload(
         "success",
         None,
         {"attempts": attempts, "vision": canonical},
+        timing,
     )
 
 
@@ -187,6 +215,7 @@ def failure_payload(
     code: str,
     message: str,
     attempts: list[dict[str, Any]],
+    timing: dict[str, Any],
     diagnostics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     partial = {"attempts": attempts, "vision": None}
@@ -198,4 +227,5 @@ def failure_payload(
         "failed",
         {"code": code, "message": message, "diagnostics": diagnostics or {}},
         partial,
+        timing,
     )

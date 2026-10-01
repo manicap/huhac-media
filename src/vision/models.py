@@ -12,7 +12,7 @@ class VisionConfig:
     num_ctx: int = 8192
     num_predict: int = 1024
     max_repair_attempts: int = 1
-    prompt_recipe: str = "objective-visual-description-v1"
+    prompt_recipe: str = "objective-visual-description-v2"
     processor_recipe: str = "vision-analysis-v1"
     result_schema_version: int = 1
 

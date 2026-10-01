@@ -24,6 +24,13 @@ def test_configuration_fingerprint_covers_semantic_recipe():
     assert base != configuration_fingerprint(VisionConfig(prompt_recipe="objective-v2"))
 
 
+def test_prompt_recipe_v2_changes_fingerprint_from_v1():
+    current = VisionConfig()
+    previous = VisionConfig(prompt_recipe="objective-visual-description-v1")
+    assert current.prompt_recipe == "objective-visual-description-v2"
+    assert configuration_fingerprint(current) != configuration_fingerprint(previous)
+
+
 def test_result_layout_distinguishes_image_and_upstream_keyframe(workspace_factory):
     prepared = prepare_workspace(workspace_factory(), VisionConfig())
     image = next(plan for plan in prepared.plans if plan.visual_input.kind == "image_preview")
@@ -51,6 +58,7 @@ def test_only_complete_valid_success_result_is_reused(workspace_factory):
         plan.visual_input,
         [{"attempt": 0, "kind": "initial", "raw_model_response": "{}", "validation_errors": []}],
         canonical_result(),
+        {"total_seconds": 1.0, "model_seconds": 0.9, "attempts": 1},
     )
     write_json_atomic(plan.output_path, payload)
     assert read_reusable_result(
@@ -90,6 +98,7 @@ def test_success_with_incomplete_attempt_audit_is_not_reused(workspace_factory):
         plan.visual_input,
         [{"attempt": 0, "kind": "initial", "raw_model_response": "{}", "validation_errors": []}],
         canonical_result(),
+        {"total_seconds": 1.0, "model_seconds": 0.9, "attempts": 1},
     )
     payload["result"]["attempts"] = [{"attempt": 0}]
     write_json_atomic(plan.output_path, payload)

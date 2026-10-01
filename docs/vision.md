@@ -30,9 +30,13 @@ not part of the semantic configuration fingerprint.
 
 The versioned neutral prompt requests only objective visual evidence. It
 prohibits identification of people, venue, band, event, or inferred location;
-text transcription or guessing; quality assessment; and social-media scoring.
-It may record that text, a sign, logo, poster, or chalkboard exists without
-claiming what it says.
+reading, transcribing, quoting, interpreting, or using visible text, letters,
+numbers, brands, logos, signs, labels, screens, or printed material as evidence;
+quality assessment; and social-media scoring. It may record that such a visual
+element exists without claiming its content or inferred meaning. Activities
+must be visibly performed and are not inferred from objects, equipment,
+furniture, or a place's apparent purpose. This stricter behavior is versioned
+as prompt recipe `objective-visual-description-v2`.
 
 ## Canonical result
 
@@ -85,6 +89,22 @@ input provenance, creation time, status/error, all raw attempts, and the
 canonical result when successful. Video input provenance retains upstream
 processor/fingerprint, keyframe ID, location, and timestamp.
 
+Every newly attempted input also records operational timing outside the
+canonical Vision result:
+
+```json
+{
+  "timing": {
+    "total_seconds": 4.18,
+    "model_seconds": 3.96,
+    "attempts": 1
+  }
+}
+```
+
+`model_seconds` includes all initial and repair model requests. Timing is not a
+semantic input and is therefore not part of the configuration fingerprint.
+
 The Vision fingerprint is canonical SHA-256 over processor and prompt recipes,
 result schema version, model name, generation parameters (`temperature`,
 `num_ctx`, `num_predict`), and `max_repair_attempts`. A result is reused only
@@ -98,12 +118,24 @@ retried. Reuse does not contact Ollama.
 vision analyze --workspace 'D:\Media\_processing' --dry-run
 vision analyze --workspace 'D:\Media\_processing' --dry-run --json
 vision analyze --workspace 'D:\Media\_processing'
+vision analyze --workspace 'D:\Media\_processing' --force
 ```
 
 Useful options include `--model`, `--endpoint`, `--temperature`, `--num-ctx`,
 `--num-predict`, `--max-repair-attempts`, and `--keyframe-fingerprint`.
 Dry-run only reads contracts and existing results: it neither contacts Ollama
 nor writes analysis artifacts.
+
+Human-readable actual runs print one progress line for each input sent to the
+model and finish with total/model/average/minimum/maximum timing. JSON mode
+keeps stdout as one machine-readable JSON document and exposes the same run
+timing summary under `timing`.
+
+`--force` bypasses reuse only for results belonging to the current Vision
+configuration fingerprint and atomically replaces those exact per-input JSON
+files. It does not delete another fingerprint, upstream keyframes, ingest data,
+or source media. With `--dry-run --force`, reusable inputs are reported as
+`would_process` without model calls or writes.
 
 ## Out of scope
 

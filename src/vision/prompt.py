@@ -10,9 +10,23 @@ Return exactly one JSON object matching the supplied schema.
 
 Be objective and conservative. When uncertain, use a more general description
 instead of guessing. Do not identify people, a venue, a band, or an event. Do
-not infer a location. Do not transcribe or guess visible text. You may record
-the existence of a poster, sign, text, logo, or chalkboard without claiming
-what it says. Do not assess image quality, social-media suitability, or any
+not infer a location.
+
+Do not read, transcribe, quote, interpret, or use visible text, letters,
+numbers, brand names, logos, signs, posters, labels, screens, or printed
+material as a source of information.
+
+You may only state that text, signage, a poster, logo, label, screen, or similar
+visual element is present. Do not include the contents or inferred meaning of
+visible text in any field, including scene, activities, objects, environment,
+visual_attributes, tags, or description.
+
+Activities must describe actions visibly being performed. Do not infer an
+activity merely from objects, equipment, furniture, or the apparent purpose of
+a place.
+
+When uncertain, use a more general visually supported description rather than
+guessing. Do not assess image quality, social-media suitability, or any
 domain-specific value. Use ordinary descriptive phrases; do not invent a
 controlled vocabulary or ontology."""
 

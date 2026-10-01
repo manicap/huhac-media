@@ -33,7 +33,21 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--num-predict", type=int, default=1024)
     analyze.add_argument("--max-repair-attempts", type=int, default=1)
     analyze.add_argument("--keyframe-fingerprint")
+    analyze.add_argument("--force", action="store_true")
     return parser
+
+
+def _timing_summary(result) -> dict:
+    totals = [timing.total_seconds for timing in result.timings]
+    return {
+        "total_seconds": round(sum(totals), 6),
+        "model_seconds": round(sum(timing.model_seconds for timing in result.timings), 6),
+        "attempts": sum(timing.attempts for timing in result.timings),
+        "timed_input_count": len(totals),
+        "average_processed_seconds": round(sum(totals) / len(totals), 6) if totals else None,
+        "min_processed_seconds": min(totals) if totals else None,
+        "max_processed_seconds": max(totals) if totals else None,
+    }
 
 
 def _report(result) -> dict:
@@ -60,6 +74,7 @@ def _report(result) -> dict:
     return {
         "workspace": str(result.prepared.workspace.workspace),
         "configuration_fingerprint": result.prepared.configuration_fingerprint,
+        "force": result.prepared.force,
         "visual_input_count": len(plans),
         "image_preview_count": sum(plan["input_kind"] == "image_preview" for plan in plans),
         "video_keyframe_count": sum(plan["input_kind"] == "video_keyframe" for plan in plans),
@@ -70,6 +85,7 @@ def _report(result) -> dict:
         "failed": result.failed,
         "skipped": result.skipped,
         "dry_run": result.dry_run,
+        "timing": _timing_summary(result),
         "inputs": plans,
         "issues": issues,
     }
@@ -86,6 +102,17 @@ def _print_report(report: dict) -> None:
     print(f"Reused:          {report['reused']}")
     print(f"Failed:          {report['failed']}")
     print(f"Skipped:         {report['skipped']}")
+    if not report["dry_run"]:
+        timing = report["timing"]
+        average = timing["average_processed_seconds"]
+        minimum = timing["min_processed_seconds"]
+        maximum = timing["max_processed_seconds"]
+        print("Timing:")
+        print(f"  Total:          {timing['total_seconds']:.2f} s")
+        print(f"  Model:          {timing['model_seconds']:.2f} s")
+        print(f"  Avg processed:  {average:.2f} s" if average is not None else "  Avg processed:  n/a")
+        print(f"  Min:            {minimum:.2f} s" if minimum is not None else "  Min:            n/a")
+        print(f"  Max:            {maximum:.2f} s" if maximum is not None else "  Max:            n/a")
     for issue in report["issues"]:
         print(f"  {issue['code']:<28} {issue['asset_id']} {issue['message']}")
 
@@ -104,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
             args.workspace,
             config,
             keyframe_fingerprint=args.keyframe_fingerprint,
+            force=args.force,
         )
         client = OllamaClient(args.endpoint, config)
     except (ContractError, OSError, ValueError) as exc:
@@ -121,7 +149,10 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Fatal error [{exc.code}]: {exc}")
                 return FATAL
         try:
-            result = execute_prepared(prepared, dry_run=False, model=client)
+            progress = None if args.json_output else _print_progress
+            result = execute_prepared(
+                prepared, dry_run=False, model=client, progress=progress
+            )
         except KeyboardInterrupt:
             print("Interrupted.")
             return INTERRUPTED
@@ -137,3 +168,13 @@ def main(argv: list[str] | None = None) -> int:
     if result.dry_run:
         return SUCCESS
     return PARTIAL if result.failed or result.skipped else SUCCESS
+
+
+def _print_progress(index, total, plan, outcome, timing) -> None:
+    visual_input = plan.visual_input
+    identity = f"{visual_input.sha256[:12]}/{visual_input.input_id}"
+    suffix = "" if outcome == "processed" else f" {outcome}"
+    print(
+        f"[{index}/{total}] {visual_input.kind} {identity}{suffix} ... "
+        f"{timing.total_seconds:.1f} s"
+    )
