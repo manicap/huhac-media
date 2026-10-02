@@ -142,6 +142,41 @@ files. It does not delete another fingerprint, upstream keyframes, ingest data,
 or source media. With `--dry-run --force`, reusable inputs are reported as
 `would_process` without model calls or writes.
 
+## Real acceptance checkpoint
+
+The default Ollama backend `minicpm-v4.6:latest` completed the accepted Vision
+v1 run over 17 real visual inputs: 12 Media Ingest image previews and 5
+Video Keyframe v1 JPEGs. All 17 inputs succeeded on the initial model attempt;
+there were no failures and no repair attempts.
+
+The complete run took 102.10 seconds, averaging 6.01 seconds per input, with a
+5.12-second minimum and 15.33-second maximum. The maximum includes the first
+cold-start input. After that initial load, individual inputs completed in
+approximately 5.1 to 6.1 seconds. Explicit `think: false` removed a
+reproducible empty-content failure on one text-dominant image and materially
+improved inference stability and latency for this backend.
+
+## Default-backend limitations
+
+The following observations are primarily limitations of the current
+`minicpm-v4.6:latest` model backend, not violations of the public workspace or
+Vision result contracts:
+
+- The model can use the content of visible text despite the prompt's explicit
+  prohibition (OCR leakage), especially on text-dominant images.
+- It can describe a state or apparent scene purpose as an activity even when no
+  action is visibly being performed, including results where
+  `people.approx_count == 0`.
+- `people.crowd` is not semantically consistent in every result.
+- Descriptions and tags can occasionally be too general or contain mildly
+  inferred semantic terms.
+
+Vision v1 intentionally does not perform OCR, person identification, Quality,
+or semantic normalization. Future specialized processors and the planned
+Normalizer may reconcile or replace these semantic observations. The
+processor-owned input/output contract keeps the Vision backend replaceable
+without changing the public Media Ingest workspace contract.
+
 ## Out of scope
 
 Vision v1 does not implement a Normalizer, ontology, Faces, recognition, OCR,
