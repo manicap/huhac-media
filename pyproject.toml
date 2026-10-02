@@ -13,12 +13,14 @@ dependencies = ["Pillow>=11"]
 [project.optional-dependencies]
 dev = ["pytest>=8", "numpy"]
 video-keyframes = ["numpy", "open_clip_torch", "torch"]
+faces = ["numpy", "opencv-python>=4.8", "openvino>=2024"]
 
 [project.scripts]
 huhac-media = "huhac_media.cli:main"
 session-grouper = "session_grouper.cli:main"
 video-keyframes = "video_keyframes.cli:main"
 vision = "vision.cli:main"
+faces = "faces.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
