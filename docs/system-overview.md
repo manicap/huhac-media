@@ -1,7 +1,8 @@
 # Media pipeline system overview
 
-The implemented system currently has four components: Media Ingest Tool v1,
-Session Grouper v1, Video Keyframe Extractor v1, and Vision Processor v1.
+The implemented system currently has five components: Media Ingest Tool v1,
+Session Grouper v1, Video Keyframe Extractor v1, Vision Processor v1, and
+Faces Processor v1.
 Everything else in this overview is explicitly future work.
 
 ```text
@@ -28,8 +29,11 @@ Standardized media workspace -- IMPLEMENTED
     +--> Vision Processor v1 -- IMPLEMENTED
     |      image previews + video keyframes -> validated visual facts
     |
+    +--> Faces Processor v1 -- IMPLEMENTED
+    |      face detection + embeddings -> anonymous complete-link clusters
+    |
     +--> FUTURE independent processors -- NOT IMPLEMENTED
-           Similarity | Faces | OCR | Quality | Audio | Normalizer
+           Similarity | OCR | Quality | Audio | Normalizer
               |
               v
            FUTURE Knowledge layer -- NOT IMPLEMENTED
@@ -59,6 +63,11 @@ completed Video Keyframe v1 artifacts. It writes one auditable, validated
 result per visual input beneath `analysis/vision/`. It does not read originals
 for image analysis, decode video, or normalize descriptive values into an
 ontology.
+
+Faces Processor independently consumes the same public image previews and
+completed Video Keyframe v1 artifacts. Detection and embedding results are
+reusable independently of anonymous clustering. All output stays beneath
+`analysis/faces/`; it performs no identity naming or demographic inference.
 
 Each future processor is expected to read public artifacts and own a versioned
 namespace under `analysis/<processor>/`. A model, configuration, or processor
