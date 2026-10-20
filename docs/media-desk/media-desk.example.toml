@@ -1,0 +1,5 @@
+[media_desk]
+workspace = "D:/Media/_processing"
+host = "127.0.0.1"
+port = 8000
+# keyframe_fingerprint = "64 lowercase hexadecimal characters"

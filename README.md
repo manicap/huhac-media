@@ -75,6 +75,8 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
   internal design rationale.
 - [Development](docs/development.md): environment, test suites, and contribution
   safeguards.
+- [Media Desk M1](docs/media-desk/README.md): read-only local gallery setup,
+  Windows/Linux start commands, demo workspace, security, and limitations.
 
 SQLite, logs, run state, locks, and ingest Python APIs are internal. Consumers
 start at `workspace.json`, follow `metadata/catalog.json`, and write only under

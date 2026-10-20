@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Media Desk{% endblock %} · Huháč</title>
+  <link rel="stylesheet" href="/static/media-desk.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span>HUHÁČ</span> Media Desk</a>
+    <div class="read-only">READ ONLY</div>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

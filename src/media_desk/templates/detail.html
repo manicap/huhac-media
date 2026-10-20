@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.source_name }}{% endblock %}
+{% block content %}
+<a class="back" href="/">← Gallery</a>
+<section class="detail-head">
+  <div class="detail-media">
+    {% if asset.preview %}<img src="/artifacts/{{ asset.preview.token }}" alt="Preview of {{ asset.source_name }}">{% else %}<div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>{% endif %}
+  </div>
+  <div class="detail-copy">
+    <p class="eyebrow">{{ asset.media_type }} · {{ asset.format }}</p>
+    <h1>{{ asset.source_name }}</h1>
+    <p class="asset-id">{{ asset.asset_id }}</p>
+    <dl class="facts">
+      <div><dt>Captured</dt><dd>{{ asset.capture_time or 'Unavailable' }}</dd></div>
+      <div><dt>Provenance</dt><dd>{{ asset.capture_source or 'Unavailable' }}</dd></div>
+      <div><dt>Size</dt><dd>{{ asset.size_bytes }} bytes</dd></div>
+      <div><dt>Original</dt><dd>{% if asset.original_online %}<a href="/artifacts/{{ asset.original.token }}">Open / stream</a>{% else %}<span class="offline-text">Offline</span>{% endif %}</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="detail-grid">
+  <article class="panel">
+    <p class="eyebrow">TIME RELATIONS</p>
+    <h2>Session Grouper v1</h2>
+    {% if asset.sessions %}
+      {% for session in asset.sessions %}<div class="result"><strong>{{ session.session_id }}</strong><p>{{ session.start }} → {{ session.end }}</p><small>Probable time-continuity session, not an identified event · {{ session.configuration_fingerprint[:12] }}</small></div>{% endfor %}
+    {% else %}<p class="muted">No completed session relation available.</p>{% endif %}
+  </article>
+
+  <article class="panel">
+    <p class="eyebrow">VISUAL DESCRIPTION</p>
+    <h2>Vision v1</h2>
+    {% if asset.vision %}
+      {% for item in asset.vision %}<div class="result"><p>{{ item.result.get('vision', {}).get('description', 'Completed result') }}</p><small>Model {{ item.model }} · config {{ item.configuration_fingerprint[:12] }}</small></div>{% endfor %}
+    {% else %}<p class="muted">No successful Vision result available.</p>{% endif %}
+  </article>
+
+  <article class="panel">
+    <p class="eyebrow">ANONYMOUS FACES</p>
+    <h2>Faces v1</h2>
+    {% if asset.faces %}
+      {% for item in asset.faces %}<div class="result"><strong>{{ item.result.get('faces', [])|length }} detected face{% if item.result.get('faces', [])|length != 1 %}s{% endif %}</strong><p>Anonymous detections only; no identity claim.</p><small>Config {{ item.configuration_fingerprint[:12] }}</small></div>{% endfor %}
+    {% else %}<p class="muted">No successful Faces result available.</p>{% endif %}
+    {% for cluster in asset.face_clusters %}<div class="cluster"><strong>{{ cluster.cluster_id }}</strong><span>{{ cluster.status }} · {{ cluster.member_count }} members</span><small>Anonymous similarity group · {{ cluster.configuration_fingerprint[:12] }}</small></div>{% endfor %}
+  </article>
+
+  <article class="panel">
+    <p class="eyebrow">TECHNICAL</p>
+    <h2>Published metadata</h2>
+    <pre>{{ technical_json }}</pre>
+  </article>
+</section>
+{% endblock %}

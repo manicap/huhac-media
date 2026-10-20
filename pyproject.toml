@@ -12,6 +12,8 @@ dependencies = ["Pillow>=11"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "numpy"]
+media-desk = ["fastapi>=0.115,<1", "jinja2>=3.1,<4", "uvicorn>=0.30,<1"]
+media-desk-dev = ["pytest>=8", "fastapi>=0.115,<1", "jinja2>=3.1,<4", "uvicorn>=0.30,<1", "httpx>=0.27,<1"]
 video-keyframes = ["numpy", "open_clip_torch", "torch"]
 faces = ["numpy", "opencv-python>=4.8", "openvino>=2024"]
 
@@ -21,9 +23,13 @@ session-grouper = "session_grouper.cli:main"
 video-keyframes = "video_keyframes.cli:main"
 vision = "vision.cli:main"
 faces = "faces.cli:main"
+media-desk = "media_desk.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+media_desk = ["templates/*.html", "static/*.css"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

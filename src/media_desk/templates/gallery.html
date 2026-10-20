@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Gallery{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">WORKSPACE {{ workspace.workspace_id }}</p>
+    <h1>Your media, ready to scan.</h1>
+    <p class="lede">Existing previews, time relations and completed analysis — without touching originals.</p>
+  </div>
+  <dl class="summary">
+    <div><dt>Assets</dt><dd>{{ workspace.assets|length }}</dd></div>
+    <div><dt>Shown</dt><dd>{{ total }}</dd></div>
+    <div><dt>Contract</dt><dd>v{{ workspace.contract_version }}</dd></div>
+  </dl>
+</section>
+
+<form class="filters" method="get" action="/">
+  <label>Type
+    <select name="media_type">
+      <option value="all" {% if media_type == 'all' %}selected{% endif %}>All media</option>
+      <option value="image" {% if media_type == 'image' %}selected{% endif %}>Images</option>
+      <option value="video" {% if media_type == 'video' %}selected{% endif %}>Videos</option>
+    </select>
+  </label>
+  <label class="search">Source or asset ID
+    <input name="q" value="{{ query }}" placeholder="poster, backstage, sha256…">
+  </label>
+  <input type="hidden" name="page_size" value="{{ page_size }}">
+  <button type="submit">Filter</button>
+</form>
+
+{% if assets %}
+<section class="grid" aria-label="Media gallery">
+  {% for asset in assets %}
+  <article class="card">
+    <a class="thumb" href="/assets/{{ asset.sha256 }}">
+      {% if asset.preview %}
+      <img src="/artifacts/{{ asset.preview.token }}" alt="Preview of {{ asset.source_name }}" loading="lazy">
+      {% else %}
+      <div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>
+      {% endif %}
+      <span class="type-pill">{{ asset.media_type }}</span>
+      {% if not asset.original_online %}<span class="offline-pill">original offline</span>{% endif %}
+    </a>
+    <div class="card-body">
+      <h2><a href="/assets/{{ asset.sha256 }}">{{ asset.source_name }}</a></h2>
+      <p>{{ asset.capture_time or 'Capture time unavailable' }}</p>
+      <div class="signals">
+        {% if asset.sessions %}<span>{{ asset.sessions|length }} time relation{% if asset.sessions|length != 1 %}s{% endif %}</span>{% endif %}
+        {% if asset.vision %}<span>Vision</span>{% endif %}
+        {% if asset.faces %}<span>Faces {{ asset.faces|length }}</span>{% endif %}
+      </div>
+      <code>{{ asset.asset_id[:24] }}…</code>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<section class="empty"><h2>No assets match this view.</h2><p>Try a different type or source search.</p></section>
+{% endif %}
+
+<nav class="pagination" aria-label="Pagination">
+  {% if page > 1 %}<a href="/?media_type={{ media_type }}&q={{ query|urlencode }}&page={{ page - 1 }}&page_size={{ page_size }}">← Previous</a>{% else %}<span></span>{% endif %}
+  <strong>Page {{ page }} / {{ pages }}</strong>
+  {% if page < pages %}<a href="/?media_type={{ media_type }}&q={{ query|urlencode }}&page={{ page + 1 }}&page_size={{ page_size }}">Next →</a>{% else %}<span></span>{% endif %}
+</nav>
+{% endblock %}
