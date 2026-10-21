@@ -34,6 +34,27 @@ class SessionReference:
 
 
 @dataclass(frozen=True)
+class SessionGroup:
+    session_id: str
+    start: str | None
+    end: str | None
+    operational_day: str | None
+    confidence: str | None
+    configuration_fingerprint: str
+    asset_ids: tuple[str, ...]
+    asset_count: int
+    image_count: int
+    video_count: int
+
+
+@dataclass(frozen=True)
+class UnassignedReference:
+    asset_id: str
+    reason: str
+    capture_time: str | None
+
+
+@dataclass(frozen=True)
 class FaceClusterReference:
     cluster_id: str
     status: str
@@ -53,6 +74,8 @@ class Asset:
     source_name: str
     capture_time: str | None
     capture_source: str | None
+    capture_timezone: str | None
+    capture_filesystem_fallback: bool
     technical: dict[str, Any]
     preview: Artifact | None
     preview_status: str
@@ -76,3 +99,6 @@ class WorkspaceSnapshot:
     assets: tuple[Asset, ...]
     artifacts: dict[str, Artifact]
     keyframe_fingerprint: str | None
+    sessions: tuple[SessionGroup, ...] = ()
+    session_unassigned: tuple[UnassignedReference, ...] = ()
+    session_status: str = "unavailable"

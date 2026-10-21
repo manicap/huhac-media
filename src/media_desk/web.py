@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from media_desk.contract import ContractError, load_workspace
+from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_label
 from media_desk.models import Artifact, Asset, WorkspaceSnapshot
 
 
@@ -30,6 +31,9 @@ def _asset_payload(asset: Asset) -> dict:
         "source_name": asset.source_name,
         "capture_time": asset.capture_time,
         "capture_source": asset.capture_source,
+        "capture_timezone": asset.capture_timezone,
+        "capture_filesystem_fallback": asset.capture_filesystem_fallback,
+        "capture_label": capture_label(asset),
         "technical": asset.technical,
         "preview_status": asset.preview_status,
         "preview_url": f"/artifacts/{asset.preview.token}" if asset.preview else None,
@@ -123,6 +127,7 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
         startup_error = str(exc)
     app.state.snapshot = snapshot
     app.state.startup_error = startup_error
+    app.state.library_index = LibraryIndex(snapshot) if snapshot is not None else None
 
     def require_snapshot() -> WorkspaceSnapshot:
         current = app.state.snapshot
@@ -189,8 +194,25 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
         q: str = "",
         page: int = Query(1, ge=1),
         page_size: int = Query(24, ge=1, le=100),
+        sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
+        limit: int | None = Query(None, ge=10, le=100),
+        cursor: str | None = None,
+        start: int | None = Query(None, ge=0),
+        snapshot_id: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
     ):
         current = require_snapshot()
+        if limit is not None or cursor is not None or start is not None or snapshot_id is not None:
+            spec = QuerySpec(media_type, q, sort, date_from, date_to)
+            try:
+                batch = app.state.library_index.batch(spec, limit or 50, cursor, start, snapshot_id)
+            except CursorError as exc:
+                return JSONResponse(
+                    {"error": "snapshot_changed", "message": str(exc), "snapshot_id": app.state.library_index.snapshot_id},
+                    status_code=409,
+                )
+            return {**batch, "items": [_asset_payload(asset) for asset in batch["items"]]}
         assets = _filtered(current, media_type, q)
         start = (page - 1) * page_size
         return {
@@ -200,6 +222,55 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
             "total": len(assets),
             "assets": [_asset_payload(asset) for asset in assets[start : start + page_size]],
         }
+
+    @app.get("/api/index")
+    def api_index(
+        media_type: str = Query("all", pattern="^(all|image|video)$"),
+        q: str = "",
+        sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ):
+        require_snapshot()
+        spec = QuerySpec(media_type, q, sort, date_from, date_to)
+        index = app.state.library_index
+        return {
+            "snapshot_id": index.snapshot_id,
+            "total_count": len(index.query(spec)),
+            "segments": index.time_segments(spec),
+        }
+
+    @app.get("/api/locate")
+    def api_locate(
+        asset_id: str | None = None,
+        year: int | None = None,
+        month: int | None = Query(None, ge=1, le=12),
+        day: int | None = Query(None, ge=1, le=31),
+        media_type: str = Query("all", pattern="^(all|image|video)$"),
+        q: str = "",
+        sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ):
+        require_snapshot()
+        if asset_id is None and year is None:
+            raise HTTPException(status_code=422, detail="asset_id or year is required")
+        spec = QuerySpec(media_type, q, sort, date_from, date_to)
+        found = app.state.library_index.locate(
+            spec, asset_id=asset_id, year=year, month=month, day=day
+        )
+        if found is None:
+            raise HTTPException(status_code=404, detail="Položka není v aktuálním výsledku")
+        return {"snapshot_id": app.state.library_index.snapshot_id, **found}
+
+    @app.get("/api/calendar")
+    def api_calendar(
+        media_type: str = Query("all", pattern="^(all|image|video)$"),
+        q: str = "",
+        sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
+    ):
+        require_snapshot()
+        return app.state.library_index.calendar(QuerySpec(media_type, q, sort))
 
     @app.get("/api/assets/{sha256}")
     def api_detail(sha256: str):

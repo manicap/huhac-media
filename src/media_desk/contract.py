@@ -12,7 +12,9 @@ from media_desk.models import (
     Asset,
     FaceClusterReference,
     ProcessorResult,
+    SessionGroup,
     SessionReference,
+    UnassignedReference,
     WorkspaceSnapshot,
 )
 
@@ -344,10 +346,13 @@ def _processor_results(
     return found
 
 
-def _apply_sessions(snapshot_assets: dict[str, Asset], workspace: Path, workspace_id: str) -> None:
+def _load_sessions(
+    snapshot_assets: dict[str, Asset], workspace: Path, workspace_id: str
+) -> tuple[tuple[SessionGroup, ...], tuple[UnassignedReference, ...], str]:
     root = workspace / "analysis" / "session-grouper" / "session-grouper-v1"
     if not root.is_dir():
-        return
+        return (), (), "unavailable"
+    candidates: list[tuple[str, list[dict[str, Any]], list[dict[str, Any]]]] = []
     for path in sorted(root.glob("*/*.json")):
         try:
             resolved = path.resolve(strict=True)
@@ -359,6 +364,7 @@ def _apply_sessions(snapshot_assets: dict[str, Asset], workspace: Path, workspac
         fingerprint = path.parent.name
         result = payload.get("result")
         sessions = result.get("sessions") if isinstance(result, dict) else None
+        unassigned = result.get("unassigned", []) if isinstance(result, dict) else []
         if not (
             _SHA256.fullmatch(fingerprint)
             and payload.get("result_schema_version") == 1
@@ -368,9 +374,17 @@ def _apply_sessions(snapshot_assets: dict[str, Asset], workspace: Path, workspac
             and payload.get("configuration_fingerprint") == fingerprint
             and payload.get("status") == "success"
             and isinstance(sessions, list)
+            and isinstance(unassigned, list)
         ):
             continue
-        for session in sessions:
+        candidates.append((fingerprint, sessions, unassigned))
+    if not candidates:
+        return (), (), "unavailable"
+    if len(candidates) != 1:
+        return (), (), "ambiguous"
+    fingerprint, raw_sessions, raw_unassigned = candidates[0]
+    groups: list[SessionGroup] = []
+    for session in raw_sessions:
             if not isinstance(session, dict) or not isinstance(session.get("assets"), list):
                 continue
             reference = SessionReference(
@@ -380,10 +394,38 @@ def _apply_sessions(snapshot_assets: dict[str, Asset], workspace: Path, workspac
                 confidence=session.get("confidence") if isinstance(session.get("confidence"), str) else None,
                 configuration_fingerprint=fingerprint,
             )
+            asset_ids: list[str] = []
             for member in session["assets"]:
                 asset = snapshot_assets.get(member.get("asset_id")) if isinstance(member, dict) else None
                 if asset is not None:
                     asset.sessions.append(reference)
+                    asset_ids.append(asset.asset_id)
+            groups.append(
+                SessionGroup(
+                    session_id=reference.session_id,
+                    start=reference.start,
+                    end=reference.end,
+                    operational_day=session.get("operational_day") if isinstance(session.get("operational_day"), str) else None,
+                    confidence=reference.confidence,
+                    configuration_fingerprint=fingerprint,
+                    asset_ids=tuple(asset_ids),
+                    asset_count=len(asset_ids),
+                    image_count=sum(snapshot_assets[item].media_type == "image" for item in asset_ids),
+                    video_count=sum(snapshot_assets[item].media_type == "video" for item in asset_ids),
+                )
+            )
+    unassigned_items: list[UnassignedReference] = []
+    for item in raw_unassigned:
+        if not isinstance(item, dict) or not isinstance(item.get("asset_id"), str):
+            continue
+        unassigned_items.append(
+            UnassignedReference(
+                asset_id=item["asset_id"],
+                reason=str(item.get("reason") or "unknown"),
+                capture_time=item.get("capture_time") if isinstance(item.get("capture_time"), str) else None,
+            )
+        )
+    return tuple(groups), tuple(unassigned_items), "available"
 
 
 def _apply_face_clusters(snapshot_assets: dict[str, Asset], workspace: Path, workspace_id: str) -> None:
@@ -515,6 +557,8 @@ def load_workspace(
             source_name=_source_name(entry),
             capture_time=capture.get("datetime") if isinstance(capture.get("datetime"), str) else None,
             capture_source=capture.get("source") if isinstance(capture.get("source"), str) else None,
+            capture_timezone=capture.get("timezone_offset") if isinstance(capture.get("timezone_offset"), str) else None,
+            capture_filesystem_fallback=capture.get("filesystem_fallback") is True,
             technical=technical,
             preview=preview,
             preview_status=preview_status,
@@ -532,7 +576,7 @@ def load_workspace(
         assets.append(asset)
 
     by_id = {asset.asset_id: asset for asset in assets}
-    _apply_sessions(by_id, workspace, workspace_id)
+    sessions, session_unassigned, session_status = _load_sessions(by_id, workspace, workspace_id)
     _apply_face_clusters(by_id, workspace, workspace_id)
     assets.sort(key=lambda asset: ((asset.capture_time or ""), asset.asset_id), reverse=True)
     return WorkspaceSnapshot(
@@ -543,4 +587,7 @@ def load_workspace(
         assets=tuple(assets),
         artifacts=artifacts,
         keyframe_fingerprint=keyframe_fingerprint,
+        sessions=sessions,
+        session_unassigned=session_unassigned,
+        session_status=session_status,
     )
