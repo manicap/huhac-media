@@ -17,6 +17,8 @@
   <div id="snapshot-notice" class="notice" hidden>Data byla aktualizována. <button type="button">Obnovit pohled</button></div>
   <div id="library-error" class="notice error-notice" role="alert" hidden><span>Část galerie se nepodařilo načíst.</span><button type="button" id="library-retry">Zkusit znovu</button><button type="button" id="library-load-more">Načíst další</button></div>
   <div id="library-viewport" class="library-viewport" tabindex="0" aria-label="Virtualizovaná galerie médií"><div id="library-canvas" class="library-canvas"><div id="library-window" class="library-window" aria-live="polite"></div></div></div>
+  <nav id="time-navigator" class="time-navigator" aria-label="Časový navigátor knihovny"></nav>
+  <label class="time-select-label" for="time-select">Přejít na období</label><select id="time-select" class="time-select"><option value="">Vyberte období…</option></select>
   <noscript><p class="notice">Pro plynulé dávkové načítání knihovny je potřeba JavaScript.</p></noscript>
 </div>
 <script type="module" src="/static/library.js"></script>

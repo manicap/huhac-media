@@ -9,6 +9,8 @@ if (app) {
   const noticeElement = document.querySelector("#snapshot-notice");
   const countElement = document.querySelector("#library-count");
   const periodElement = document.querySelector("#library-period");
+  const timeNavigator = document.querySelector("#time-navigator");
+  const timeSelect = document.querySelector("#time-select");
   const batchSize = Number(app.dataset.batchSize || 50);
   const rowHeight = 324;
   const overscanRows = 3;
@@ -22,6 +24,7 @@ if (app) {
   let renderScheduled = false;
   let lastFailedStart = 0;
   let activeAssetId = app.dataset.activeAssetId || new URL(location.href).searchParams.get("active_asset_id");
+  let segments = [];
 
   const params = () => {
     const values = new URLSearchParams(new FormData(form));
@@ -120,7 +123,49 @@ if (app) {
     [...needed].slice(0, 2).forEach(fetchBatch);
     const firstItem = itemAt(Math.floor(viewport.scrollTop / rowHeight) * columns);
     periodElement.textContent = firstItem?.capture_label || "";
+    if (firstItem) setActivePeriod(firstItem);
     updateDebug(start, end);
+  };
+
+  const monthName = (month) => new Intl.DateTimeFormat("cs-CZ", { month: "short" }).format(new Date(2020, month - 1, 1));
+  const segmentKey = (segment) => segment.year ? `${segment.year}-${String(segment.month).padStart(2, "0")}` : "unknown";
+  const renderTimeNavigator = () => {
+    if (!form.elements.sort.value.startsWith("captured_")) {
+      timeNavigator.innerHTML = '<span class="muted">Časová osa je dostupná jen pro chronologické řazení.</span>';
+      return;
+    }
+    const years = new Map();
+    for (const segment of segments.filter((item) => item.year)) {
+      if (!years.has(segment.year)) years.set(segment.year, []);
+      years.get(segment.year).push(segment);
+    }
+    timeNavigator.innerHTML = [...years].map(([year, months]) => `<div class="time-year"><button type="button" data-period="${year}-${String(months[0].month).padStart(2, "0")}" aria-label="Přejít na rok ${year}">${year}</button><div class="time-months">${months.map((item) => `<button type="button" data-period="${segmentKey(item)}" title="${item.count} médií">${escapeHtml(monthName(item.month))}</button>`).join("")}</div></div>`).join("") + (segments.some((item) => !item.year) ? '<button type="button" data-period="unknown">Bez data</button>' : "");
+    timeSelect.innerHTML = '<option value="">Vyberte období…</option>' + segments.map((item) => `<option value="${segmentKey(item)}">${item.year ? `${monthName(item.month)} ${item.year}` : "Bez důvěryhodného data"} · ${item.count}</option>`).join("");
+  };
+  const setActivePeriod = (item) => {
+    let key = "unknown";
+    if (item.capture_time && !item.capture_filesystem_fallback) {
+      const match = item.capture_time.match(/^(\d{4})-(\d{2})/);
+      if (match) key = `${match[1]}-${match[2]}`;
+    }
+    for (const button of timeNavigator.querySelectorAll("[data-period]")) {
+      button.classList.toggle("is-current", button.dataset.period === key);
+    }
+    timeSelect.value = segments.some((item) => segmentKey(item) === key) ? key : "";
+  };
+  const jumpToPeriod = async (key) => {
+    const segment = segments.find((item) => segmentKey(item) === key);
+    if (!segment) return;
+    let index = segment.index;
+    if (segment.year) {
+      const response = await fetch(apiUrl("/api/locate", { year: segment.year, month: segment.month }));
+      if (!response.ok) return;
+      index = (await response.json()).index;
+    }
+    await fetchBatch(Math.floor(index / batchSize) * batchSize);
+    viewport.scrollTop = Math.floor(index / columns) * rowHeight;
+    scheduleRender();
+    viewport.focus({ preventScroll: true });
   };
   const scheduleRender = () => {
     if (!renderScheduled) {
@@ -160,7 +205,9 @@ if (app) {
     const payload = await response.json();
     snapshotId = payload.snapshot_id;
     totalCount = payload.total_count;
+    segments = payload.segments;
     countElement.textContent = `${new Intl.NumberFormat("cs-CZ").format(totalCount)} médií`;
+    renderTimeNavigator();
     render();
     if (restore) {
       let stored;
@@ -188,5 +235,10 @@ if (app) {
   document.querySelector("#library-retry").addEventListener("click", () => fetchBatch(lastFailedStart));
   document.querySelector("#library-load-more").addEventListener("click", () => fetchBatch(lastFailedStart));
   noticeElement.querySelector("button").addEventListener("click", () => location.reload());
+  timeNavigator.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-period]");
+    if (button) jumpToPeriod(button.dataset.period);
+  });
+  timeSelect.addEventListener("change", () => jumpToPeriod(timeSelect.value));
   reset().catch(() => { errorElement.hidden = false; countElement.textContent = "Knihovnu nelze načíst"; });
 }

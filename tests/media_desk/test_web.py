@@ -57,6 +57,8 @@ def test_library_uses_virtualized_client_and_cursor_api(workspace_builder) -> No
     assert script.status_code == 200
     assert "maxCachedBatches = 12" in script.text
     assert "__MEDIA_DESK_DEBUG__" in script.text
+    assert "jumpToPeriod" in script.text
+    assert "time-navigator" in page.text
     assert batch.json()["start_index"] == 50
     assert len(batch.json()["items"]) == 50
 
