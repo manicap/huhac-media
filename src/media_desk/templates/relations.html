@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Časové relace{% endblock %}
+{% block content %}
+<section class="view-head"><div><p class="eyebrow">SESSION GROUPER · NEJDE O POTVRZENÉ AKCE</p><h1>Časové relace</h1><p class="muted">Automatické časové skupiny podle publikovaného výsledku Session Grouperu.</p></div><a href="/relations?order={{ 'asc' if order == 'desc' else 'desc' }}{% if active_asset_id %}&active_asset_id={{ active_asset_id|urlencode }}{% endif %}">{{ 'Nejstarší první' if order == 'desc' else 'Nejnovější první' }}</a></section>
+{% if workspace.session_status == 'ambiguous' %}<section class="empty"><h2>Výsledek není jednoznačný</h2><p>Je dostupných více validních konfigurací Session Grouperu. Media Desk je neslučuje ani neodhaduje správnou.</p></section>
+{% elif workspace.session_status != 'available' %}<section class="empty"><h2>Relace zatím nejsou k dispozici</h2><p>Chybí jednoznačný validní výsledek Session Grouperu.</p></section>
+{% else %}
+  {% if active_asset_id and not active_in_session %}<p class="notice">Aktivní médium je nezařazené.{% if unassigned %} Důvod: <code>{{ unassigned.reason }}</code>.{% endif %}</p>{% endif %}
+  <div class="timeline">{% for group_year,items in groups.items() %}<section><h2>{{ group_year }}</h2>{% for item in items %}{% set session=item.session %}<details class="session-card" {% if active_asset_id in session.asset_ids %}open{% endif %}><summary>{% if item.cover %}<img src="/artifacts/{{ item.cover.preview.token }}" alt="" loading="lazy">{% endif %}<span><small>Automatická časová skupina</small><strong>{{ session.start or 'Začátek neznámý' }}</strong><em>{{ session.asset_count }} médií · {{ session.confidence or 'důvěra neznámá' }}</em></span></summary><div class="session-assets">{% for asset_id in session.asset_ids %}{% set asset = workspace.assets|selectattr('asset_id','equalto',asset_id)|first %}{% if asset %}<a class="{% if asset.asset_id == active_asset_id %}is-active{% endif %}" href="/assets/{{ asset.sha256 }}?return_to=/library&active_asset_id={{ asset.asset_id|urlencode }}">{{ asset.source_name }}</a>{% endif %}{% endfor %}</div></details>{% endfor %}</section>{% endfor %}</div>
+{% endif %}
+{% endblock %}

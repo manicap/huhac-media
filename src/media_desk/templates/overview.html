@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Přehled{% endblock %}
+{% block content %}
+<section class="overview-head"><div><p class="eyebrow">WORKSPACE {{ workspace.workspace_id }}</p><h1>Přehled</h1><p class="muted">Rychlý vstup do existujícího archivu bez změny zdrojových dat.</p></div><a class="primary-action" href="/library{% if active_asset_id %}?active_asset_id={{ active_asset_id|urlencode }}{% endif %}">Otevřít knihovnu</a></section>
+<dl class="overview-stats"><div><dt>Obrázky</dt><dd>{{ image_count }}</dd></div><div><dt>Videa</dt><dd>{{ video_count }}</dd></div><div><dt>Časové relace</dt><dd>{% if workspace.session_status == 'available' %}{{ workspace.sessions|length }}{% elif workspace.session_status == 'ambiguous' %}<small>Výsledek není jednoznačný</small>{% else %}<small>Zatím nejsou k dispozici</small>{% endif %}</dd></div></dl>
+<div class="overview-grid">
+  <section class="panel"><div class="section-title"><div><p class="eyebrow">KALENDÁŘ</p><h2>Nedávné měsíce</h2></div><a href="/calendar">Všechny roky</a></div>{% if recent_months %}<div class="month-list">{% for item in recent_months %}<a href="/calendar?year={{ item.year }}&month={{ item.month }}"><strong>{{ item.month }} / {{ item.year }}</strong><span>{{ item.count }} médií</span></a>{% endfor %}</div>{% else %}<p class="muted">Žádná média s důvěryhodným datem.</p>{% endif %}</section>
+  <section class="panel"><div class="section-title"><div><p class="eyebrow">ČASOVÉ RELACE</p><h2>Poslední skupiny</h2></div><a href="/relations">Celá timeline</a></div>{% if recent_sessions %}{% for session in recent_sessions %}<a class="session-row" href="/relations?active_asset_id={{ session.asset_ids[0]|urlencode }}"><strong>{{ session.start or 'Čas neznámý' }}</strong><span>Automatická časová skupina · {{ session.asset_count }} médií</span></a>{% endfor %}{% elif workspace.session_status == 'ambiguous' %}<p class="muted">Je dostupných více výsledků Session Grouperu; vyberte jednoznačnou konfiguraci mimo M1.1.</p>{% else %}<p class="muted">Relace zatím nejsou k dispozici.</p>{% endif %}</section>
+</div>
+{% endblock %}

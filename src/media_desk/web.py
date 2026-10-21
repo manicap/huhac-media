@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 from typing import Iterator
+from urllib.parse import parse_qs, urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
@@ -11,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from media_desk.contract import ContractError, load_workspace
-from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_label
+from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_date, capture_label
 from media_desk.models import Artifact, Asset, WorkspaceSnapshot
 
 
@@ -136,12 +137,9 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
         return current
 
     @app.get("/", response_class=HTMLResponse)
-    def gallery(
+    def overview(
         request: Request,
-        media_type: str = Query("all", pattern="^(all|image|video)$"),
-        q: str = "",
-        page: int = Query(1, ge=1),
-        page_size: int = Query(24, ge=1, le=100),
+        active_asset_id: str | None = None,
     ):
         if app.state.snapshot is None:
             return templates.TemplateResponse(
@@ -151,39 +149,54 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
                 status_code=503,
             )
         current: WorkspaceSnapshot = app.state.snapshot
-        assets = _filtered(current, media_type, q)
-        total = len(assets)
-        pages = max(1, (total + page_size - 1) // page_size)
-        if page > pages:
-            page = pages
-        start = (page - 1) * page_size
+        index = app.state.library_index
+        calendar = index.calendar(QuerySpec())
+        recent_months = []
+        for year, year_data in sorted(calendar["years"].items(), reverse=True):
+            for month, month_data in sorted(year_data["months"].items(), reverse=True):
+                recent_months.append({"year": year, "month": month, **month_data})
         return templates.TemplateResponse(
             request=request,
-            name="gallery.html",
+            name="overview.html",
             context={
                 "workspace": current,
-                "assets": assets[start : start + page_size],
-                "media_type": media_type,
-                "query": q,
-                "page": page,
-                "pages": pages,
-                "page_size": page_size,
-                "total": total,
+                "image_count": sum(asset.media_type == "image" for asset in current.assets),
+                "video_count": sum(asset.media_type == "video" for asset in current.assets),
+                "recent_months": recent_months[:6],
+                "recent_sessions": sorted(current.sessions, key=lambda item: item.start or "", reverse=True)[:5],
+                "active_asset_id": active_asset_id,
             },
         )
 
     @app.get("/assets/{sha256}", response_class=HTMLResponse)
-    def detail(request: Request, sha256: str):
+    def detail(request: Request, sha256: str, return_to: str | None = None, active_asset_id: str | None = None):
         current = require_snapshot()
         asset = next((item for item in current.assets if item.sha256 == sha256), None)
         if asset is None:
             raise HTTPException(status_code=404, detail="Asset not found")
+        safe_return = return_to if return_to and return_to.startswith("/library") and not return_to.startswith("//") else "/library"
+        query = parse_qs(urlsplit(safe_return).query)
+        spec = QuerySpec(
+            query.get("media_type", ["all"])[0],
+            query.get("q", [""])[0],
+            query.get("sort", ["captured_desc"])[0],
+            query.get("date_from", [None])[0],
+            query.get("date_to", [None])[0],
+        )
+        ordered = app.state.library_index.query(spec)
+        position = next((index for index, item in enumerate(ordered) if item.asset_id == asset.asset_id), None)
+        previous_asset = ordered[position - 1] if position is not None and position > 0 else None
+        next_asset = ordered[position + 1] if position is not None and position + 1 < len(ordered) else None
         return templates.TemplateResponse(
             request=request,
             name="detail.html",
             context={
                 "workspace": current,
                 "asset": asset,
+                "active_asset_id": active_asset_id or asset.asset_id,
+                "return_to": safe_return,
+                "previous_asset": previous_asset,
+                "next_asset": next_asset,
                 "technical_json": json.dumps(asset.technical, ensure_ascii=False, indent=2, sort_keys=True),
             },
         )
@@ -246,6 +259,81 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
                 "date_from": date_from,
                 "date_to": date_to,
                 "snapshot_id": app.state.library_index.snapshot_id,
+            },
+        )
+
+    @app.get("/calendar", response_class=HTMLResponse)
+    def calendar_view(
+        request: Request,
+        year: int | None = None,
+        month: int | None = Query(None, ge=1, le=12),
+        day: int | None = Query(None, ge=1, le=31),
+        media_type: str = Query("all", pattern="^(all|image|video)$"),
+        q: str = "",
+        active_asset_id: str | None = None,
+    ):
+        current = require_snapshot()
+        active = next((asset for asset in current.assets if asset.asset_id == active_asset_id), None)
+        active_date = capture_date(active) if active else None
+        if active_date and year is None:
+            year, month, day = active_date.year, active_date.month, active_date.day
+        spec = QuerySpec(media_type, q)
+        calendar = app.state.library_index.calendar(spec)
+        day_assets = ()
+        if year and month and day:
+            date_value = f"{year:04d}-{month:02d}-{day:02d}"
+            day_assets = app.state.library_index.query(
+                QuerySpec(media_type, q, "captured_desc", date_value, date_value)
+            )
+        return templates.TemplateResponse(
+            request=request,
+            name="calendar.html",
+            context={
+                "workspace": current,
+                "calendar": calendar,
+                "year": year,
+                "month": month,
+                "day": day,
+                "day_assets": day_assets,
+                "active_asset_id": active_asset_id,
+                "active_date_unknown": active is not None and active_date is None,
+                "media_type": media_type,
+                "query": q,
+            },
+        )
+
+    @app.get("/relations", response_class=HTMLResponse)
+    def relations_view(
+        request: Request,
+        order: str = Query("desc", pattern="^(asc|desc)$"),
+        year: int | None = None,
+        active_asset_id: str | None = None,
+    ):
+        current = require_snapshot()
+        sessions = list(current.sessions)
+        sessions.sort(key=lambda item: item.start or "", reverse=order == "desc")
+        grouped: dict[str, list[dict]] = {}
+        for session in sessions:
+            group_year = (session.operational_day or session.start or "Neznámý rok")[:4]
+            if year is not None and group_year != str(year):
+                continue
+            first = next((asset for asset in current.assets if asset.asset_id in session.asset_ids and asset.preview), None)
+            grouped.setdefault(group_year, []).append({"session": session, "cover": first})
+        unassigned = next(
+            (item for item in current.session_unassigned if item.asset_id == active_asset_id), None
+        )
+        active_in_session = any(active_asset_id in session.asset_ids for session in current.sessions) if active_asset_id else False
+        return templates.TemplateResponse(
+            request=request,
+            name="relations.html",
+            context={
+                "workspace": current,
+                "groups": grouped,
+                "order": order,
+                "year": year,
+                "active_asset_id": active_asset_id,
+                "active_in_session": active_in_session,
+                "unassigned": unassigned,
             },
         )
 

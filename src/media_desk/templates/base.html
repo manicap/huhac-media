@@ -1,17 +1,29 @@
 <!doctype html>
-<html lang="en">
+<html lang="cs">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Media Desk{% endblock %} · Huháč</title>
   <link rel="stylesheet" href="/static/media-desk.css">
   <link rel="stylesheet" href="/static/library.css">
+  <link rel="stylesheet" href="/static/shell.css">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/"><span>HUHÁČ</span> Media Desk</a>
+    <button class="nav-toggle" type="button" aria-label="Sbalit navigaci" aria-expanded="true">☰</button>
     <div class="read-only">READ ONLY</div>
   </header>
-  <main>{% block content %}{% endblock %}</main>
+  {% set active_query = '?active_asset_id=' ~ (active_asset_id|urlencode) if active_asset_id else '' %}
+  <aside class="sidebar" aria-label="Hlavní navigace">
+    <nav>
+      <a class="{% if request.url.path == '/' %}current{% endif %}" href="/{{ active_query }}">Přehled</a>
+      <a class="{% if request.url.path == '/library' %}current{% endif %}" href="/library{{ active_query }}">Knihovna</a>
+      <a class="{% if request.url.path == '/calendar' %}current{% endif %}" href="/calendar{{ active_query }}">Kalendář</a>
+      <a class="{% if request.url.path == '/relations' %}current{% endif %}" href="/relations{{ active_query }}">Časové relace</a>
+    </nav>
+  </aside>
+  <main class="app-main">{% block content %}{% endblock %}</main>
+  <script>document.querySelector('.nav-toggle').addEventListener('click',event=>{document.body.classList.toggle('nav-collapsed');event.currentTarget.setAttribute('aria-expanded',String(!document.body.classList.contains('nav-collapsed')))})</script>
 </body>
 </html>
