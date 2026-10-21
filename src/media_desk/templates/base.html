@@ -11,11 +11,10 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/"><span>HUHÁČ</span> Media Desk</a>
-    <button class="nav-toggle" type="button" aria-label="Sbalit navigaci" aria-expanded="true">☰</button>
     <div class="read-only">READ ONLY</div>
   </header>
   {% set active_query = '?active_asset_id=' ~ (active_asset_id|urlencode) if active_asset_id else '' %}
-  <aside class="sidebar" aria-label="Hlavní navigace">
+  <aside id="primary-sidebar" class="sidebar" aria-label="Hlavní navigace">
     <nav>
       <a class="{% if request.url.path == '/' %}current{% endif %}" href="/{{ active_query }}">Přehled</a>
       <a id="library-nav" class="{% if request.url.path == '/library' %}current{% endif %}" href="/library{{ active_query }}">Knihovna</a>
@@ -23,9 +22,13 @@
       <a class="{% if request.url.path == '/relations' %}current{% endif %}" href="/relations{{ active_query }}">Časové relace</a>
     </nav>
   </aside>
+  <button class="nav-toggle" type="button" aria-controls="primary-sidebar" aria-label="Sbalit navigaci" aria-expanded="true"><span aria-hidden="true">‹</span></button>
   <main class="app-main">{% block content %}{% endblock %}</main>
   <script>
-    document.querySelector('.nav-toggle').addEventListener('click',event=>{document.body.classList.toggle('nav-collapsed');event.currentTarget.setAttribute('aria-expanded',String(!document.body.classList.contains('nav-collapsed')))})
+    const navToggle=document.querySelector('.nav-toggle');
+    const updateNavigationState=collapsed=>{document.body.classList.toggle('nav-collapsed',collapsed);navToggle.setAttribute('aria-expanded',String(!collapsed));navToggle.setAttribute('aria-label',collapsed?'Otevřít navigaci':'Sbalit navigaci');navToggle.querySelector('span').textContent=collapsed?'›':'‹'};
+    updateNavigationState(matchMedia('(max-width: 800px)').matches);
+    navToggle.addEventListener('click',()=>updateNavigationState(!document.body.classList.contains('nav-collapsed')))
     try { const state=JSON.parse(sessionStorage.getItem('mediaDesk.library')); if(state?.url?.startsWith('/library')) document.querySelector('#library-nav').href=state.url; } catch {}
   </script>
 </body>

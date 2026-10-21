@@ -59,6 +59,9 @@ def test_library_uses_virtualized_client_and_cursor_api(workspace_builder) -> No
     assert "__MEDIA_DESK_DEBUG__" in script.text
     assert "jumpToPeriod" in script.text
     assert "time-navigator" in page.text
+    assert 'class="app-main"' in page.text
+    assert 'class="nav-toggle"' in page.text
+    assert "scrollRoot.addEventListener" in script.text
     assert batch.json()["start_index"] == 50
     assert len(batch.json()["items"]) == 50
 

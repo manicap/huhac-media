@@ -2,6 +2,7 @@ const app = document.querySelector("#library-app");
 
 if (app) {
   const viewport = document.querySelector("#library-viewport");
+  const scrollRoot = document.querySelector(".app-main");
   const canvas = document.querySelector("#library-canvas");
   const windowElement = document.querySelector("#library-window");
   const form = document.querySelector("#library-filters");
@@ -103,10 +104,12 @@ if (app) {
     return promise;
   };
   const visibleRange = () => {
-    const firstRow = Math.max(0, Math.floor(viewport.scrollTop / rowHeight) - overscanRows);
-    const visibleRows = Math.ceil(viewport.clientHeight / rowHeight) + overscanRows * 2;
+    const firstRow = Math.max(0, Math.floor(galleryScrollTop() / rowHeight) - overscanRows);
+    const visibleRows = Math.ceil(scrollRoot.clientHeight / rowHeight) + overscanRows * 2;
     return { firstRow, start: firstRow * columns, end: Math.min(totalCount, (firstRow + visibleRows) * columns) };
   };
+  const galleryTop = () => viewport.getBoundingClientRect().top - scrollRoot.getBoundingClientRect().top + scrollRoot.scrollTop;
+  const galleryScrollTop = () => Math.max(0, scrollRoot.scrollTop - galleryTop());
   const updateDebug = (start, end) => {
     const domTiles = windowElement.querySelectorAll(".media-tile").length;
     metrics.peakDomTiles = Math.max(metrics.peakDomTiles, domTiles);
@@ -137,7 +140,7 @@ if (app) {
     }
     windowElement.innerHTML = cards.join("") || (totalCount ? '<div class="gallery-skeleton">Načítání médií…</div>' : '<div class="empty"><h2>Žádná média</h2><p>Změňte filtry nebo hledání.</p></div>');
     [...needed].slice(0, 2).forEach(fetchBatch);
-    const firstItem = itemAt(Math.floor(viewport.scrollTop / rowHeight) * columns);
+    const firstItem = itemAt(Math.floor(galleryScrollTop() / rowHeight) * columns);
     periodElement.textContent = firstItem?.capture_label || "";
     if (firstItem) setActivePeriod(firstItem);
     updateDebug(start, end);
@@ -179,7 +182,7 @@ if (app) {
       index = (await response.json()).index;
     }
     await fetchBatch(Math.floor(index / batchSize) * batchSize);
-    viewport.scrollTop = Math.floor(index / columns) * rowHeight;
+    scrollRoot.scrollTop = galleryTop() + Math.floor(index / columns) * rowHeight;
     scheduleRender();
     viewport.focus({ preventScroll: true });
   };
@@ -190,13 +193,14 @@ if (app) {
     }
   };
   const saveAnchor = () => {
-    const index = Math.floor(viewport.scrollTop / rowHeight) * columns;
+    const currentGalleryScroll = galleryScrollTop();
+    const index = Math.floor(currentGalleryScroll / rowHeight) * columns;
     const item = itemAt(index);
     if (!item) return;
     sessionStorage.setItem("mediaDesk.library", JSON.stringify({
       url: location.pathname + location.search,
       assetId: item.asset_id,
-      offset: viewport.scrollTop - Math.floor(index / columns) * rowHeight,
+      offset: currentGalleryScroll - Math.floor(index / columns) * rowHeight,
       snapshotId,
     }));
   };
@@ -206,7 +210,7 @@ if (app) {
     if (!response.ok) return false;
     const located = await response.json();
     await fetchBatch(Math.floor(located.index / batchSize) * batchSize);
-    viewport.scrollTop = Math.floor(located.index / columns) * rowHeight + offset;
+    scrollRoot.scrollTop = galleryTop() + Math.floor(located.index / columns) * rowHeight + offset;
     scheduleRender();
     return true;
   };
@@ -232,12 +236,16 @@ if (app) {
       await locateAndRestore(activeAssetId || (sameUrl ? stored.assetId : null), sameUrl ? stored.offset : 0);
     }
   };
-  viewport.addEventListener("scroll", () => { scheduleRender(); saveAnchor(); }, { passive: true });
+  scrollRoot.addEventListener("scroll", () => { scheduleRender(); saveAnchor(); }, { passive: true });
   new ResizeObserver(() => {
-    const anchor = itemAt(Math.floor(viewport.scrollTop / rowHeight) * columns)?.asset_id;
+    const oldColumns = columns;
+    const currentGalleryScroll = galleryScrollTop();
+    const anchorIndex = Math.floor(currentGalleryScroll / rowHeight) * oldColumns;
+    const anchor = itemAt(anchorIndex);
+    const offset = currentGalleryScroll % rowHeight;
     render();
-    if (anchor) locateAndRestore(anchor, viewport.scrollTop % rowHeight);
-  }).observe(viewport);
+    if (anchor) scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
+  }).observe(scrollRoot);
   windowElement.addEventListener("click", (event) => { if (event.target.closest("a")) saveAnchor(); });
   form.addEventListener("submit", (event) => {
     event.preventDefault();

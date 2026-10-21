@@ -20,7 +20,7 @@ def test_overview_and_calendar_follow_active_asset(workspace_builder) -> None:
     assert "Přehled" in overview.text
     assert "Otevřít knihovnu" in overview.text
     assert calendar.status_code == 200
-    assert "1. 10. 2026" in calendar.text
+    assert "1. Říjen 2026" in calendar.text
     assert "media-1.jpg" in calendar.text
     assert "is-active" in calendar.text
 
@@ -43,6 +43,21 @@ def test_calendar_keeps_fallback_and_missing_dates_unassigned(workspace_builder)
     assert response.status_code == 200
     assert "Datum pořízení aktivního média není důvěryhodně známé" in response.text
     assert "2 médií má neznámé datum" in response.text
+
+
+def test_calendar_defaults_to_latest_year_month_grid(workspace_builder) -> None:
+    workspace_builder.add_asset(1)
+    workspace_builder.add_asset(2)
+    root = workspace_builder.publish()
+
+    response = TestClient(create_app(root)).get("/calendar")
+
+    assert response.status_code == 200
+    assert "Kalendář médií" in response.text
+    assert "Přehled měsíců · 2026" in response.text
+    assert 'class="calendar-months"' in response.text
+    assert all(name in response.text for name in ("Leden", "Červen", "Prosinec"))
+    assert "Roky" not in response.text
 
 
 def test_relations_use_operational_day_and_expand_active_asset(workspace_builder) -> None:

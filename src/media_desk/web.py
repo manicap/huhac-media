@@ -292,6 +292,8 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
             year, month, day = active_date.year, active_date.month, active_date.day
         spec = QuerySpec(media_type, q)
         calendar = app.state.library_index.calendar(spec)
+        if year is None and calendar["years"]:
+            year = max(calendar["years"])
         day_assets = ()
         if year and month and day:
             date_value = f"{year:04d}-{month:02d}-{day:02d}"
@@ -312,6 +314,10 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
                 "active_date_unknown": active is not None and active_date is None,
                 "media_type": media_type,
                 "query": q,
+                "month_names": (
+                    "Leden", "Únor", "Březen", "Duben", "Květen", "Červen",
+                    "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec",
+                ),
             },
         )
 
