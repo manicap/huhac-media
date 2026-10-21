@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import calendar as calendar_module
+from datetime import datetime
 import json
 from pathlib import Path
 import re
@@ -56,6 +58,16 @@ def _size_cs(value: int) -> str:
             return f"{amount:.{digits}f}".replace(".", ",") + f" {unit}"
         amount /= 1000
     return f"{value} B"
+
+
+def _datetime_cs(value: str | None) -> str:
+    if not value:
+        return "Čas neznámý"
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    return f"{parsed.day}. {parsed.month}. {parsed.year} · {parsed:%H:%M}"
 
 
 def _filtered(snapshot: WorkspaceSnapshot, media_type: str, query: str) -> list[Asset]:
@@ -131,6 +143,7 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
     app = FastAPI(title="Huháč Media Desk", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(_PACKAGE_ROOT / "templates"))
     templates.env.filters["size_cs"] = _size_cs
+    templates.env.filters["datetime_cs"] = _datetime_cs
     app.mount("/static", StaticFiles(directory=str(_PACKAGE_ROOT / "static")), name="static")
     try:
         snapshot = load_workspace(workspace, keyframe_fingerprint)
@@ -300,6 +313,7 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
             day_assets = app.state.library_index.query(
                 QuerySpec(media_type, q, "captured_desc", date_value, date_value)
             )
+        month_weeks = calendar_module.Calendar(firstweekday=0).monthdayscalendar(year, month) if year and month else ()
         return templates.TemplateResponse(
             request=request,
             name="calendar.html",
@@ -310,6 +324,7 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
                 "month": month,
                 "day": day,
                 "day_assets": day_assets,
+                "month_weeks": month_weeks,
                 "active_asset_id": active_asset_id,
                 "active_date_unknown": active is not None and active_date is None,
                 "media_type": media_type,

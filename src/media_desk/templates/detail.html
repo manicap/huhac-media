@@ -11,7 +11,7 @@
     <h1>{{ asset.source_name }}</h1>
     <p class="asset-id">{{ asset.asset_id }}</p>
     <dl class="facts">
-      <div><dt>Pořízeno</dt><dd>{{ asset.capture_time or 'Neznámé' }}{% if asset.capture_filesystem_fallback %}<br><small>čas souboru · nízká důvěra</small>{% elif asset.capture_time and not asset.capture_timezone and not asset.capture_time.endswith('Z') %}<br><small>bez časové zóny</small>{% endif %}</dd></div>
+      <div><dt>Pořízeno</dt><dd>{{ asset.capture_time|datetime_cs }}{% if asset.capture_filesystem_fallback %}<br><small>čas souboru · nízká důvěra</small>{% elif asset.capture_time and not asset.capture_timezone and not asset.capture_time.endswith('Z') %}<br><small>bez časové zóny</small>{% endif %}</dd></div>
       <div><dt>Zdroj času</dt><dd>{{ asset.capture_source or 'Neznámý' }}</dd></div>
       <div><dt>Velikost</dt><dd>{{ asset.size_bytes|size_cs }}</dd></div>
       <div><dt>Originál</dt><dd>{% if asset.original_online %}<a href="/artifacts/{{ asset.original.token }}">Otevřít / přehrát</a>{% else %}<span class="offline-text">Offline</span>{% endif %}</dd></div>
@@ -46,7 +46,7 @@
     {% for cluster in asset.face_clusters %}<div class="cluster"><strong>{{ cluster.cluster_id }}</strong><span>{{ cluster.status }} · {{ cluster.member_count }} members</span><small>Anonymous similarity group · {{ cluster.configuration_fingerprint[:12] }}</small></div>{% endfor %}
   </article>
 
-  <article class="panel">
+  <article class="panel technical-panel">
     <p class="eyebrow">TECHNICAL</p>
     <h2>Published metadata</h2>
     <details><summary>Zobrazit technické JSON</summary><pre>{{ technical_json }}</pre></details>

@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Media Desk{% endblock %} · Huháč</title>
-  <link rel="stylesheet" href="/static/media-desk.css">
-  <link rel="stylesheet" href="/static/library.css">
-  <link rel="stylesheet" href="/static/shell.css">
+  <link rel="stylesheet" href="/static/media-desk.css?v=1.2.1">
+  <link rel="stylesheet" href="/static/library.css?v=1.2.1">
+  <link rel="stylesheet" href="/static/shell.css?v=1.2.1">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/"><span>HUHÁČ</span> Media Desk</a>
+    <a class="brand" href="/" aria-label="HUHÁČ Media Desk – Přehled"><span class="brand-mark">HUHÁČ</span><span class="brand-product">Media Desk</span></a>
     <div class="read-only">READ ONLY</div>
   </header>
   {% set active_query = '?active_asset_id=' ~ (active_asset_id|urlencode) if active_asset_id else '' %}
@@ -22,7 +22,7 @@
       <a class="{% if request.url.path == '/relations' %}current{% endif %}" href="/relations{{ active_query }}">Časové relace</a>
     </nav>
   </aside>
-  <button class="nav-toggle" type="button" aria-controls="primary-sidebar" aria-label="Sbalit navigaci" aria-expanded="true"><span aria-hidden="true">‹</span></button>
+  <button class="nav-toggle" type="button" aria-controls="primary-sidebar" aria-label="Sbalit navigaci" aria-expanded="true" title="Otevřít nebo sbalit navigaci"><span aria-hidden="true">‹</span></button>
   <main class="app-main">{% block content %}{% endblock %}</main>
   <script>
     const navToggle=document.querySelector('.nav-toggle');

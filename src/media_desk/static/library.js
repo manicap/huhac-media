@@ -12,8 +12,8 @@ if (app) {
   const periodElement = document.querySelector("#library-period");
   const timeNavigator = document.querySelector("#time-navigator");
   const timeSelect = document.querySelector("#time-select");
+  const densityControls = [...form.querySelectorAll('input[name="density"]')];
   const batchSize = Number(app.dataset.batchSize || 50);
-  const rowHeight = 324;
   const overscanRows = 3;
   const maxCachedBatches = 12;
   const cache = new Map();
@@ -26,6 +26,9 @@ if (app) {
   let lastFailedStart = 0;
   let activeAssetId = app.dataset.activeAssetId || new URL(location.href).searchParams.get("active_asset_id");
   let segments = [];
+  let rowHeight = 260;
+  let tileMin = 176;
+  let tileGap = 10;
   const metrics = { batchRequests: 0, failedBatchRequests: 0, deduplicatedFetches: 0, maxInflightRequests: 0, peakDomTiles: 0, longTasksOver100ms: 0, initialHeapBytes: globalThis.performance?.memory?.usedJSHeapSize ?? null };
   if (globalThis.PerformanceObserver) {
     try {
@@ -35,8 +38,15 @@ if (app) {
 
   const params = () => {
     const values = new URLSearchParams(new FormData(form));
+    values.delete("density");
     for (const [key, value] of [...values.entries()]) if (!value) values.delete(key);
     return values;
+  };
+  const readGeometry = () => {
+    const styles = getComputedStyle(app);
+    rowHeight = Number.parseFloat(styles.getPropertyValue("--tile-row-height")) || 260;
+    tileMin = Number.parseFloat(styles.getPropertyValue("--tile-min")) || 176;
+    tileGap = Number.parseFloat(styles.getPropertyValue("--tile-gap")) || 10;
   };
   const apiUrl = (path, extra = {}) => {
     const values = params();
@@ -120,13 +130,17 @@ if (app) {
       totalCount,
       renderedStart: start,
       renderedEnd: end,
+      columns,
+      rowHeight,
+      density: app.dataset.density,
       ...metrics,
       currentHeapBytes: globalThis.performance?.memory?.usedJSHeapSize ?? null,
     };
   };
   const render = () => {
     renderScheduled = false;
-    columns = Math.max(1, Math.floor((viewport.clientWidth - 24) / 238));
+    readGeometry();
+    columns = Math.max(1, Math.floor((viewport.clientWidth + tileGap) / (tileMin + tileGap)));
     canvas.style.height = `${Math.max(1, Math.ceil(totalCount / columns) * rowHeight)}px`;
     const { firstRow, start, end } = visibleRange();
     windowElement.style.transform = `translateY(${firstRow * rowHeight}px)`;
@@ -158,7 +172,7 @@ if (app) {
       if (!years.has(segment.year)) years.set(segment.year, []);
       years.get(segment.year).push(segment);
     }
-    timeNavigator.innerHTML = [...years].map(([year, months]) => `<div class="time-year"><button type="button" data-period="${year}-${String(months[0].month).padStart(2, "0")}" aria-label="Přejít na rok ${year}">${year}</button><div class="time-months">${months.map((item) => `<button type="button" data-period="${segmentKey(item)}" title="${item.count} médií">${escapeHtml(monthName(item.month))}</button>`).join("")}</div></div>`).join("") + (segments.some((item) => !item.year) ? '<button type="button" data-period="unknown">Bez data</button>' : "");
+    timeNavigator.innerHTML = [...years].slice(0, 4).map(([year, months]) => `<div class="time-year"><button type="button" data-period="${year}-${String(months[0].month).padStart(2, "0")}" aria-label="Přejít na rok ${year}">${year}</button><div class="time-months">${months.map((item) => `<button type="button" data-period="${segmentKey(item)}" title="${item.count} médií">${escapeHtml(monthName(item.month))}</button>`).join("")}</div></div>`).join("") + (segments.some((item) => !item.year) ? '<button type="button" data-period="unknown">Bez data</button>' : "");
     timeSelect.innerHTML = '<option value="">Vyberte období…</option>' + segments.map((item) => `<option value="${segmentKey(item)}">${item.year ? `${monthName(item.month)} ${item.year}` : "Bez důvěryhodného data"} · ${item.count}</option>`).join("");
   };
   const setActivePeriod = (item) => {
@@ -214,6 +228,26 @@ if (app) {
     scheduleRender();
     return true;
   };
+  const applyDensity = (density, preserveAnchor = true) => {
+    const allowed = new Set(["small", "medium", "large"]);
+    const next = allowed.has(density) ? density : "medium";
+    const oldRowHeight = rowHeight;
+    const oldColumns = columns;
+    const oldScrollTop = scrollRoot.scrollTop;
+    const oldGalleryTop = galleryTop();
+    const insideGallery = oldScrollTop > oldGalleryTop;
+    const currentGalleryScroll = Math.max(0, oldScrollTop - oldGalleryTop);
+    const anchorIndex = Math.floor(currentGalleryScroll / oldRowHeight) * oldColumns;
+    const offset = currentGalleryScroll % oldRowHeight;
+    app.dataset.density = next;
+    densityControls.forEach((control) => { control.checked = control.value === next; });
+    try { localStorage.setItem("mediaDesk.libraryDensity", next); } catch { /* Preference persistence is optional. */ }
+    requestAnimationFrame(() => {
+      render();
+      if (!preserveAnchor || !insideGallery) scrollRoot.scrollTop = oldScrollTop;
+      else scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
+    });
+  };
   const reset = async ({ restore = true } = {}) => {
     generation += 1;
     for (const promise of inflight.values()) promise.controller?.abort();
@@ -239,12 +273,16 @@ if (app) {
   scrollRoot.addEventListener("scroll", () => { scheduleRender(); saveAnchor(); }, { passive: true });
   new ResizeObserver(() => {
     const oldColumns = columns;
+    const oldScrollTop = scrollRoot.scrollTop;
+    const oldGalleryTop = galleryTop();
+    const insideGallery = oldScrollTop > oldGalleryTop;
     const currentGalleryScroll = galleryScrollTop();
     const anchorIndex = Math.floor(currentGalleryScroll / rowHeight) * oldColumns;
     const anchor = itemAt(anchorIndex);
     const offset = currentGalleryScroll % rowHeight;
     render();
-    if (anchor) scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
+    if (!insideGallery) scrollRoot.scrollTop = oldScrollTop;
+    else if (anchor) scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
   }).observe(scrollRoot);
   windowElement.addEventListener("click", (event) => { if (event.target.closest("a")) saveAnchor(); });
   form.addEventListener("submit", (event) => {
@@ -264,5 +302,11 @@ if (app) {
     if (button) jumpToPeriod(button.dataset.period);
   });
   timeSelect.addEventListener("change", () => jumpToPeriod(timeSelect.value));
+  form.elements.media_type.addEventListener("change", () => form.requestSubmit());
+  form.elements.sort.addEventListener("change", () => form.requestSubmit());
+  densityControls.forEach((control) => control.addEventListener("change", () => applyDensity(control.value)));
+  let initialDensity = "medium";
+  try { initialDensity = localStorage.getItem("mediaDesk.libraryDensity") || initialDensity; } catch { /* Optional preference. */ }
+  applyDensity(initialDensity, false);
   reset().catch(() => { errorElement.hidden = false; countElement.textContent = "Knihovnu nelze načíst"; });
 }

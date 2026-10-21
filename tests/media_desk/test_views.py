@@ -60,6 +60,18 @@ def test_calendar_defaults_to_latest_year_month_grid(workspace_builder) -> None:
     assert "Roky" not in response.text
 
 
+def test_calendar_month_uses_seven_column_week_grid(workspace_builder) -> None:
+    workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+
+    response = TestClient(create_app(root)).get("/calendar", params={"year": 2026, "month": 10})
+
+    assert response.status_code == 200
+    assert 'class="calendar-weekdays"' in response.text
+    assert 'class="calendar-weeks"' in response.text
+    assert all(day in response.text for day in ("Po", "Út", "St", "Čt", "Pá", "So", "Ne"))
+
+
 def test_relations_use_operational_day_and_expand_active_asset(workspace_builder) -> None:
     assigned = workspace_builder.add_asset(1)
     unassigned = workspace_builder.add_asset(2)
