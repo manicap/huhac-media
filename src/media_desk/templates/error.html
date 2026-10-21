@@ -1,10 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Workspace error{% endblock %}
+{% block title %}Workspace nedostupný{% endblock %}
 {% block content %}
 <section class="error-panel">
-  <p class="eyebrow">WORKSPACE ERROR</p>
-  <h1>The gallery could not open this workspace.</h1>
+  <p class="eyebrow">{% if workspace_validation %}{{ workspace_validation.label|upper }}{% else %}WORKSPACE{% endif %}</p>
+  <h1>Workspace nelze otevřít</h1>
   <p>{{ message }}</p>
-  <p class="muted">Media Desk did not modify the workspace.</p>
+  {% if workspace_validation and workspace_validation.requested_path %}<p class="path-value">{{ workspace_validation.requested_path }}</p>{% endif %}
+  <div class="settings-actions"><a class="secondary-action" href="/settings?recheck=1">Zkusit znovu</a><a class="primary-action" href="/settings">Změnit cestu</a></div>
+  <p class="muted">Media Desk workspace nezměnil.</p>
 </section>
 {% endblock %}

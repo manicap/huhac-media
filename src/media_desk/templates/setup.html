@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Připojit workspace{% endblock %}
+{% block content %}
+<section class="setup-shell">
+  <p class="eyebrow">{% if fresh_setup %}PRVNÍ SPUŠTĚNÍ{% else %}KNIHOVNA{% endif %}</p>
+  <h1>{% if fresh_setup %}Připojit existující workspace{% else %}Workspace nedostupný{% endif %}</h1>
+  <p class="muted">Media Desk očekává adresář obsahující <code>workspace.json</code>. Nevybírejte složku fotografií ani soubor katalogu.</p>
+  {% if workspace_validation.requested_path %}<p class="path-value">{{ workspace_validation.requested_path }}</p>{% endif %}
+  <div class="status-line status-{{ workspace_validation.state }}"><strong>{{ workspace_validation.label }}</strong><span>{{ workspace_validation.message }}</span></div>
+  <div class="settings-actions">
+    {% if not fresh_setup %}<a class="secondary-action" href="/settings?recheck=1">Zkusit znovu</a>{% endif %}
+    <a class="primary-action" href="/settings">{% if fresh_setup %}Otevřít nastavení{% else %}Změnit cestu{% endif %}</a>
+  </div>
+  <p class="muted">Workspace i mediální soubory zůstávají pouze pro čtení.</p>
+</section>
+{% endblock %}

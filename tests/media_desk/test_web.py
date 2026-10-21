@@ -162,7 +162,7 @@ def test_invalid_workspace_renders_safe_error(workspace_builder) -> None:
     response = client.get("/")
 
     assert response.status_code == 503
-    assert "Unsupported workspace contract version" in response.text
+    assert "nepodporovanou verzi kontraktu" in response.text
     assert "Traceback" not in response.text
 
 

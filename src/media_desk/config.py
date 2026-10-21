@@ -25,6 +25,8 @@ def user_config_path(
     if config_dir is not None:
         return Path(config_dir) / "config.toml"
     env = os.environ if environ is None else environ
+    if env.get("MEDIA_DESK_CONFIG_DIR"):
+        return Path(env["MEDIA_DESK_CONFIG_DIR"]) / "config.toml"
     platform_value = sys.platform if platform_name is None else platform_name
     home_value = Path.home() if home is None else Path(home)
     if platform_value.startswith("win"):

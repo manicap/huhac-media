@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Nastavení{% endblock %}
+{% block content %}
+<section class="settings-head"><div><p class="eyebrow">MEDIA DESK</p><h1>Nastavení</h1><p class="muted">Jeden aktivní workspace, bezpečně a pouze pro čtení.</p></div></section>
+
+{% if notice %}<div class="settings-message is-success" role="status">{{ notice }}</div>{% endif %}
+{% if error %}<div class="settings-message is-error" role="alert">{{ error }}</div>{% endif %}
+
+<div class="settings-grid">
+  <section class="panel settings-library">
+    <div class="section-title"><div><p class="eyebrow">KNIHOVNA</p><h2>Aktivní workspace</h2></div><span class="status-badge status-{{ workspace_validation.state }}">{{ workspace_validation.label }}</span></div>
+    <dl class="settings-facts">
+      <div><dt>Cesta</dt><dd class="path-value">{{ workspace_path or '—' }}</dd></div>
+      <div><dt>Zdroj hodnoty</dt><dd>{{ workspace_source }}</dd></div>
+    </dl>
+    <p class="muted">{{ workspace_validation.message }}</p>
+    {% if workspace_path %}<a class="secondary-action" href="/settings?recheck=1">Zkontrolovat znovu</a>{% endif %}
+  </section>
+
+  <section class="panel settings-editor">
+    <p class="eyebrow">PŘIPOJENÍ</p><h2>Cesta k existujícímu workspace</h2>
+    {% if workspace_editable %}
+      <form action="/settings/validate" method="post" class="settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="workspace-path">Adresář obsahující workspace.json</label>
+        <input id="workspace-path" name="workspace" maxlength="4096" value="{{ candidate if candidate is not none else workspace_path }}" placeholder="D:\Media\_processing nebo /mnt/media/_processing" autocomplete="off" required>
+        <p class="field-help">Cesta se vyhodnocuje na počítači, kde běží Media Desk. Automatické převody mezi Windows a Linuxem se neprovádějí.</p>
+        <button class="secondary-action" type="submit">Ověřit cestu</button>
+      </form>
+      {% if candidate_validation %}
+        <div class="validation-result status-{{ candidate_validation.state }}">
+          <strong>{{ candidate_validation.label }}</strong><span>{{ candidate_validation.message }}</span>
+        </div>
+        {% if candidate_validation.valid %}
+          <form action="/settings/save" method="post" class="save-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="workspace" value="{{ candidate }}">
+            <button class="primary-action" type="submit">Uložit změny</button>
+            <span>Aktivace proběhne po restartu Media Desku.</span>
+          </form>
+        {% endif %}
+      {% endif %}
+    {% else %}
+      <input value="{{ workspace_path }}" disabled aria-label="Cesta k workspace">
+      <p class="settings-message">Aktivní cestu určuje {{ workspace_source }}. Změňte příslušný parametr při spuštění; profilová konfigurace má nižší prioritu.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel settings-about">
+    <p class="eyebrow">O APLIKACI</p><h2>HUHÁČ Media Desk {{ app_version }}</h2>
+    <dl class="settings-facts"><div><dt>Konfigurace aplikace</dt><dd class="path-value">{{ config_path }}</dd></div><div><dt>Režim workspace</dt><dd>Read-only</dd></div></dl>
+    <p class="muted">Media Desk zapisuje pouze tento per-user konfigurační soubor. Katalog, metadata, originály i výstupy procesorů nemění.</p>
+  </section>
+</div>
+{% endblock %}

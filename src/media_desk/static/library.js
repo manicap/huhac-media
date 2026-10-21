@@ -1,6 +1,7 @@
 const app = document.querySelector("#library-app");
 
 if (app) {
+  const storageKey = `mediaDesk.library:${app.dataset.workspaceId}`;
   const viewport = document.querySelector("#library-viewport");
   const scrollRoot = document.querySelector(".app-main");
   const canvas = document.querySelector("#library-canvas");
@@ -220,7 +221,7 @@ if (app) {
     const index = Math.floor(currentGalleryScroll / rowHeight) * columns;
     const item = itemAt(index);
     if (!item) return;
-    sessionStorage.setItem("mediaDesk.library", JSON.stringify({
+    sessionStorage.setItem(storageKey, JSON.stringify({
       url: location.pathname + location.search,
       assetId: item.asset_id,
       offset: currentGalleryScroll - Math.floor(index / columns) * rowHeight,
@@ -274,7 +275,7 @@ if (app) {
     render();
     if (restore) {
       let stored;
-      try { stored = JSON.parse(sessionStorage.getItem("mediaDesk.library")); } catch { stored = null; }
+      try { stored = JSON.parse(sessionStorage.getItem(storageKey)); } catch { stored = null; }
       const sameUrl = stored?.url === location.pathname + location.search;
       await locateAndRestore(activeAssetId || (sameUrl ? stored.assetId : null), sameUrl ? stored.offset : 0);
     }

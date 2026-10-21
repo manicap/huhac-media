@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Media Desk{% endblock %} · Huháč</title>
-  <link rel="stylesheet" href="/static/media-desk.css?v=1.2.2">
-  <link rel="stylesheet" href="/static/library.css?v=1.2.2">
-  <link rel="stylesheet" href="/static/shell.css?v=1.2.2">
+  <link rel="stylesheet" href="/static/media-desk.css?v=1.3.0">
+  <link rel="stylesheet" href="/static/library.css?v=1.3.0">
+  <link rel="stylesheet" href="/static/shell.css?v=1.3.0">
 </head>
-<body>
+<body data-workspace-id="{{ active_workspace_id }}">
   <header class="topbar">
     <a class="brand" href="/" aria-label="HUHÁČ Media Desk – Přehled"><img class="brand-logo" src="/static/huhac-logo.png" alt="HUHÁČ" width="1672" height="941"><span class="brand-product">Media Desk</span></a>
     <div class="read-only">READ ONLY</div>
@@ -20,6 +20,7 @@
       <a id="library-nav" class="{% if request.url.path == '/library' %}current{% endif %}" href="/library{{ active_query }}">Knihovna</a>
       <a class="{% if request.url.path == '/calendar' %}current{% endif %}" href="/calendar{{ active_query }}">Kalendář</a>
       <a class="{% if request.url.path == '/relations' %}current{% endif %}" href="/relations{{ active_query }}">Časové relace</a>
+      <a class="{% if request.url.path == '/settings' or request.url.path.startswith('/settings/') %}current{% endif %}" href="/settings">Nastavení</a>
     </nav>
   </aside>
   <button class="nav-toggle" type="button" aria-controls="primary-sidebar" aria-label="Sbalit navigaci" aria-expanded="true" title="Otevřít nebo sbalit navigaci"><span aria-hidden="true">‹</span></button>
@@ -29,7 +30,7 @@
     const updateNavigationState=collapsed=>{document.body.classList.toggle('nav-collapsed',collapsed);navToggle.setAttribute('aria-expanded',String(!collapsed));navToggle.setAttribute('aria-label',collapsed?'Otevřít navigaci':'Sbalit navigaci');navToggle.querySelector('span').textContent=collapsed?'›':'‹'};
     updateNavigationState(matchMedia('(max-width: 800px)').matches);
     navToggle.addEventListener('click',()=>updateNavigationState(!document.body.classList.contains('nav-collapsed')))
-    try { const state=JSON.parse(sessionStorage.getItem('mediaDesk.library')); if(state?.url?.startsWith('/library')) document.querySelector('#library-nav').href=state.url; } catch {}
+    try { const state=JSON.parse(sessionStorage.getItem(`mediaDesk.library:${document.body.dataset.workspaceId}`)); if(state?.url?.startsWith('/library')) document.querySelector('#library-nav').href=state.url; } catch {}
   </script>
 </body>
 </html>

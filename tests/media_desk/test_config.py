@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from media_desk.cli import main
 from media_desk.config import (
     ConfigurationError,
     load_settings,
@@ -47,6 +48,12 @@ def test_clean_profile_starts_without_workspace(tmp_path: Path) -> None:
     assert settings.workspace_editable is True
     assert settings.host == "127.0.0.1"
     assert settings.port == 8000
+
+
+def test_config_directory_can_be_isolated_by_environment(tmp_path: Path) -> None:
+    resolved = user_config_path(environ={"MEDIA_DESK_CONFIG_DIR": str(tmp_path / "isolated")})
+
+    assert resolved == tmp_path / "isolated/config.toml"
 
 
 def test_precedence_is_resolved_per_parameter(tmp_path: Path) -> None:
@@ -106,3 +113,28 @@ def test_failed_replace_keeps_original_config(tmp_path: Path, monkeypatch: pytes
 
     assert config.read_text(encoding="utf-8") == original
     assert list(profile.glob("*.tmp")) == []
+
+
+def test_cli_without_workspace_starts_web_setup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured = {}
+    monkeypatch.setenv("MEDIA_DESK_CONFIG_DIR", str(tmp_path / "clean-profile"))
+    for name in (
+        "MEDIA_DESK_WORKSPACE",
+        "MEDIA_DESK_HOST",
+        "MEDIA_DESK_PORT",
+        "MEDIA_DESK_KEYFRAME_FINGERPRINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def fake_run(app, *, host, port):
+        captured.update(app=app, host=host, port=port)
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    assert main([]) == 0
+    assert captured["host"] == "127.0.0.1"
+    assert captured["port"] == 8000
+    assert captured["app"].state.snapshot is None
+    assert captured["app"].state.workspace_validation.state == "unset"

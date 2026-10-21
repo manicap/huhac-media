@@ -16,7 +16,7 @@
   {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from }}">{% endif %}{% if date_to %}<input type="hidden" name="date_to" value="{{ date_to }}">{% endif %}
   <button type="submit">Filtrovat</button>
 </form>
-<div id="library-app" data-snapshot-id="{{ snapshot_id }}" data-active-asset-id="{{ active_asset_id or '' }}" data-batch-size="50">
+<div id="library-app" data-snapshot-id="{{ snapshot_id }}" data-workspace-id="{{ workspace.workspace_id }}" data-active-asset-id="{{ active_asset_id or '' }}" data-batch-size="50">
   <div class="library-meta-row">
     <div class="library-status" aria-live="polite"><span id="library-count">Načítání indexu…</span><span id="library-period"></span></div>
     <nav id="time-navigator" class="time-navigator" aria-label="Časový navigátor knihovny"></nav>
@@ -27,5 +27,5 @@
   <div id="library-viewport" class="library-viewport" tabindex="0" aria-label="Virtualizovaná galerie médií"><div id="library-canvas" class="library-canvas"><div id="library-window" class="library-window" aria-live="polite"></div></div></div>
   <noscript><p class="notice">Pro plynulé dávkové načítání knihovny je potřeba JavaScript.</p></noscript>
 </div>
-<script type="module" src="/static/library.js?v=1.2.1"></script>
+<script type="module" src="/static/library.js?v=1.3.0"></script>
 {% endblock %}

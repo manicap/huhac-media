@@ -32,26 +32,41 @@ source .venv/bin/activate
 python -m pip install -e '.[media-desk]'
 ```
 
-## Start
+## Start and first setup
 
 The default bind is loopback-only (`127.0.0.1`).
 
 Windows:
 
 ```powershell
-media-desk --workspace 'D:\Media\_processing'
+media-desk
 ```
 
 Linux:
 
 ```bash
-media-desk --workspace '/mnt/media/_processing'
+media-desk
 ```
 
-Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). The equivalent
-module command is `python -m media_desk --workspace PATH`.
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000), open **Nastavení**,
+enter the existing directory that contains `workspace.json`, validate it, save,
+and restart Media Desk. The equivalent module command is:
 
-Configuration precedence is CLI, environment, TOML, then defaults. Supported
+```powershell
+.\.venv\Scripts\python.exe -m media_desk
+```
+
+The saved workspace is loaded automatically on later starts. The profile file
+is `%APPDATA%\HUHAC\MediaDesk\config.toml` on Windows and
+`${XDG_CONFIG_HOME:-~/.config}/huhac/media-desk/config.toml` on Linux. The
+workspace remains read-only; only this application config is written.
+
+`--workspace PATH` is still supported for temporary or managed launches. A
+workspace supplied by CLI, environment, or explicit `--config` has higher
+priority, so the web UI shows its source and locks profile editing.
+
+Configuration precedence is CLI, environment, explicit TOML, per-user profile,
+then defaults, independently for every setting. Supported
 environment variables are `MEDIA_DESK_WORKSPACE`, `MEDIA_DESK_HOST`,
 `MEDIA_DESK_PORT`, and `MEDIA_DESK_KEYFRAME_FINGERPRINT`. A TOML example is in
 [`media-desk.example.toml`](media-desk.example.toml):
@@ -95,6 +110,9 @@ metadata browsable.
 - `GET /library` — virtualized library with type/search/sort/date filters;
 - `GET /calendar` — year/month/day navigation over trustworthy capture dates;
 - `GET /relations` — Session Grouper timeline, explicitly not an Event list;
+- `GET /settings` — active path, source, status and application information;
+- `POST /settings/validate` — read-only validation of one submitted path;
+- `POST /settings/save` — revalidation and atomic per-user config update;
 - `GET /assets/{sha256}` — asset detail;
 - `GET /api/assets?limit=50&cursor=...` — snapshot-bound batches; legacy
   `page`/`page_size` remains compatible;
@@ -135,8 +153,11 @@ paths. Workspace-relative paths reject traversal and resolved symlink escapes;
 only public preview/keyframe namespaces and validated active originals can be
 served.
 
-Keep the default loopback bind. Binding to a LAN address is an explicit
-operator choice and M1 has no authentication or TLS.
+Keep the default loopback bind. Settings POST requests require a loopback bind,
+loopback `Host`, same-origin `Origin` when present, and a SameSite/HttpOnly CSRF
+cookie token. A non-loopback bind remains usable for read-only viewing when
+explicitly requested, but server-side configuration changes are blocked because
+M1.3 has no authentication or TLS.
 
 ## Tests
 
@@ -155,7 +176,9 @@ every workspace file's content, size, and modification time.
 
 ## Known M1.1 limitations
 
-- One workspace per server process; no multi-workspace library.
+- One workspace per server process; no multi-workspace library. A saved path
+  change becomes active after restart, never through an HTTP-triggered restart
+  or partial hot swap.
 - Snapshot refresh requires a restart after processors publish new output; an
   open mismatched view receives an explicit refresh warning.
 - No authentication; loopback is the safe default and LAN exposure is not an

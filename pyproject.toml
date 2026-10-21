@@ -29,7 +29,7 @@ media-desk = "media_desk.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-media_desk = ["templates/*.html", "static/*.css", "static/*.js"]
+media_desk = ["templates/*.html", "static/*.css", "static/*.js", "static/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

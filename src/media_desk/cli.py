@@ -43,6 +43,6 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     from media_desk.web import create_app
 
-    app = create_app(settings.workspace, settings.keyframe_fingerprint)
+    app = create_app(settings=settings)
     uvicorn.run(app, host=settings.host, port=settings.port)
     return 0

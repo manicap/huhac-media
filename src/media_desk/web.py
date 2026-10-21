@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import calendar as calendar_module
 from datetime import datetime
+import hmac
+from importlib.metadata import PackageNotFoundError, version
+import ipaddress
 import json
 from pathlib import Path
 import re
+import secrets
 from typing import Iterator
 from urllib.parse import parse_qs, urlsplit
 
@@ -13,13 +17,51 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from media_desk.contract import ContractError, load_workspace
+from media_desk.config import ConfigurationError, Settings, save_profile_workspace, user_config_path
 from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_date, capture_label
 from media_desk.models import Artifact, Asset, WorkspaceSnapshot
+from media_desk.workspace_status import WorkspaceValidation, validate_workspace
 
 
 _PACKAGE_ROOT = Path(__file__).parent
 _RANGE = re.compile(r"bytes=(\d*)-(\d*)")
+_MAX_FORM_BYTES = 8192
+_MAX_WORKSPACE_PATH = 4096
+_CSRF_COOKIE = "media_desk_csrf"
+_SOURCE_LABELS = {
+    "default": "nenastaveno",
+    "profile": "profil",
+    "cli": "CLI",
+    "env": "ENV",
+    "explicit_config": "explicitní config",
+}
+
+
+def _app_version() -> str:
+    try:
+        return version("huhac-media")
+    except PackageNotFoundError:
+        return "0.1.0"
+
+
+def _is_loopback(value: str | None) -> bool:
+    if not value:
+        return False
+    candidate = value.strip().strip("[]").casefold()
+    if candidate == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(candidate).is_loopback
+    except ValueError:
+        return False
+
+
+def _safe_path_input(value: str) -> str:
+    if not value or len(value) > _MAX_WORKSPACE_PATH:
+        raise ValueError("Cesta musí mít 1 až 4096 znaků.")
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ValueError("Cesta obsahuje nepovolené řídicí znaky.")
+    return value
 
 
 def _asset_payload(asset: Asset) -> dict:
@@ -139,27 +181,189 @@ def _serve_original(request: Request, artifact: Artifact, resolved: Path):
     )
 
 
-def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> FastAPI:
+def create_app(
+    workspace: Path | None = None,
+    keyframe_fingerprint: str | None = None,
+    *,
+    settings: Settings | None = None,
+) -> FastAPI:
+    if settings is None:
+        settings = Settings(
+            workspace=workspace,
+            keyframe_fingerprint=keyframe_fingerprint,
+            profile_config_path=user_config_path(),
+            workspace_source="cli" if workspace is not None else "default",
+        )
+    workspace = settings.workspace
+    keyframe_fingerprint = settings.keyframe_fingerprint
     app = FastAPI(title="Huháč Media Desk", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(_PACKAGE_ROOT / "templates"))
     templates.env.filters["size_cs"] = _size_cs
     templates.env.filters["datetime_cs"] = _datetime_cs
     app.mount("/static", StaticFiles(directory=str(_PACKAGE_ROOT / "static")), name="static")
-    try:
-        snapshot = load_workspace(workspace, keyframe_fingerprint)
-        startup_error: str | None = None
-    except ContractError as exc:
-        snapshot = None
-        startup_error = str(exc)
+    validation = validate_workspace(workspace, keyframe_fingerprint)
+    snapshot = validation.snapshot
     app.state.snapshot = snapshot
-    app.state.startup_error = startup_error
+    app.state.workspace_validation = validation
+    app.state.startup_error = None if validation.valid else validation.message
     app.state.library_index = LibraryIndex(snapshot) if snapshot is not None else None
+    app.state.settings = settings
+    app.state.csrf_secret = secrets.token_urlsafe(32)
+    templates.env.globals["active_workspace_id"] = snapshot.workspace_id if snapshot else "none"
 
     def require_snapshot() -> WorkspaceSnapshot:
         current = app.state.snapshot
         if current is None:
             raise HTTPException(status_code=503, detail=app.state.startup_error)
         return current
+
+    def settings_context(
+        request: Request,
+        *,
+        candidate: str | None = None,
+        candidate_validation: WorkspaceValidation | None = None,
+        error: str | None = None,
+        notice: str | None = None,
+    ) -> dict:
+        current_settings: Settings = app.state.settings
+        return {
+            "request": request,
+            "workspace_validation": app.state.workspace_validation,
+            "workspace_path": str(current_settings.workspace or ""),
+            "workspace_source": _SOURCE_LABELS.get(
+                current_settings.workspace_source, current_settings.workspace_source
+            ),
+            "workspace_editable": current_settings.workspace_editable,
+            "candidate": candidate,
+            "candidate_validation": candidate_validation,
+            "error": error,
+            "notice": notice,
+            "config_path": current_settings.profile_config_path or user_config_path(),
+            "app_version": _app_version(),
+            "csrf_token": request.cookies.get(_CSRF_COOKIE) or app.state.csrf_secret,
+            "active_asset_id": None,
+        }
+
+    def render_settings(request: Request, **values):
+        response = templates.TemplateResponse(
+            request=request,
+            name="settings.html",
+            context=settings_context(request, **values),
+        )
+        if request.cookies.get(_CSRF_COOKIE) != app.state.csrf_secret:
+            response.set_cookie(
+                _CSRF_COOKIE,
+                app.state.csrf_secret,
+                httponly=True,
+                samesite="strict",
+                secure=False,
+                path="/",
+            )
+        return response
+
+    async def protected_form(request: Request) -> dict[str, str]:
+        current_settings: Settings = app.state.settings
+        if not _is_loopback(current_settings.host):
+            raise HTTPException(status_code=403, detail="Změny nastavení jsou povoleny jen při loopback bindu.")
+        raw_host = request.headers.get("host", "")
+        host_name = urlsplit(f"//{raw_host}").hostname
+        if not _is_loopback(host_name):
+            raise HTTPException(status_code=403, detail="Neplatný Host pro změnu nastavení.")
+        origin = request.headers.get("origin")
+        if origin:
+            parsed_origin = urlsplit(origin)
+            expected = f"{request.url.scheme}://{raw_host}".casefold()
+            if f"{parsed_origin.scheme}://{parsed_origin.netloc}".casefold() != expected:
+                raise HTTPException(status_code=403, detail="Cizí Origin není povolen.")
+        length = request.headers.get("content-length")
+        if length and (not length.isdigit() or int(length) > _MAX_FORM_BYTES):
+            raise HTTPException(status_code=413, detail="Formulář je příliš velký.")
+        body = await request.body()
+        if len(body) > _MAX_FORM_BYTES:
+            raise HTTPException(status_code=413, detail="Formulář je příliš velký.")
+        try:
+            parsed = parse_qs(body.decode("utf-8"), keep_blank_values=True, max_num_fields=4)
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Neplatný formulář.") from exc
+        if set(parsed) != {"csrf_token", "workspace"} or any(len(items) != 1 for items in parsed.values()):
+            raise HTTPException(status_code=400, detail="Formulář obsahuje neočekávaná pole.")
+        cookie = request.cookies.get(_CSRF_COOKIE, "")
+        token = parsed["csrf_token"][0]
+        if not cookie or not hmac.compare_digest(cookie, token) or not hmac.compare_digest(token, app.state.csrf_secret):
+            raise HTTPException(status_code=403, detail="Neplatný CSRF token.")
+        return {key: items[0] for key, items in parsed.items()}
+
+    @app.exception_handler(HTTPException)
+    async def friendly_workspace_error(request: Request, exc: HTTPException):
+        if exc.status_code == 503 and app.state.snapshot is None and not request.url.path.startswith("/api/"):
+            return templates.TemplateResponse(
+                request=request,
+                name="error.html",
+                context={
+                    "message": app.state.startup_error,
+                    "workspace_validation": app.state.workspace_validation,
+                    "active_asset_id": None,
+                },
+                status_code=503,
+            )
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings_page(request: Request, recheck: bool = False):
+        current_settings: Settings = app.state.settings
+        if recheck and current_settings.workspace is not None:
+            checked = validate_workspace(current_settings.workspace, keyframe_fingerprint)
+            notice = "Cesta je dostupná. Pro načtení knihovny restartujte Media Desk." if checked.valid and app.state.snapshot is None else None
+            return render_settings(
+                request,
+                candidate=str(current_settings.workspace),
+                candidate_validation=checked,
+                notice=notice,
+            )
+        return render_settings(request)
+
+    @app.post("/settings/validate", response_class=HTMLResponse)
+    async def validate_settings(request: Request):
+        fields = await protected_form(request)
+        if not app.state.settings.workspace_editable:
+            return render_settings(request, error="Aktivní cestu určuje vyšší priorita; změňte ji při spuštění." )
+        try:
+            candidate = _safe_path_input(fields["workspace"])
+        except ValueError as exc:
+            return render_settings(request, candidate=fields["workspace"], error=str(exc))
+        checked = validate_workspace(Path(candidate).expanduser(), keyframe_fingerprint)
+        return render_settings(request, candidate=candidate, candidate_validation=checked)
+
+    @app.post("/settings/save", response_class=HTMLResponse)
+    async def save_settings(request: Request):
+        fields = await protected_form(request)
+        current_settings: Settings = app.state.settings
+        if not current_settings.workspace_editable:
+            return render_settings(request, error="Aktivní cestu určuje vyšší priorita; profil nelze upravit." )
+        try:
+            candidate = _safe_path_input(fields["workspace"])
+        except ValueError as exc:
+            return render_settings(request, candidate=fields["workspace"], error=str(exc))
+        checked = validate_workspace(Path(candidate).expanduser(), keyframe_fingerprint)
+        if not checked.valid or checked.resolved_path is None:
+            return render_settings(request, candidate=candidate, candidate_validation=checked)
+        try:
+            save_profile_workspace(
+                current_settings.profile_config_path or user_config_path(), checked.resolved_path
+            )
+        except ConfigurationError as exc:
+            return render_settings(
+                request,
+                candidate=candidate,
+                candidate_validation=checked,
+                error=f"Konfiguraci se nepodařilo uložit: {exc}",
+            )
+        return render_settings(
+            request,
+            candidate=candidate,
+            candidate_validation=checked,
+            notice="Cesta byla bezpečně uložena. Pro její aktivaci restartujte Media Desk.",
+        )
 
     @app.get("/", response_class=HTMLResponse)
     def overview(
@@ -169,9 +373,12 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
         if app.state.snapshot is None:
             return templates.TemplateResponse(
                 request=request,
-                name="error.html",
-                context={"message": app.state.startup_error},
-                status_code=503,
+                name="setup.html",
+                context={
+                    **settings_context(request),
+                    "fresh_setup": app.state.workspace_validation.state == "unset",
+                },
+                status_code=200 if app.state.workspace_validation.state == "unset" else 503,
             )
         current: WorkspaceSnapshot = app.state.snapshot
         index = app.state.library_index
@@ -455,7 +662,15 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
     @app.get("/health")
     def health():
         if app.state.snapshot is None:
-            return JSONResponse({"status": "error", "message": app.state.startup_error}, status_code=503)
+            return JSONResponse(
+                {
+                    "status": "running",
+                    "ready": False,
+                    "workspace_status": app.state.workspace_validation.state,
+                    "message": app.state.startup_error,
+                },
+                status_code=503,
+            )
         return {"status": "ok", "workspace_id": app.state.snapshot.workspace_id}
 
     return app
