@@ -25,6 +25,12 @@ if (app) {
   let lastFailedStart = 0;
   let activeAssetId = app.dataset.activeAssetId || new URL(location.href).searchParams.get("active_asset_id");
   let segments = [];
+  const metrics = { batchRequests: 0, failedBatchRequests: 0, deduplicatedFetches: 0, maxInflightRequests: 0, peakDomTiles: 0, longTasksOver100ms: 0, initialHeapBytes: globalThis.performance?.memory?.usedJSHeapSize ?? null };
+  if (globalThis.PerformanceObserver) {
+    try {
+      new PerformanceObserver((list) => { metrics.longTasksOver100ms += list.getEntries().filter((entry) => entry.duration > 100).length; }).observe({ type: "longtask", buffered: true });
+    } catch { /* Long-task observation is optional in unsupported browsers. */ }
+  }
 
   const params = () => {
     const values = new URLSearchParams(new FormData(form));
@@ -64,9 +70,13 @@ if (app) {
   };
   const fetchBatch = async (start) => {
     if (start < 0 || start >= totalCount || cache.has(start)) return;
-    if (inflight.has(start)) return inflight.get(start);
+    if (inflight.has(start)) {
+      metrics.deduplicatedFetches += 1;
+      return inflight.get(start);
+    }
     const localGeneration = generation;
     const controller = new AbortController();
+    metrics.batchRequests += 1;
     const promise = fetch(apiUrl("/api/assets", { limit: batchSize, start, snapshot_id: snapshotId }), {
       signal: controller.signal, headers: { Accept: "application/json" },
     }).then(async (response) => {
@@ -82,12 +92,14 @@ if (app) {
       scheduleRender();
     }).catch((error) => {
       if (error.name !== "AbortError" && error.message !== "snapshot_changed") {
+        metrics.failedBatchRequests += 1;
         lastFailedStart = start;
         errorElement.hidden = false;
       }
     }).finally(() => inflight.delete(start));
     promise.controller = controller;
     inflight.set(start, promise);
+    metrics.maxInflightRequests = Math.max(metrics.maxInflightRequests, inflight.size);
     return promise;
   };
   const visibleRange = () => {
@@ -96,13 +108,17 @@ if (app) {
     return { firstRow, start: firstRow * columns, end: Math.min(totalCount, (firstRow + visibleRows) * columns) };
   };
   const updateDebug = (start, end) => {
+    const domTiles = windowElement.querySelectorAll(".media-tile").length;
+    metrics.peakDomTiles = Math.max(metrics.peakDomTiles, domTiles);
     window.__MEDIA_DESK_DEBUG__ = {
-      domTiles: windowElement.querySelectorAll(".media-tile").length,
+      domTiles,
       cachedBatches: cache.size,
       inflightRequests: inflight.size,
       totalCount,
       renderedStart: start,
       renderedEnd: end,
+      ...metrics,
+      currentHeapBytes: globalThis.performance?.memory?.usedJSHeapSize ?? null,
     };
   };
   const render = () => {

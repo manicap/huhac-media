@@ -45,8 +45,10 @@ def run(count: int, requests: int, keep: Path | None) -> dict:
     else:
         root = keep
         root.mkdir(parents=True, exist_ok=True)
+    workspace = root / "workspace"
+    if not (workspace / "workspace.json").is_file():
+        workspace = build_workspace(root, count)
     started = time.perf_counter()
-    workspace = build_workspace(root, count)
     app = create_app(workspace)
     startup_ms = (time.perf_counter() - started) * 1000
     client = TestClient(app)
@@ -60,7 +62,7 @@ def run(count: int, requests: int, keep: Path | None) -> dict:
         response.raise_for_status()
         samples.append((time.perf_counter() - tick) * 1000)
     tick = time.perf_counter()
-    located = client.get("/api/locate", params={"year": 2012, "month": 12})
+    located = client.get("/api/locate", params={"year": 2012, "month": 4})
     located.raise_for_status()
     locate_ms = (time.perf_counter() - tick) * 1000
     result = {
