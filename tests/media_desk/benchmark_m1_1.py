@@ -54,13 +54,25 @@ def run(count: int, requests: int, keep: Path | None) -> dict:
     client = TestClient(app)
     client.get("/api/assets", params={"limit": 50})
     samples = []
+    pages = (count + 49) // 50
+    forward_ids: list[str] = []
+    backward_ids: list[str] = []
     for index in range(requests):
+        if index < pages:
+            start = index * 50
+        elif index < pages * 2:
+            start = max(0, count - (index - pages + 1) * 50)
+        else:
+            start = index * 50 % count
         tick = time.perf_counter()
-        response = client.get(
-            "/api/assets", params={"limit": 50, "start": index * 50 % count}
-        )
+        response = client.get("/api/assets", params={"limit": 50, "start": start})
         response.raise_for_status()
         samples.append((time.perf_counter() - tick) * 1000)
+        ids = [item["asset_id"] for item in response.json()["items"]]
+        if index < pages:
+            forward_ids.extend(ids)
+        elif index < pages * 2:
+            backward_ids.extend(ids)
     tick = time.perf_counter()
     located = client.get("/api/locate", params={"year": 2012, "month": 4})
     located.raise_for_status()
@@ -73,6 +85,12 @@ def run(count: int, requests: int, keep: Path | None) -> dict:
         "batch_p95_ms": round(percentile(samples, 0.95), 3),
         "batch_max_ms": round(max(samples), 3),
         "remote_month_locator_ms": round(locate_ms, 3),
+        "forward_unique_assets": len(set(forward_ids)),
+        "forward_duplicate_assets": len(forward_ids) - len(set(forward_ids)),
+        "forward_missing_assets": count - len(set(forward_ids)),
+        "backward_unique_assets": len(set(backward_ids)),
+        "backward_duplicate_assets": len(backward_ids) - len(set(backward_ids)),
+        "same_assets_both_directions": set(forward_ids) == set(backward_ids),
         "workspace": str(workspace) if keep else None,
     }
     if temporary:
