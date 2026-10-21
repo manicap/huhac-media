@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Media Desk{% endblock %} · Huháč</title>
-  <link rel="stylesheet" href="/static/media-desk.css?v=1.2.1">
-  <link rel="stylesheet" href="/static/library.css?v=1.2.1">
-  <link rel="stylesheet" href="/static/shell.css?v=1.2.1">
+  <link rel="stylesheet" href="/static/media-desk.css?v=1.2.2">
+  <link rel="stylesheet" href="/static/library.css?v=1.2.2">
+  <link rel="stylesheet" href="/static/shell.css?v=1.2.2">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="HUHÁČ Media Desk – Přehled"><span class="brand-mark">HUHÁČ</span><span class="brand-product">Media Desk</span></a>
+    <a class="brand" href="/" aria-label="HUHÁČ Media Desk – Přehled"><img class="brand-logo" src="/static/huhac-logo.png" alt="HUHÁČ" width="1672" height="941"><span class="brand-product">Media Desk</span></a>
     <div class="read-only">READ ONLY</div>
   </header>
   {% set active_query = '?active_asset_id=' ~ (active_asset_id|urlencode) if active_asset_id else '' %}

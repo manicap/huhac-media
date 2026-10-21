@@ -49,9 +49,14 @@ def test_library_uses_virtualized_client_and_cursor_api(workspace_builder) -> No
 
     page = client.get("/library", params={"media_type": "image", "q": "media"})
     script = client.get("/static/library.js")
+    logo = client.get("/static/huhac-logo.png")
     batch = client.get("/api/assets", params={"limit": 50, "start": 50})
 
     assert page.status_code == 200
+    assert 'class="brand-logo"' in page.text
+    assert 'alt="HUHÁČ"' in page.text
+    assert logo.status_code == 200
+    assert logo.headers["content-type"] == "image/png"
     assert "library-viewport" in page.text
     assert "pagination" not in page.text
     assert script.status_code == 200

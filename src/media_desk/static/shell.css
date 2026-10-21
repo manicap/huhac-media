@@ -1,6 +1,6 @@
 .topbar { position: fixed; z-index: 20; inset: 0 0 auto; height: var(--topbar-height); display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); background: rgb(12 14 16 / .96); backdrop-filter: blur(12px); }
 .brand { display: inline-flex; align-items: center; gap: 9px; min-width: 0; text-decoration: none; font-weight: 680; }
-.brand-mark { color: var(--accent); font-size: 13px; letter-spacing: .045em; }
+.brand-logo { display: block; width: auto; height: 34px; object-fit: contain; }
 .brand-product { color: var(--muted); font-size: 13px; }
 .sidebar { position: fixed; z-index: 15; top: var(--topbar-height); bottom: 0; left: 0; width: var(--sidebar-width); padding: 44px 10px 12px; border-right: 1px solid var(--line); background: var(--bg); transition: transform .16s ease; }
 .sidebar nav { display: grid; gap: 4px; }
