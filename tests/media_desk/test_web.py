@@ -41,6 +41,26 @@ def test_filtering_and_pagination(workspace_builder) -> None:
     assert search.json()["assets"][0]["media_type"] == "video"
 
 
+def test_library_uses_virtualized_client_and_cursor_api(workspace_builder) -> None:
+    for number in range(1, 121):
+        workspace_builder.add_asset(number)
+    root = workspace_builder.publish()
+    client = TestClient(create_app(root))
+
+    page = client.get("/library", params={"media_type": "image", "q": "media"})
+    script = client.get("/static/library.js")
+    batch = client.get("/api/assets", params={"limit": 50, "start": 50})
+
+    assert page.status_code == 200
+    assert "library-viewport" in page.text
+    assert "pagination" not in page.text
+    assert script.status_code == 200
+    assert "maxCachedBatches = 12" in script.text
+    assert "__MEDIA_DESK_DEBUG__" in script.text
+    assert batch.json()["start_index"] == 50
+    assert len(batch.json()["items"]) == 50
+
+
 def test_artifact_registry_blocks_traversal_and_sqlite(workspace_builder) -> None:
     image = workspace_builder.add_asset(1)
     root = workspace_builder.publish()

@@ -223,6 +223,32 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
             "assets": [_asset_payload(asset) for asset in assets[start : start + page_size]],
         }
 
+    @app.get("/library", response_class=HTMLResponse)
+    def library(
+        request: Request,
+        media_type: str = Query("all", pattern="^(all|image|video)$"),
+        q: str = "",
+        sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
+        active_asset_id: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ):
+        current = require_snapshot()
+        return templates.TemplateResponse(
+            request=request,
+            name="library.html",
+            context={
+                "workspace": current,
+                "media_type": media_type,
+                "query": q,
+                "sort": sort,
+                "active_asset_id": active_asset_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "snapshot_id": app.state.library_index.snapshot_id,
+            },
+        )
+
     @app.get("/api/index")
     def api_index(
         media_type: str = Query("all", pattern="^(all|image|video)$"),

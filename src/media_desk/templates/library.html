@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Knihovna{% endblock %}
+{% block content %}
+<section class="library-heading">
+  <div><p class="eyebrow">KNIHOVNA · {{ workspace.workspace_id }}</p><h1>Média</h1></div>
+  <p class="muted">Stabilní snapshot · pouze pro čtení</p>
+</section>
+<form class="filters library-filters" id="library-filters" action="/library" method="get">
+  <label>Typ<select name="media_type"><option value="all" {% if media_type == 'all' %}selected{% endif %}>Vše</option><option value="image" {% if media_type == 'image' %}selected{% endif %}>Obrázky</option><option value="video" {% if media_type == 'video' %}selected{% endif %}>Video</option></select></label>
+  <label class="search">Hledat<input name="q" value="{{ query }}" placeholder="Název zdroje nebo asset ID"></label>
+  <label>Řazení<select name="sort"><option value="captured_desc" {% if sort == 'captured_desc' %}selected{% endif %}>Nejnovější</option><option value="captured_asc" {% if sort == 'captured_asc' %}selected{% endif %}>Nejstarší</option></select></label>
+  {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from }}">{% endif %}{% if date_to %}<input type="hidden" name="date_to" value="{{ date_to }}">{% endif %}
+  <button type="submit">Použít</button>
+</form>
+<div id="library-app" data-snapshot-id="{{ snapshot_id }}" data-active-asset-id="{{ active_asset_id or '' }}" data-batch-size="50">
+  <div class="library-status" aria-live="polite"><span id="library-count">Načítání indexu…</span><span id="library-period"></span></div>
+  <div id="snapshot-notice" class="notice" hidden>Data byla aktualizována. <button type="button">Obnovit pohled</button></div>
+  <div id="library-error" class="notice error-notice" role="alert" hidden><span>Část galerie se nepodařilo načíst.</span><button type="button" id="library-retry">Zkusit znovu</button><button type="button" id="library-load-more">Načíst další</button></div>
+  <div id="library-viewport" class="library-viewport" tabindex="0" aria-label="Virtualizovaná galerie médií"><div id="library-canvas" class="library-canvas"><div id="library-window" class="library-window" aria-live="polite"></div></div></div>
+  <noscript><p class="notice">Pro plynulé dávkové načítání knihovny je potřeba JavaScript.</p></noscript>
+</div>
+<script type="module" src="/static/library.js"></script>
+{% endblock %}
