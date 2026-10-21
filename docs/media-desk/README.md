@@ -1,13 +1,15 @@
-# Media Desk M1
+# Media Desk M1.1
 
-Media Desk M1 is a local, read-only web gallery for one existing Huháč media
+Media Desk M1.1 is a local, read-only web gallery for one existing Huháč media
 workspace. It starts at `workspace.json`, requires public workspace contract
 version 1, follows `metadata/catalog.json`, and never reads ingest SQLite.
 
-M1 shows paginated image/video cards, public metadata, source names, capture
-time, technical facts, probable time-continuity sessions, completed Vision
-descriptions, and anonymous Faces results. Image cards use published ingest
-previews. Video cards use one complete compatible Video Keyframe v1 result.
+M1.1 adds a compact overview, a virtualized image/video library, direct time
+navigation, a year/month/day calendar, and a timeline of automatic Session
+Grouper time relations. It retains completed Vision/Faces results, anonymous
+clusters, explicit keyframe selection, offline originals, and HTTP Range video
+playback from M1. A browser request never opens ingest SQLite, runs a processor,
+decodes a video, creates a thumbnail, or changes the workspace.
 
 ## Install
 
@@ -87,18 +89,41 @@ media-desk --workspace ./.media-desk-demo
 The demo deliberately marks originals offline while keeping previews and
 metadata browsable.
 
-## HTTP surface
+## Navigation and HTTP surface
 
-- `GET /` — gallery with `media_type`, `q`, `page`, and `page_size` filters;
+- `GET /` — compact overview;
+- `GET /library` — virtualized library with type/search/sort/date filters;
+- `GET /calendar` — year/month/day navigation over trustworthy capture dates;
+- `GET /relations` — Session Grouper timeline, explicitly not an Event list;
 - `GET /assets/{sha256}` — asset detail;
-- `GET /api/assets` and `GET /api/assets/{sha256}` — public metadata views;
+- `GET /api/assets?limit=50&cursor=...` — snapshot-bound batches; legacy
+  `page`/`page_size` remains compatible;
+- `GET /api/index` — filtered counts and available time segments;
+- `GET /api/locate` — direct lookup by asset or year/month/day;
+- `GET /api/calendar` and `GET /api/assets/{sha256}` — calendar/detail data;
 - `GET /artifacts/{opaque-token}` — only artifacts registered from validated
   public paths and authorized active originals;
 - `GET /health` — workspace readiness.
 
 Original video responses support one HTTP byte range per request. The browser
 therefore does not need to load a complete video before seeking. Preview and
-keyframe images use lazy loading in the gallery.
+keyframe images use lazy loading, identity ETags, and immutable browser caching.
+
+The batch response contains `items`, `next_cursor`, `prev_cursor`,
+`start_index`, `total_count`, and `snapshot_id`. Cursors bind the snapshot,
+filters, and sort; incompatible reuse returns HTTP 409. Batch size defaults to
+50 and is constrained to 10–100. The library keeps visible rows plus overscan
+in the DOM and at most 12 metadata batches in its LRU cache. Anchor restoration
+uses `asset_id` plus pixel offset and `/api/locate`, not preceding downloads.
+
+## Calendar time policy
+
+Capture timestamps retain the wall-clock date written by the source. An
+explicit offset is displayed but never converted to the server timezone. A
+timestamp without an offset remains timezone-naive. Filesystem mtime fallbacks
+have low confidence and, together with missing/invalid timestamps, appear under
+**Nezařazeno podle data**. Session years use published `operational_day`; a
+session crossing midnight is never split into fake events.
 
 ## Security and read-only behavior
 
@@ -128,10 +153,11 @@ fingerprints, all five existing component outputs, filtering, pagination,
 range responses, traversal attempts, safe browser errors, and preservation of
 every workspace file's content, size, and modification time.
 
-## Known M1 limitations
+## Known M1.1 limitations
 
 - One workspace per server process; no multi-workspace library.
-- Snapshot refresh requires a restart after processors publish new output.
+- Snapshot refresh requires a restart after processors publish new output; an
+  open mismatched view receives an explicit refresh warning.
 - No authentication; loopback is the safe default and LAN exposure is not an
   M1 deployment mode.
 - No import, upload, processing orchestration, favorites, ratings, collections,
@@ -142,6 +168,10 @@ every workspace file's content, size, and modification time.
   not receive or reinterpret host filesystem paths.
 - Session relationships are labelled as probable time continuity, never as
   identified events. Faces clusters remain anonymous similarity groups.
+- Multiple valid Session Grouper results produce an ambiguous state instead of
+  being guessed or merged.
+- Library virtualization requires JavaScript. The API and details remain
+  available without it, but thousands of fallback cards are not rendered.
 
 The governing scope and later milestones are recorded in
 [`CONTRACT.md`](CONTRACT.md). M2–M5 are not implemented.

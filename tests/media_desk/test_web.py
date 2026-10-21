@@ -92,6 +92,42 @@ def test_original_supports_http_range(workspace_builder) -> None:
     assert response.headers["accept-ranges"] == "bytes"
 
 
+def test_preview_has_identity_cache_headers(workspace_builder) -> None:
+    image = workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    client = TestClient(create_app(root))
+    url = f"/artifacts/preview-{image['sha256']}"
+
+    first = client.get(url)
+    cached = client.get(url, headers={"If-None-Match": first.headers["etag"]})
+
+    assert first.status_code == 200
+    assert "immutable" in first.headers["cache-control"]
+    assert cached.status_code == 304
+
+
+def test_detail_preserves_filtered_return_and_neighbors(workspace_builder) -> None:
+    first = workspace_builder.add_asset(1)
+    second = workspace_builder.add_asset(2)
+    workspace_builder.add_asset(3, "video")
+    root = workspace_builder.publish()
+    client = TestClient(create_app(root))
+
+    response = client.get(
+        f"/assets/{second['sha256']}",
+        params={"return_to": "/library?media_type=image&q=media"},
+    )
+    unsafe = client.get(
+        f"/assets/{first['sha256']}", params={"return_to": "//example.invalid/steal"}
+    )
+
+    assert response.status_code == 200
+    assert "Předchozí" in response.text or "Další" in response.text
+    assert "media_type=image" in response.text
+    assert "ArrowLeft" in response.text
+    assert "example.invalid" not in unsafe.text
+
+
 def test_requests_do_not_modify_workspace(workspace_builder) -> None:
     image = workspace_builder.add_asset(1)
     root = workspace_builder.publish()

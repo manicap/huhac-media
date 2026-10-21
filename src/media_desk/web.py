@@ -7,7 +7,7 @@ from typing import Iterator
 from urllib.parse import parse_qs, urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -45,6 +45,17 @@ def _asset_payload(asset: Asset) -> dict:
         "faces_result_count": len(asset.faces),
         "anonymous_face_clusters": [reference.__dict__ for reference in asset.face_clusters],
     }
+
+
+def _size_cs(value: int) -> str:
+    units = ("B", "kB", "MB", "GB", "TB")
+    amount = float(value)
+    for unit in units:
+        if amount < 1000 or unit == units[-1]:
+            digits = 0 if unit == "B" else 1
+            return f"{amount:.{digits}f}".replace(".", ",") + f" {unit}"
+        amount /= 1000
+    return f"{value} B"
 
 
 def _filtered(snapshot: WorkspaceSnapshot, media_type: str, query: str) -> list[Asset]:
@@ -119,6 +130,7 @@ def _serve_original(request: Request, artifact: Artifact, resolved: Path):
 def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> FastAPI:
     app = FastAPI(title="Huháč Media Desk", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(_PACKAGE_ROOT / "templates"))
+    templates.env.filters["size_cs"] = _size_cs
     app.mount("/static", StaticFiles(directory=str(_PACKAGE_ROOT / "static")), name="static")
     try:
         snapshot = load_workspace(workspace, keyframe_fingerprint)
@@ -174,7 +186,8 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
         asset = next((item for item in current.assets if item.sha256 == sha256), None)
         if asset is None:
             raise HTTPException(status_code=404, detail="Asset not found")
-        safe_return = return_to if return_to and return_to.startswith("/library") and not return_to.startswith("//") else "/library"
+        allowed_returns = ("/library", "/calendar", "/relations")
+        safe_return = return_to if return_to and return_to.startswith(allowed_returns) and not return_to.startswith("//") else "/library"
         query = parse_qs(urlsplit(safe_return).query)
         spec = QuerySpec(
             query.get("media_type", ["all"])[0],
@@ -412,7 +425,11 @@ def create_app(workspace: Path, keyframe_fingerprint: str | None = None) -> Fast
             raise HTTPException(status_code=404, detail="Artifact is unavailable")
         if selected.kind == "original":
             return _serve_original(request, selected, resolved)
-        return FileResponse(resolved, media_type=selected.media_type)
+        etag = f'"{token}"'
+        headers = {"ETag": etag, "Cache-Control": "public, max-age=31536000, immutable"}
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=headers)
+        return FileResponse(resolved, media_type=selected.media_type, headers=headers)
 
     @app.get("/health")
     def health():
