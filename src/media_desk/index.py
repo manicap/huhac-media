@@ -48,16 +48,11 @@ def capture_date(asset: Asset):
 def capture_label(asset: Asset) -> str:
     if not asset.capture_time:
         return "Datum pořízení neznámé"
-    try:
-        value = datetime.fromisoformat(asset.capture_time.replace("Z", "+00:00"))
-        label = f"{value.day}. {value.month}. {value.year} · {value:%H:%M}"
-    except ValueError:
-        label = asset.capture_time
     if asset.capture_filesystem_fallback:
-        return f"{label} · čas souboru (nízká důvěra)"
-    if not (asset.capture_timezone or asset.capture_time.endswith("Z") or "+" in asset.capture_time[10:]):
-        return f"{label} · bez časové zóny"
-    return label
+        return f"{asset.capture_time} · čas souboru (nízká důvěra)"
+    if asset.capture_timezone or asset.capture_time.endswith("Z") or "+" in asset.capture_time[10:]:
+        return asset.capture_time
+    return f"{asset.capture_time} · bez časové zóny"
 
 
 class LibraryIndex:

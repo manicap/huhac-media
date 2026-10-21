@@ -58,6 +58,15 @@ if (app) {
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]);
+  const formatCaptureLabel = (item) => {
+    if (!item.capture_time) return item.capture_label;
+    const match = item.capture_time.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!match) return item.capture_label;
+    const label = `${Number(match[3])}. ${Number(match[2])}. ${match[1]} · ${match[4]}:${match[5]}`;
+    if (item.capture_filesystem_fallback) return `${label} · čas souboru (nízká důvěra)`;
+    if (!(item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"))) return `${label} · bez časové zóny`;
+    return label;
+  };
   const cardHtml = (item, index) => {
     const preview = item.preview_url
       ? `<img src="${escapeHtml(item.preview_url)}" alt="Náhled ${escapeHtml(item.source_name)}" width="320" height="210" loading="lazy" decoding="async">`
@@ -67,7 +76,7 @@ if (app) {
     url.searchParams.set("active_asset_id", item.asset_id);
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
       <a class="tile-preview" href="${escapeHtml(url.pathname + url.search)}">${preview}<span class="type-pill">${item.media_type === "video" ? "video" : "foto"}</span>${item.original_online ? "" : '<span class="offline-pill">originál offline</span>'}</a>
-      <div class="tile-copy"><strong title="${escapeHtml(item.source_name)}">${escapeHtml(item.source_name)}</strong><span>${escapeHtml(item.capture_label)}</span></div>
+      <div class="tile-copy"><strong title="${escapeHtml(item.source_name)}">${escapeHtml(item.source_name)}</strong><span>${escapeHtml(formatCaptureLabel(item))}</span></div>
     </article>`;
   };
   const touchCache = (start, items) => {

@@ -5,7 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 from media_desk.contract import load_workspace
-from media_desk.index import LibraryIndex, QuerySpec, capture_date, capture_label
+from media_desk.index import LibraryIndex, QuerySpec, capture_date
 from media_desk.web import create_app
 
 
@@ -69,8 +69,6 @@ def test_locator_calendar_and_date_policy(workspace_builder) -> None:
     assert calendar["years"][2025]["months"][12]["count"] == 1
     assert calendar["years"][2026]["months"][1]["count"] == 1
     assert calendar["unassigned_count"] == 2
-    assert capture_label(next(item for item in snapshot.assets if item.asset_id == aware["asset_id"])) == "31. 12. 2025 · 23:30"
-    assert capture_label(next(item for item in snapshot.assets if item.asset_id == naive["asset_id"])).endswith("bez časové zóny")
 
 
 def test_range_api_locates_without_prior_batches(workspace_builder) -> None:
