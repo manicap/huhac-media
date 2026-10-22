@@ -1,6 +1,25 @@
-# Media Desk M1.1
+# HUHÁČ Media Desk (M1–M1.3)
 
-Media Desk M1.1 is a local, read-only web gallery for one existing Huháč media
+**Dokumentace auditována:** 2026-10-22 na větvi `mediadesk`, aplikační revize
+`4397b9289de8689ed9282d9cbce842f3de4a60c2`.
+
+## Začni zde — aktuální autoritativní dokumentace
+
+- [STATUS.md](STATUS.md) — co je skutečně implementováno a známé limity;
+- [ARCHITECTURE.md](ARCHITECTURE.md) — ownership, data, cesty, DB a bezpečnost;
+- [DECISIONS.md](DECISIONS.md) — přijatá rozhodnutí a návrhy čekající na schválení;
+- [ROADMAP.md](ROADMAP.md) — pořadí dalších etap a stop-gate;
+- [AUDIT_2026-10.md](AUDIT_2026-10.md) — auditní důkazy a gap analýza;
+- [SETUP_STORAGE_RFC.md](SETUP_STORAGE_RFC.md) — varianty setup/storage bez implementace.
+- [Veřejný workspace kontrakt](../workspace-contract.md) a dokumentace
+  [Media Ingest](../media-ingest.md), [Session Grouper](../session-grouper.md),
+  [Video Keyframes](../video-keyframes.md), [Vision](../vision.md) a
+  [Faces](../faces.md) — závazné hranice existujících producentů a konzumentů.
+
+Historický [CONTRACT.md](CONTRACT.md) zachovává původní zadání M1, ale není
+autoritou pro další etapy.
+
+Media Desk is a local, read-only web gallery for one existing Huháč media
 workspace. It starts at `workspace.json`, requires public workspace contract
 version 1, follows `metadata/catalog.json`, and never reads ingest SQLite.
 
@@ -174,7 +193,7 @@ fingerprints, all five existing component outputs, filtering, pagination,
 range responses, traversal attempts, safe browser errors, and preservation of
 every workspace file's content, size, and modification time.
 
-## Known M1.1 limitations
+## Known current limitations
 
 - One workspace per server process; no multi-workspace library. A saved path
   change becomes active after restart, never through an HTTP-triggered restart
@@ -196,5 +215,6 @@ every workspace file's content, size, and modification time.
 - Library virtualization requires JavaScript. The API and details remain
   available without it, but thousands of fallback cards are not rendered.
 
-The governing scope and later milestones are recorded in
-[`CONTRACT.md`](CONTRACT.md). M2–M5 are not implemented.
+The current state and approval gates are recorded in [`STATUS.md`](STATUS.md) and
+[`DECISIONS.md`](DECISIONS.md). Historical M2–M5 in [`CONTRACT.md`](CONTRACT.md)
+are not implemented and must not be started without a new approved scope.

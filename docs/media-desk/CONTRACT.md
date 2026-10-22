@@ -1,5 +1,14 @@
 # HUHÁČ Media Desk — implementační kontrakt v0.1
 
+> **HISTORICKÝ DOKUMENT — NEPOUŽÍVAT JAKO AKTUÁLNÍ ROADMAPU.** Tento text
+> zachovává původní zadání M1 a jeho historii. Skutečný stav M1–M1.3 a platné
+> hranice jsou v [STATUS.md](STATUS.md), [ARCHITECTURE.md](ARCHITECTURE.md) a
+> [DECISIONS.md](DECISIONS.md). Staré instrukce k větvi a etapám níže nejsou
+> oprávněním zahájit další implementaci.
+>
+> Disclaimer auditován 2026-10-22 na `mediadesk` proti aplikační revizi
+> `4397b9289de8689ed9282d9cbce842f3de4a60c2`.
+
 **Určeno pro:** Codex
 **Repozitář:** `manicap/huhac-media`
 **Výchozí větev:** `main`
