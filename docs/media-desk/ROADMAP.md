@@ -23,6 +23,10 @@ posloupnost pro tři schválené provozní scénáře.
    veřejný katalog a DB zůstaly beze změny. Prováděcí plán a důkazy:
    [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md). S2a je přechodný
    adapter pro v1, nikoli cílová storage architektura.
+3a. **S2a.1 — ACCEPTED / IMPLEMENTATION IN PROGRESS.** Odstranit plošné
+   per-asset filesystem kontroly originálů ze startu a přesunout autorizaci,
+   confinement a bezpečné otevření konkrétního souboru do GET/Range požadavku.
+   Baseline: [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
 4. **S2b — PROPOSED.** Po provozním ověření rozhodnout, zda stejnou abstrakci
    potřebují Video Keyframes/ingest. Teprve pak navrhnout společný adapter nebo
    contract v2; bez automatické migrace.

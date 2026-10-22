@@ -92,6 +92,13 @@ storage abstrakci vyžaduje nové rozhodnutí a samostatný návrh; S2a procesor
 Video Keyframes nadále přímo používá katalogový `source_root`
 (`src/video_keyframes/contract.py:102-124`).
 
+**ACCEPTED/TARGET S2a.1, IMPLEMENTACE PROBÍHÁ.** D-016 odděluje katalogem
+autorizovanou source reference od aktuálně ověřeného souboru. Snapshot a UI
+nesmějí vyžadovat per-asset I/O k originálům. Každý GET/Range musí naopak znovu
+ověřit aktivní binding, bezpečnou relativní cestu, canonical confinement a
+symlink escape a použít jeden request-scoped otevřený soubor. Baseline je v
+[S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
+
 ## Bezpečnost Media Desku
 
 - **IMPLEMENTED:** workspace validuje výhradně veřejný kontrakt

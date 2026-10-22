@@ -12,6 +12,8 @@
 - [SETUP_STORAGE_RFC.md](SETUP_STORAGE_RFC.md) — varianty setup/storage bez implementace.
 - [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md) — schválený rozsah a
   dokončené ověření přechodného read-only mapování originálů.
+- [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md) — profil a průběh
+  schválené optimalizace startupu a lazy ověřování originálů.
 - [Veřejný workspace kontrakt](../workspace-contract.md) a dokumentace
   [Media Ingest](../media-ingest.md), [Session Grouper](../session-grouper.md),
   [Video Keyframes](../video-keyframes.md), [Vision](../vision.md) a
