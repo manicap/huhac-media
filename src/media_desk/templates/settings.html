@@ -46,6 +46,52 @@
     {% endif %}
   </section>
 
+  <section class="panel settings-originals">
+    <div class="section-title">
+      <div><p class="eyebrow">ORIGIN&Aacute;LY</p><h2>Lok&aacute;ln&iacute; mapov&aacute;n&iacute; zdroje</h2></div>
+      <span class="status-badge status-{{ mapping_state }}">{{ mapping_state }}</span>
+    </div>
+    <dl class="settings-facts">
+      <div><dt>P&#367;vodn&iacute; source_root</dt><dd class="path-value">{{ mapping_source_root or '&mdash;'|safe }}</dd></div>
+      <div><dt>Lok&aacute;ln&iacute; ko&#345;en</dt><dd class="path-value">{{ mapping_local_root or '&mdash;'|safe }}</dd></div>
+      {% if mapping_configured %}<div><dt>Ulo&#382;en&yacute; vzorek</dt><dd>{{ mapping_sampled_assets }} z {{ mapping_eligible_assets }} zp&#367;sobil&yacute;ch asset&#367;</dd></div>{% endif %}
+    </dl>
+    <p class="muted">{{ mapping_message }}</p>
+    <p class="field-help"><strong>Vzorkov&aacute; SHA-256 kontrola nen&iacute; &uacute;plnou kontrolou integrity archivu.</strong> Prov&aacute;d&iacute; se jen p&#345;i vytvo&#345;en&iacute; nebo zm&#283;n&#283; mapov&aacute;n&iacute;, ne p&#345;i startu aplikace.</p>
+
+    {% if workspace_editable and workspace_validation.valid %}
+      <form action="/settings/originals/validate" method="post" class="settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="originals-root">Lok&aacute;ln&iacute; adres&aacute;&#345; odpov&iacute;daj&iacute;c&iacute; p&#367;vodn&iacute;mu source_root</label>
+        <input id="originals-root" name="local_root" maxlength="4096" value="{{ mapping_candidate if mapping_candidate is not none else mapping_local_root }}" placeholder="E:\Archiv nebo /mnt/archive" autocomplete="off" required>
+        <button class="secondary-action" type="submit">Ov&#283;&#345;it mapov&aacute;n&iacute;</button>
+      </form>
+      {% if mapping_validation %}
+        <div class="validation-result status-{{ mapping_validation.state }}">
+          <strong>{{ mapping_validation.state }}</strong><span>{{ mapping_validation.message }}</span>
+          <span>Vzorek: {{ mapping_validation.matched_assets }} / {{ mapping_validation.sampled_assets }}, dostupn&yacute;ch {{ mapping_validation.accessible_assets }} z {{ mapping_validation.eligible_assets }}.</span>
+        </div>
+        {% if mapping_validation.valid %}
+          <form action="/settings/originals/save" method="post" class="save-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="local_root" value="{{ mapping_candidate }}">
+            <button class="primary-action" type="submit">Ulo&#382;it mapov&aacute;n&iacute;</button>
+            <span>Aktivace prob&#283;hne po restartu Media Desku.</span>
+          </form>
+        {% endif %}
+      {% endif %}
+      {% if mapping_configured %}
+        <form action="/settings/originals/clear" method="post" class="save-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="secondary-action" type="submit">Odstranit lok&aacute;ln&iacute; mapov&aacute;n&iacute;</button>
+          <span>Do&#269;asn&aacute; nedostupnost &uacute;lo&#382;i&scaron;t&#283; mapov&aacute;n&iacute; sama neodstran&iacute;.</span>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="settings-message">Mapov&aacute;n&iacute; lze upravit jen pro dostupn&yacute; workspace spravovan&yacute; lok&aacute;ln&iacute;m profilem.</p>
+    {% endif %}
+  </section>
+
   <section class="panel settings-about">
     <p class="eyebrow">O APLIKACI</p><h2>HUHÁČ Media Desk {{ app_version }}</h2>
     <dl class="settings-facts"><div><dt>Konfigurace aplikace</dt><dd class="path-value">{{ config_path }}</dd></div><div><dt>Režim workspace</dt><dd>Read-only</dd></div></dl>

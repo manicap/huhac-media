@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 import re
 
+import pytest
 from fastapi.testclient import TestClient
 
 from media_desk.config import Settings, load_settings, save_profile_workspace
@@ -49,6 +51,39 @@ def _post(client: TestClient, endpoint: str, token: str, workspace: str, **extra
         data={"csrf_token": token, "workspace": workspace, **extra},
         headers={"Origin": "http://127.0.0.1"},
     )
+
+
+def _mapping_post(
+    client: TestClient,
+    endpoint: str,
+    token: str,
+    local_root: str | None = None,
+    **extra,
+):
+    data = {"csrf_token": token, **extra}
+    if local_root is not None:
+        data["local_root"] = local_root
+    return client.post(endpoint, data=data, headers={"Origin": "http://127.0.0.1"})
+
+
+def _publish_mappable_workspace(
+    workspace_builder, *, source_root: str
+) -> tuple[Path, Path, str]:
+    content = b"verified-original-content"
+    entry = workspace_builder.add_asset(1, original=False)
+    digest = hashlib.sha256(content).hexdigest()
+    entry["asset_id"] = f"sha256:{digest}"
+    entry["sha256"] = digest
+    entry["size_bytes"] = len(content)
+    original = workspace_builder.originals.joinpath(*entry["sources"][0]["relative_path"].split("/"))
+    original.parent.mkdir(parents=True, exist_ok=True)
+    original.write_bytes(content)
+    root = workspace_builder.publish()
+    catalog_path = root / "metadata/catalog.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    catalog["source_root"] = source_root
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+    return root, original, digest
 
 
 def test_fresh_profile_serves_setup_settings_and_nonready_health(tmp_path: Path) -> None:
@@ -172,3 +207,164 @@ def test_settings_posts_reject_foreign_origin_host_lan_and_unexpected_fields(
     assert "1 až 4096 znaků" in too_long.text
     assert lan.status_code == 403
     assert not config.exists()
+
+
+@pytest.mark.parametrize("source_root", [r"D:\Archive\Huhac", "/srv/archive/huhac"])
+def test_originals_mapping_validate_save_restart_and_clear(
+    workspace_builder, tmp_path: Path, source_root: str
+) -> None:
+    root, _original, digest = _publish_mappable_workspace(
+        workspace_builder, source_root=source_root
+    )
+    before = _state(root)
+    profile = tmp_path / "profile/config.toml"
+    save_profile_workspace(profile, root)
+    client = _client(create_app(settings=_profile_settings(profile, root)))
+    token = _csrf(client)
+
+    checked = _mapping_post(
+        client,
+        "/settings/originals/validate",
+        token,
+        str(workspace_builder.originals),
+    )
+    assert checked.status_code == 200
+    assert "valid_sampled" in checked.text
+    assert "Vzorkov" in checked.text and "integrity archivu" in checked.text
+    assert "[media_desk.originals_mapping]" not in profile.read_text(encoding="utf-8")
+
+    saved = _mapping_post(
+        client,
+        "/settings/originals/save",
+        token,
+        str(workspace_builder.originals),
+    )
+    assert saved.status_code == 200
+    assert "[media_desk.originals_mapping]" in profile.read_text(encoding="utf-8")
+    assert _state(root) == before
+
+    restarted_settings = load_settings(
+        workspace=None,
+        host=None,
+        port=None,
+        keyframe_fingerprint=None,
+        config_path=None,
+        config_dir=profile.parent,
+        environ={},
+    )
+    restarted = _client(create_app(settings=restarted_settings))
+    assert restarted.get(f"/artifacts/original-{digest}").content == b"verified-original-content"
+    assert "valid_sampled" in restarted.get("/settings").text
+
+    clear_token = _csrf(restarted)
+    cleared = _mapping_post(restarted, "/settings/originals/clear", clear_token)
+    assert cleared.status_code == 200
+    assert "[media_desk.originals_mapping]" not in profile.read_text(encoding="utf-8")
+    assert load_settings(
+        workspace=None,
+        host=None,
+        port=None,
+        keyframe_fingerprint=None,
+        config_path=None,
+        config_dir=profile.parent,
+        environ={},
+    ).originals_mapping is None
+
+
+def test_failed_mapping_save_preserves_existing_profile(workspace_builder, tmp_path: Path) -> None:
+    root, original, _digest = _publish_mappable_workspace(
+        workspace_builder, source_root=r"D:\Archive\Huhac"
+    )
+    profile = tmp_path / "profile/config.toml"
+    save_profile_workspace(profile, root)
+    client = _client(create_app(settings=_profile_settings(profile, root)))
+    token = _csrf(client)
+    valid = _mapping_post(
+        client, "/settings/originals/save", token, str(workspace_builder.originals)
+    )
+    assert valid.status_code == 200
+    original_profile = profile.read_bytes()
+
+    original.write_bytes(b"same-length-invalid-hash!!")
+    catalog_path = root / "metadata/catalog.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    catalog["assets"][0]["size_bytes"] = original.stat().st_size
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+    rejected = _mapping_post(
+        client, "/settings/originals/save", token, str(workspace_builder.originals)
+    )
+
+    assert rejected.status_code == 200
+    assert "storage_mismatch" in rejected.text
+    assert profile.read_bytes() == original_profile
+
+
+def test_original_artifact_rechecks_symlink_confinement_on_every_access(
+    workspace_builder, tmp_path: Path
+) -> None:
+    root, original, digest = _publish_mappable_workspace(
+        workspace_builder, source_root="/srv/archive/huhac"
+    )
+    profile = tmp_path / "profile/config.toml"
+    save_profile_workspace(profile, root)
+    initial = _client(create_app(settings=_profile_settings(profile, root)))
+    token = _csrf(initial)
+    _mapping_post(initial, "/settings/originals/save", token, str(workspace_builder.originals))
+    settings = load_settings(
+        workspace=None,
+        host=None,
+        port=None,
+        keyframe_fingerprint=None,
+        config_path=None,
+        config_dir=profile.parent,
+        environ={},
+    )
+    client = _client(create_app(settings=settings))
+    assert client.get(f"/artifacts/original-{digest}").status_code == 200
+
+    outside = tmp_path / "outside.jpg"
+    outside.write_bytes(b"outside")
+    original.unlink()
+    try:
+        original.symlink_to(outside)
+    except OSError:
+        pytest.skip("Symlink creation is unavailable on this Windows host")
+
+    assert client.get(f"/artifacts/original-{digest}").status_code == 404
+
+
+def test_originals_mapping_posts_use_settings_security_boundary(
+    workspace_builder, tmp_path: Path
+) -> None:
+    root, _original, _digest = _publish_mappable_workspace(
+        workspace_builder, source_root="/srv/archive/huhac"
+    )
+    profile = tmp_path / "profile/config.toml"
+    client = _client(create_app(settings=_profile_settings(profile, root)))
+    token = _csrf(client)
+
+    foreign = client.post(
+        "/settings/originals/save",
+        data={"csrf_token": token, "local_root": str(workspace_builder.originals)},
+        headers={"Origin": "http://evil.invalid"},
+    )
+    unexpected = _mapping_post(
+        client,
+        "/settings/originals/save",
+        token,
+        str(workspace_builder.originals),
+        target="anything",
+    )
+    lan = _client(create_app(settings=_profile_settings(profile, root, host="0.0.0.0")))
+    lan_token = _csrf(lan)
+    denied_lan = _mapping_post(
+        lan,
+        "/settings/originals/save",
+        lan_token,
+        str(workspace_builder.originals),
+    )
+
+    assert foreign.status_code == 403
+    assert unexpected.status_code == 400
+    assert denied_lan.status_code == 403
+    assert not profile.exists()

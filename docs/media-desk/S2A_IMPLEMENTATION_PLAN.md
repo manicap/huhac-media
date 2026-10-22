@@ -20,7 +20,11 @@
 - **IMPLEMENTED:** fail-closed contract/startup integrace; validní binding mění
   pouze kořen originálů, offline/mismatch zachová workspace a previews bez SHA
   při startu (`src/media_desk/contract.py`, `workspace_status.py`).
-- **NOT IMPLEMENTED:** webové validate/save/clear flow.
+- **IMPLEMENTED:** chráněné webové validate/save/clear flow v Nastavení; save
+  kandidáta znovu validuje, neúspěch původní profil nemění a aktivace vyžaduje
+  restart (`src/media_desk/web.py`, `templates/settings.html`).
+- **PROBÍHÁ ZÁVĚREČNÉ OVĚŘENÍ:** souhrnná regrese, 10k měření a finální
+  synchronizace dokumentace.
 
 ## 1. Výsledek etapy
 

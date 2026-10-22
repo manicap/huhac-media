@@ -17,9 +17,16 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from media_desk.config import ConfigurationError, Settings, save_profile_workspace, user_config_path
+from media_desk.config import (
+    ConfigurationError,
+    Settings,
+    save_profile,
+    save_profile_workspace,
+    user_config_path,
+)
 from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_date, capture_label
 from media_desk.models import Artifact, Asset, WorkspaceSnapshot
+from media_desk.originals import MappingValidation, validate_mapping_candidate
 from media_desk.workspace_status import WorkspaceValidation, validate_workspace
 
 
@@ -224,8 +231,12 @@ def create_app(
         candidate_validation: WorkspaceValidation | None = None,
         error: str | None = None,
         notice: str | None = None,
+        mapping_candidate: str | None = None,
+        mapping_validation: MappingValidation | None = None,
     ) -> dict:
         current_settings: Settings = app.state.settings
+        current_snapshot: WorkspaceSnapshot | None = app.state.snapshot
+        configured_mapping = current_settings.originals_mapping
         return {
             "request": request,
             "workspace_validation": app.state.workspace_validation,
@@ -238,6 +249,33 @@ def create_app(
             "candidate_validation": candidate_validation,
             "error": error,
             "notice": notice,
+            "mapping_candidate": mapping_candidate,
+            "mapping_validation": mapping_validation,
+            "mapping_configured": configured_mapping is not None,
+            "mapping_local_root": str(configured_mapping.local_root) if configured_mapping else "",
+            "mapping_source_root": (
+                current_snapshot.catalog_source_root
+                if current_snapshot is not None
+                else configured_mapping.source_root if configured_mapping else ""
+            ),
+            "mapping_state": (
+                current_snapshot.originals_mapping_state
+                if current_snapshot is not None
+                else "unconfigured" if configured_mapping is None else "unavailable"
+            ),
+            "mapping_message": (
+                current_snapshot.originals_mapping_message
+                if current_snapshot is not None
+                else "Mapování není nastaveno."
+                if configured_mapping is None
+                else "Workspace není dostupný; uložené mapování zůstává beze změny."
+            ),
+            "mapping_sampled_assets": (
+                configured_mapping.verified_assets if configured_mapping else 0
+            ),
+            "mapping_eligible_assets": (
+                configured_mapping.eligible_assets if configured_mapping else 0
+            ),
             "config_path": current_settings.profile_config_path or user_config_path(),
             "app_version": _app_version(),
             "csrf_token": request.cookies.get(_CSRF_COOKIE) or app.state.csrf_secret,
@@ -261,7 +299,7 @@ def create_app(
             )
         return response
 
-    async def protected_form(request: Request) -> dict[str, str]:
+    async def protected_form(request: Request, expected_fields: set[str]) -> dict[str, str]:
         current_settings: Settings = app.state.settings
         if not _is_loopback(current_settings.host):
             raise HTTPException(status_code=403, detail="Změny nastavení jsou povoleny jen při loopback bindu.")
@@ -282,10 +320,14 @@ def create_app(
         if len(body) > _MAX_FORM_BYTES:
             raise HTTPException(status_code=413, detail="Formulář je příliš velký.")
         try:
-            parsed = parse_qs(body.decode("utf-8"), keep_blank_values=True, max_num_fields=4)
+            parsed = parse_qs(
+                body.decode("utf-8"),
+                keep_blank_values=True,
+                max_num_fields=max(4, len(expected_fields)),
+            )
         except (UnicodeDecodeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail="Neplatný formulář.") from exc
-        if set(parsed) != {"csrf_token", "workspace"} or any(len(items) != 1 for items in parsed.values()):
+        if set(parsed) != expected_fields or any(len(items) != 1 for items in parsed.values()):
             raise HTTPException(status_code=400, detail="Formulář obsahuje neočekávaná pole.")
         cookie = request.cookies.get(_CSRF_COOKIE, "")
         token = parsed["csrf_token"][0]
@@ -312,7 +354,11 @@ def create_app(
     def settings_page(request: Request, recheck: bool = False):
         current_settings: Settings = app.state.settings
         if recheck and current_settings.workspace is not None:
-            checked = validate_workspace(current_settings.workspace, keyframe_fingerprint)
+            checked = validate_workspace(
+                current_settings.workspace,
+                keyframe_fingerprint,
+                current_settings.originals_mapping,
+            )
             notice = "Cesta je dostupná. Pro načtení knihovny restartujte Media Desk." if checked.valid and app.state.snapshot is None else None
             return render_settings(
                 request,
@@ -324,7 +370,7 @@ def create_app(
 
     @app.post("/settings/validate", response_class=HTMLResponse)
     async def validate_settings(request: Request):
-        fields = await protected_form(request)
+        fields = await protected_form(request, {"csrf_token", "workspace"})
         if not app.state.settings.workspace_editable:
             return render_settings(request, error="Aktivní cestu určuje vyšší priorita; změňte ji při spuštění." )
         try:
@@ -336,7 +382,7 @@ def create_app(
 
     @app.post("/settings/save", response_class=HTMLResponse)
     async def save_settings(request: Request):
-        fields = await protected_form(request)
+        fields = await protected_form(request, {"csrf_token", "workspace"})
         current_settings: Settings = app.state.settings
         if not current_settings.workspace_editable:
             return render_settings(request, error="Aktivní cestu určuje vyšší priorita; profil nelze upravit." )
@@ -363,6 +409,106 @@ def create_app(
             candidate=candidate,
             candidate_validation=checked,
             notice="Cesta byla bezpečně uložena. Pro její aktivaci restartujte Media Desk.",
+        )
+
+    def mapping_workspace() -> tuple[Settings, WorkspaceSnapshot] | None:
+        current_settings: Settings = app.state.settings
+        current_snapshot: WorkspaceSnapshot | None = app.state.snapshot
+        if not current_settings.workspace_editable or current_snapshot is None:
+            return None
+        return current_settings, current_snapshot
+
+    @app.post("/settings/originals/validate", response_class=HTMLResponse)
+    async def validate_originals_settings(request: Request):
+        fields = await protected_form(request, {"csrf_token", "local_root"})
+        available = mapping_workspace()
+        if available is None:
+            return render_settings(
+                request,
+                error="Mapování lze změnit jen pro dostupný workspace spravovaný profilem.",
+            )
+        _current_settings, current_snapshot = available
+        try:
+            candidate = _safe_path_input(fields["local_root"])
+        except ValueError as exc:
+            return render_settings(
+                request,
+                mapping_candidate=fields["local_root"],
+                error=str(exc),
+            )
+        checked = validate_mapping_candidate(current_snapshot.root, Path(candidate).expanduser())
+        return render_settings(
+            request,
+            mapping_candidate=candidate,
+            mapping_validation=checked,
+        )
+
+    @app.post("/settings/originals/save", response_class=HTMLResponse)
+    async def save_originals_settings(request: Request):
+        fields = await protected_form(request, {"csrf_token", "local_root"})
+        available = mapping_workspace()
+        if available is None:
+            return render_settings(
+                request,
+                error="Mapování lze změnit jen pro dostupný workspace spravovaný profilem.",
+            )
+        current_settings, current_snapshot = available
+        try:
+            candidate = _safe_path_input(fields["local_root"])
+        except ValueError as exc:
+            return render_settings(
+                request,
+                mapping_candidate=fields["local_root"],
+                error=str(exc),
+            )
+        checked = validate_mapping_candidate(current_snapshot.root, Path(candidate).expanduser())
+        if not checked.valid or checked.mapping is None:
+            return render_settings(
+                request,
+                mapping_candidate=candidate,
+                mapping_validation=checked,
+            )
+        try:
+            save_profile(
+                current_settings.profile_config_path or user_config_path(),
+                workspace=current_snapshot.root,
+                originals_mapping=checked.mapping,
+            )
+        except ConfigurationError as exc:
+            return render_settings(
+                request,
+                mapping_candidate=candidate,
+                mapping_validation=checked,
+                error=f"Mapování se nepodařilo uložit: {exc}",
+            )
+        return render_settings(
+            request,
+            mapping_candidate=candidate,
+            mapping_validation=checked,
+            notice="Mapování bylo bezpečně uloženo. Pro jeho aktivaci restartujte Media Desk.",
+        )
+
+    @app.post("/settings/originals/clear", response_class=HTMLResponse)
+    async def clear_originals_settings(request: Request):
+        await protected_form(request, {"csrf_token"})
+        available = mapping_workspace()
+        if available is None:
+            return render_settings(
+                request,
+                error="Mapování lze změnit jen pro dostupný workspace spravovaný profilem.",
+            )
+        current_settings, current_snapshot = available
+        try:
+            save_profile(
+                current_settings.profile_config_path or user_config_path(),
+                workspace=current_snapshot.root,
+                originals_mapping=None,
+            )
+        except ConfigurationError as exc:
+            return render_settings(request, error=f"Mapování se nepodařilo odstranit: {exc}")
+        return render_settings(
+            request,
+            notice="Lokální mapování bylo odstraněno. Změna se projeví po restartu.",
         )
 
     @app.get("/", response_class=HTMLResponse)
@@ -647,7 +793,7 @@ def create_app(
         try:
             resolved = selected.path.resolve(strict=True)
             allowed_root = selected.authorization_root.resolve(strict=True)
-        except OSError as exc:
+        except (OSError, RuntimeError) as exc:
             raise HTTPException(status_code=404, detail="Artifact is unavailable") from exc
         if allowed_root not in resolved.parents or not resolved.is_file():
             raise HTTPException(status_code=404, detail="Artifact is unavailable")
