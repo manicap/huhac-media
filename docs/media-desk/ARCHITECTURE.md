@@ -92,11 +92,15 @@ storage abstrakci vyžaduje nové rozhodnutí a samostatný návrh; S2a procesor
 Video Keyframes nadále přímo používá katalogový `source_root`
 (`src/video_keyframes/contract.py:102-124`).
 
-**ACCEPTED/TARGET S2a.1, IMPLEMENTACE PROBÍHÁ.** D-016 odděluje katalogem
+**IMPLEMENTED S2a.1, FINAL VERIFICATION PENDING.** D-016 odděluje katalogem
 autorizovanou source reference od aktuálně ověřeného souboru. Snapshot a UI
 nesmějí vyžadovat per-asset I/O k originálům. Každý GET/Range musí naopak znovu
 ověřit aktivní binding, bezpečnou relativní cestu, canonical confinement a
-symlink escape a použít jeden request-scoped otevřený soubor. Baseline je v
+symlink escape a použít jeden request-scoped otevřený soubor. Opaque token
+obsahuje epochu odvozenou z `workspace_id`, katalogového `source_root` a aktivního
+server-side rootu; token z předchozího mappingu proto nový snapshot neregistruje.
+API stav `unchecked` znamená pouze autorizovanou katalogovou referenci, nikoli
+potvrzenou dostupnost souboru. Baseline a průběžné měření jsou v
 [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
 
 ## Bezpečnost Media Desku

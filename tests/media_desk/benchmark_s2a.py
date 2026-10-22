@@ -127,6 +127,10 @@ def run(count: int, keep: Path | None) -> dict:
         "startup_ms": round(startup_ms, 3),
         "startup_hash_calls": startup_hash_calls,
         "online_originals": sum(asset.original_online for asset in snapshot.assets),
+        "original_references": sum(asset.original is not None for asset in snapshot.assets),
+        "unchecked_originals": sum(
+            asset.original_access_state == "unchecked" for asset in snapshot.assets
+        ),
         "workspace": str(workspace) if keep else None,
     }
     if temporary:

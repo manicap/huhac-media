@@ -1,6 +1,6 @@
 # S2a.1 — profil a optimalizace startu
 
-**Stav:** **ACCEPTED / IMPLEMENTATION IN PROGRESS**
+**Stav:** **IMPLEMENTED / FINAL VERIFICATION IN PROGRESS**
 
 **Baseline commit:** `159fc910e806019494e179b596531040cab9127a`
 
@@ -65,5 +65,18 @@ nebo Range požadavku znovu odvodí z aktivního server-side rootu, canonicalizu
 ověří confinement a teprve potom jednou otevře. `original_online` před tímto
 request-scoped ověřením nesmí být `true`.
 
-Finální výsledky před/po, access latence, bezpečnostní testy a zbytková omezení
-budou doplněny až po ověřené implementaci.
+## Průběžný after profil
+
+Na stejném uchovaném 10k datasetu po zavedení lazy reference byly tři startupy
+6 495 / 6 150 / 5 133 ms, p50 **6 150 ms**, p95 **6 495 ms**. To je proti
+baseline p50 zrychlení **4,19×**. Startup provedl jediný `resolve` samotného mapped
+rootu při bindingu a **0 per-file resolve/stat/open/SHA** originálů. Orientační
+peak nových Python alokací klesl na **31,72 MiB**.
+
+After `cProfile` už neukazuje filesystem přístup originálů mezi hlavními náklady.
+Nejdražší je nyní stávající `_processor_results` (4,204 s profilovaného běhu)
+kvůli kontrolám analysis adresářů; jeho změna není nutná ke splnění cíle >3× a
+není součástí bezpečnostní změny S2a.1.
+
+Finální benchmark doplní opakované HTTP a origin access p50/p95, bezpečnostní
+testy a zbytková omezení.

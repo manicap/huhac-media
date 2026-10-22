@@ -57,6 +57,8 @@ def test_offline_original_is_explicit(workspace_builder) -> None:
     asset = load_workspace(root).assets[0]
 
     assert not asset.original_online
+    assert asset.original_access_state == "unchecked"
+    assert asset.original is not None
     assert asset.preview is not None
 
 
@@ -141,9 +143,11 @@ def test_foreign_platform_source_root_uses_exact_host_local_mapping(
 
     snapshot = load_workspace(root, originals_mapping=mapping)
 
-    assert snapshot.assets[0].original_online
+    assert not snapshot.assets[0].original_online
+    assert snapshot.assets[0].original_access_state == "unchecked"
     assert snapshot.assets[0].original is not None
-    assert snapshot.assets[0].original.authorization_root == workspace_builder.originals.resolve()
+    assert snapshot.assets[0].original.source_root == workspace_builder.originals.resolve()
+    assert snapshot.assets[0].original.relative_paths == ("set/media-1.jpg",)
     assert snapshot.originals_mapping_state == "valid_sampled"
     assert snapshot.catalog_source_root == r"D:\Huhac\Media"
 

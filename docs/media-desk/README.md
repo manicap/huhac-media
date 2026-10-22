@@ -99,6 +99,13 @@ dostupné a mapped originály jsou dočasně offline. Běžný start SHA-256 vzo
 neopakuje. Mapping je přesně vázaný na `workspace_id` a původní text
 `source_root`; není přenášen v workspace ani čten z explicitního `--config`.
 
+Katalogová reference originálu se po startu zobrazuje jako **neověřená**. To
+neznamená, že je konkrétní soubor online. Jeho aktuální existence, confinement a
+symlink bezpečnost se ověří až při GET nebo video Range požadavku. Chybějící či
+odpojený soubor vrátí bezpečné 404 a neovlivní prohlížení katalogu a previews.
+Originální odpovědi mají `Cache-Control: no-store`; token se mění s epochou
+aktivního mapped rootu.
+
 `--workspace PATH` is still supported for temporary or managed launches. A
 workspace supplied by CLI, environment, or explicit `--config` has higher
 priority, so the web UI shows its source and locks profile editing.
@@ -238,10 +245,9 @@ every workspace file's content, size, and modification time.
 - Original availability is checked on the backend host. A browser client does
   not receive or reinterpret host filesystem paths.
 - SHA-256 sampling does not prove full archive integrity. Unsampled or later
-  changed files can become unavailable when opened. A 10k synthetic catalog on
-  the verification Windows host took 18.1 s to validate and 23.0 s to create the
-  application; startup performed zero hashes, but still canonicalized every
-  available path.
+  changed files can become unavailable when opened. Historická S2a baseline
+  canonicalizovala každý originál při startu; S2a.1 tuto kontrolu přesouvá na
+  konkrétní GET/Range. Aktuální měření jsou v `S2A1_STARTUP_PERFORMANCE.md`.
 - Session relationships are labelled as probable time continuity, never as
   identified events. Faces clusters remain anonymous similarity groups.
 - Multiple valid Session Grouper results produce an ambiguous state instead of

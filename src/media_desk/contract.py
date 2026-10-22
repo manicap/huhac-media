@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -12,6 +13,7 @@ from media_desk.models import (
     Artifact,
     Asset,
     FaceClusterReference,
+    OriginalReference,
     ProcessorResult,
     SessionGroup,
     SessionReference,
@@ -135,48 +137,47 @@ def _source_name(entry: dict[str, Any]) -> str:
     return candidates[0] if candidates else "Unknown source"
 
 
-def _original(
+def _original_reference(
     source_root_value: object,
     entry: dict[str, Any],
     sha256: str,
-) -> Artifact | None:
+    workspace_id: str,
+    catalog_source_root: str,
+) -> OriginalReference | None:
     if not isinstance(source_root_value, (str, Path)) or not str(source_root_value):
         return None
     source_root = Path(source_root_value)
     if not source_root.is_absolute():
         return None
-    root = source_root.resolve(strict=False)
     sources = entry.get("sources")
     if not isinstance(sources, list):
         return None
-    active: list[tuple[str, str]] = []
+    active: set[str] = set()
     for source in sources:
         if not isinstance(source, dict) or source.get("status") != "active":
             continue
         relative = source.get("relative_path")
         version = source.get("source_version_id")
-        if isinstance(relative, str) and isinstance(version, str):
-            active.append((relative, version))
-    for relative, _version in sorted(active):
-        try:
-            if "\\" in relative:
-                continue
-            pure = PurePosixPath(relative)
-            if pure.is_absolute() or ".." in pure.parts:
-                continue
-            candidate = root.joinpath(*pure.parts).resolve(strict=True)
-            if root not in candidate.parents or not candidate.is_file():
-                continue
-        except (OSError, RuntimeError):
+        if not isinstance(relative, str) or not isinstance(version, str) or "\\" in relative:
             continue
-        return Artifact(
-            token=f"original-{sha256}",
-            path=candidate,
-            authorization_root=root,
-            media_type=str(entry.get("mime_type") or mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"),
-            kind="original",
-        )
-    return None
+        pure = PurePosixPath(relative)
+        if not relative or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+            continue
+        active.add(pure.as_posix())
+    if not active:
+        return None
+    epoch = hashlib.sha256(
+        f"{workspace_id}\0{catalog_source_root}\0{source_root}".encode("utf-8")
+    ).hexdigest()
+    return OriginalReference(
+        token=f"original-{sha256}-{epoch[:16]}",
+        relative_paths=tuple(sorted(active)),
+        source_root=source_root,
+        catalog_source_root=catalog_source_root,
+        workspace_id=workspace_id,
+        media_type=str(entry.get("mime_type") or "application/octet-stream"),
+        binding_epoch=epoch,
+    )
 
 
 def _valid_keyframes(
@@ -516,7 +517,10 @@ def load_workspace(
         configured=originals_mapping,
     )
     if originals_mapping is None:
-        effective_source_root: str | Path | None = source_root
+        native_source_root = Path(source_root)
+        effective_source_root: Path | None = (
+            native_source_root if native_source_root.is_absolute() else None
+        )
     elif mapping_validation.valid and mapping_validation.resolved_root is not None:
         effective_source_root = mapping_validation.resolved_root
     else:
@@ -524,6 +528,7 @@ def load_workspace(
 
     assets: list[Asset] = []
     artifacts: dict[str, Artifact] = {}
+    originals: dict[str, OriginalReference] = {}
     seen: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict):
@@ -560,7 +565,13 @@ def load_workspace(
             workspace, workspace_id, version, entry, asset_id, sha256, keyframe_fingerprint
         )
         original = (
-            _original(effective_source_root, entry, sha256)
+            _original_reference(
+                effective_source_root,
+                entry,
+                sha256,
+                workspace_id,
+                source_root,
+            )
             if availability == "available" and effective_source_root is not None
             else None
         )
@@ -588,9 +599,10 @@ def load_workspace(
         asset.faces.extend(
             _processor_results(workspace, workspace_id, version, asset_id, sha256, "faces", "faces-v1")
         )
-        for artifact in (preview, original):
-            if artifact is not None:
-                artifacts[artifact.token] = artifact
+        if preview is not None:
+            artifacts[preview.token] = preview
+        if original is not None:
+            originals[original.token] = original
         assets.append(asset)
 
     by_id = {asset.asset_id: asset for asset in assets}
@@ -604,6 +616,7 @@ def load_workspace(
         generated_at=catalog.get("generated_at") if isinstance(catalog.get("generated_at"), str) else None,
         assets=tuple(assets),
         artifacts=artifacts,
+        originals=originals,
         keyframe_fingerprint=keyframe_fingerprint,
         sessions=sessions,
         session_unassigned=session_unassigned,

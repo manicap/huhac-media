@@ -8,6 +8,7 @@ import pytest
 
 from fastapi.testclient import TestClient
 
+from media_desk.config import ORIGINALS_MAPPING_VERIFICATION, OriginalsMapping, Settings
 from media_desk.web import create_app
 
 
@@ -21,6 +22,16 @@ def _state(root: Path) -> dict[str, tuple[int, int, str]]:
         for path in root.rglob("*")
         if path.is_file()
     }
+
+
+def _original_url(client: TestClient, sha256: str) -> str:
+    response = client.get(f"/api/assets/{sha256}")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["original_online"] is False
+    assert payload["original_access_state"] == "unchecked"
+    assert payload["original_url"]
+    return payload["original_url"]
 
 
 def test_filtering_and_pagination(workspace_builder) -> None:
@@ -91,18 +102,43 @@ def test_artifact_registry_blocks_traversal_and_sqlite(workspace_builder) -> Non
     assert b"private" not in client.get("/api/assets").content
 
 
-def test_original_supports_http_range(workspace_builder) -> None:
+def test_original_supports_http_range(workspace_builder, monkeypatch) -> None:
     image = workspace_builder.add_asset(1)
     root = workspace_builder.publish()
     client = TestClient(create_app(root))
 
-    response = client.get(
-        f"/artifacts/original-{image['sha256']}", headers={"Range": "bytes=2-5"}
-    )
+    url = _original_url(client, image["sha256"])
+    original_open = Path.open
+    opened = []
+
+    def counted_open(path: Path, *args, **kwargs):
+        if str(path).startswith(str(workspace_builder.originals)):
+            opened.append(path)
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", counted_open)
+    response = client.get(url, headers={"Range": "bytes=2-5"})
+    invalid = client.get(url, headers={"Range": "bytes=999-1000"})
 
     assert response.status_code == 206
     assert response.content == b"2345"
     assert response.headers["accept-ranges"] == "bytes"
+    assert response.headers["cache-control"] == "no-store"
+    assert invalid.status_code == 416
+    assert len(opened) == 2
+
+
+def test_original_full_get_is_verified_and_opened_on_demand(workspace_builder) -> None:
+    image = workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    client = TestClient(create_app(root))
+
+    response = client.get(_original_url(client, image["sha256"]))
+
+    assert response.status_code == 200
+    assert response.content == b"0123456789-original-media"
+    assert response.headers["content-length"] == str(len(response.content))
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_preview_has_identity_cache_headers(workspace_builder) -> None:
@@ -179,7 +215,129 @@ def test_original_symlink_swap_is_blocked(workspace_builder, tmp_path: Path) -> 
     except OSError:
         pytest.skip("Symlink creation is unavailable on this Windows host")
 
-    response = TestClient(app).get(f"/artifacts/original-{image['sha256']}")
+    client = TestClient(app)
+    response = client.get(_original_url(client, image["sha256"]))
 
     assert response.status_code == 404
     assert b"secret" not in response.content
+
+
+def test_original_deleted_after_start_fails_closed(workspace_builder) -> None:
+    image = workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    client = TestClient(create_app(root))
+    url = _original_url(client, image["sha256"])
+    (workspace_builder.originals / "set/media-1.jpg").unlink()
+
+    response = client.get(url)
+
+    assert response.status_code == 404
+
+
+def test_original_nested_symlink_created_after_start_is_blocked(
+    workspace_builder, tmp_path: Path
+) -> None:
+    image = workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    client = TestClient(create_app(root))
+    url = _original_url(client, image["sha256"])
+    source_dir = workspace_builder.originals / "set"
+    source_file = source_dir / "media-1.jpg"
+    source_file.unlink()
+    source_dir.rmdir()
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    (outside_dir / "media-1.jpg").write_bytes(b"nested-secret")
+    try:
+        os.symlink(outside_dir, source_dir, target_is_directory=True)
+    except OSError:
+        pytest.skip("Directory symlink creation is unavailable on this Windows host")
+
+    response = client.get(url)
+
+    assert response.status_code == 404
+    assert b"nested-secret" not in response.content
+
+
+def test_mapping_epoch_invalidates_old_original_token(workspace_builder, tmp_path: Path) -> None:
+    image = workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    source_root = str(workspace_builder.originals.resolve())
+    second_root = tmp_path / "second-originals"
+    second_file = second_root / "set/media-1.jpg"
+    second_file.parent.mkdir(parents=True)
+    second_file.write_bytes(b"second-root")
+    first_mapping = OriginalsMapping(
+        workspace_builder.workspace_id,
+        source_root,
+        workspace_builder.originals.resolve(),
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+    second_mapping = OriginalsMapping(
+        workspace_builder.workspace_id,
+        source_root,
+        second_root.resolve(),
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+    first = TestClient(
+        create_app(settings=Settings(root, originals_mapping=first_mapping))
+    )
+    second = TestClient(
+        create_app(settings=Settings(root, originals_mapping=second_mapping))
+    )
+    first_url = _original_url(first, image["sha256"])
+    second_url = _original_url(second, image["sha256"])
+
+    assert first_url != second_url
+    assert second.get(first_url).status_code == 404
+    assert second.get(second_url).content == b"second-root"
+
+
+def test_startup_and_metadata_gets_do_not_touch_individual_originals(
+    workspace_builder, monkeypatch
+) -> None:
+    image = workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    original_root = workspace_builder.originals.absolute()
+    calls = []
+    original_resolve = Path.resolve
+    original_stat = Path.stat
+    original_open = Path.open
+
+    def is_child(path: Path) -> bool:
+        value = str(path.absolute())
+        return value.startswith(str(original_root) + os.sep)
+
+    def guarded_resolve(path: Path, *args, **kwargs):
+        if is_child(path):
+            calls.append(("resolve", path))
+        return original_resolve(path, *args, **kwargs)
+
+    def guarded_stat(path: Path, *args, **kwargs):
+        if is_child(path):
+            calls.append(("stat", path))
+        return original_stat(path, *args, **kwargs)
+
+    def guarded_open(path: Path, *args, **kwargs):
+        if is_child(path):
+            calls.append(("open", path))
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+    monkeypatch.setattr(Path, "stat", guarded_stat)
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(
+        "media_desk.originals._sha256_file",
+        lambda _path: pytest.fail("startup and browsing must not hash originals"),
+    )
+
+    client = TestClient(create_app(root))
+    assert client.get("/").status_code == 200
+    assert client.get("/library").status_code == 200
+    assert client.get("/api/index").status_code == 200
+    assert client.get(f"/assets/{image['sha256']}").status_code == 200
+    assert calls == []

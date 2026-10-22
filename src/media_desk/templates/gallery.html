@@ -40,7 +40,7 @@
       <div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>
       {% endif %}
       <span class="type-pill">{{ asset.media_type }}</span>
-      {% if not asset.original_online %}<span class="offline-pill">original offline</span>{% endif %}
+      {% if asset.original %}<span class="offline-pill">originál se ověří při otevření</span>{% else %}<span class="offline-pill">originál offline</span>{% endif %}
     </a>
     <div class="card-body">
       <h2><a href="/assets/{{ asset.sha256 }}">{{ asset.source_name }}</a></h2>

@@ -66,6 +66,14 @@ def _mapping_post(
     return client.post(endpoint, data=data, headers={"Origin": "http://127.0.0.1"})
 
 
+def _original_url(client: TestClient, sha256: str) -> str:
+    response = client.get(f"/api/assets/{sha256}")
+    assert response.status_code == 200
+    url = response.json()["original_url"]
+    assert url
+    return url
+
+
 def _publish_mappable_workspace(
     workspace_builder, *, source_root: str
 ) -> tuple[Path, Path, str]:
@@ -253,7 +261,7 @@ def test_originals_mapping_validate_save_restart_and_clear(
         environ={},
     )
     restarted = _client(create_app(settings=restarted_settings))
-    assert restarted.get(f"/artifacts/original-{digest}").content == b"verified-original-content"
+    assert restarted.get(_original_url(restarted, digest)).content == b"verified-original-content"
     assert "valid_sampled" in restarted.get("/settings").text
 
     clear_token = _csrf(restarted)
@@ -320,7 +328,8 @@ def test_original_artifact_rechecks_symlink_confinement_on_every_access(
         environ={},
     )
     client = _client(create_app(settings=settings))
-    assert client.get(f"/artifacts/original-{digest}").status_code == 200
+    original_url = _original_url(client, digest)
+    assert client.get(original_url).status_code == 200
 
     outside = tmp_path / "outside.jpg"
     outside.write_bytes(b"outside")
@@ -330,7 +339,7 @@ def test_original_artifact_rechecks_symlink_confinement_on_every_access(
     except OSError:
         pytest.skip("Symlink creation is unavailable on this Windows host")
 
-    assert client.get(f"/artifacts/original-{digest}").status_code == 404
+    assert client.get(original_url).status_code == 404
 
 
 def test_originals_mapping_posts_use_settings_security_boundary(

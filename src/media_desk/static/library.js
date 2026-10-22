@@ -76,7 +76,7 @@ if (app) {
     url.searchParams.set("return_to", location.pathname + location.search);
     url.searchParams.set("active_asset_id", item.asset_id);
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
-      <a class="tile-preview" href="${escapeHtml(url.pathname + url.search)}">${preview}<span class="type-pill">${item.media_type === "video" ? "video" : "foto"}</span>${item.original_online ? "" : '<span class="offline-pill">originál offline</span>'}</a>
+      <a class="tile-preview" href="${escapeHtml(url.pathname + url.search)}">${preview}<span class="type-pill">${item.media_type === "video" ? "video" : "foto"}</span>${item.original_access_state === "unchecked" ? '<span class="offline-pill">ověří se při otevření</span>' : '<span class="offline-pill">originál offline</span>'}</a>
       <div class="tile-copy"><strong title="${escapeHtml(item.source_name)}">${escapeHtml(item.source_name)}</strong><span>${escapeHtml(formatCaptureLabel(item))}</span></div>
     </article>`;
   };

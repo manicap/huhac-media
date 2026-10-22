@@ -4,7 +4,7 @@
 <a class="back" href="{{ return_to }}">← Zpět</a>
 <section class="detail-head">
   <div class="detail-media">
-    {% if asset.media_type == 'video' and asset.original_online %}<video src="/artifacts/{{ asset.original.token }}" {% if asset.preview %}poster="/artifacts/{{ asset.preview.token }}"{% endif %} controls preload="metadata"></video>{% elif asset.preview %}<img src="/artifacts/{{ asset.preview.token }}" alt="Náhled {{ asset.source_name }}">{% else %}<div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>{% endif %}
+    {% if asset.media_type == 'video' and asset.original %}<video src="/artifacts/{{ asset.original.token }}" {% if asset.preview %}poster="/artifacts/{{ asset.preview.token }}"{% endif %} controls preload="metadata"></video>{% elif asset.preview %}<img src="/artifacts/{{ asset.preview.token }}" alt="Náhled {{ asset.source_name }}">{% else %}<div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>{% endif %}
   </div>
   <div class="detail-copy">
     <p class="eyebrow">{{ asset.media_type }} · {{ asset.format }}</p>
@@ -14,7 +14,7 @@
       <div><dt>Pořízeno</dt><dd>{{ asset.capture_time|datetime_cs }}{% if asset.capture_filesystem_fallback %}<br><small>čas souboru · nízká důvěra</small>{% elif asset.capture_time and not asset.capture_timezone and not asset.capture_time.endswith('Z') %}<br><small>bez časové zóny</small>{% endif %}</dd></div>
       <div><dt>Zdroj času</dt><dd>{{ asset.capture_source or 'Neznámý' }}</dd></div>
       <div><dt>Velikost</dt><dd>{{ asset.size_bytes|size_cs }}</dd></div>
-      <div><dt>Originál</dt><dd>{% if asset.original_online %}<a href="/artifacts/{{ asset.original.token }}">Otevřít / přehrát</a>{% else %}<span class="offline-text">Offline</span>{% endif %}</dd></div>
+      <div><dt>Originál</dt><dd>{% if asset.original %}<a href="/artifacts/{{ asset.original.token }}">Otevřít / přehrát</a> <span class="muted">Dostupnost se ověří při otevření.</span>{% else %}<span class="offline-text">Offline nebo bez platného mapování</span>{% endif %}</dd></div>
     </dl>
     <nav class="detail-neighbors" aria-label="Předchozí a další médium">{% if previous_asset %}<a id="previous-asset" href="/assets/{{ previous_asset.sha256 }}?return_to={{ return_to|urlencode }}&active_asset_id={{ previous_asset.asset_id|urlencode }}">← Předchozí</a>{% else %}<span></span>{% endif %}{% if next_asset %}<a id="next-asset" href="/assets/{{ next_asset.sha256 }}?return_to={{ return_to|urlencode }}&active_asset_id={{ next_asset.asset_id|urlencode }}">Další →</a>{% endif %}</nav>
   </div>

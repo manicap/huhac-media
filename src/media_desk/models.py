@@ -15,6 +15,19 @@ class Artifact:
 
 
 @dataclass(frozen=True)
+class OriginalReference:
+    """Catalog-authorized description; filesystem access is verified per request."""
+
+    token: str
+    relative_paths: tuple[str, ...]
+    source_root: Path
+    catalog_source_root: str
+    workspace_id: str
+    media_type: str
+    binding_epoch: str
+
+
+@dataclass(frozen=True)
 class ProcessorResult:
     processor: str
     version: str
@@ -79,7 +92,7 @@ class Asset:
     technical: dict[str, Any]
     preview: Artifact | None
     preview_status: str
-    original: Artifact | None
+    original: OriginalReference | None
     sessions: list[SessionReference] = field(default_factory=list)
     vision: list[ProcessorResult] = field(default_factory=list)
     faces: list[ProcessorResult] = field(default_factory=list)
@@ -87,7 +100,12 @@ class Asset:
 
     @property
     def original_online(self) -> bool:
-        return self.original is not None
+        # A catalog reference is intentionally not an access-time filesystem fact.
+        return False
+
+    @property
+    def original_access_state(self) -> str:
+        return "unchecked" if self.original is not None else "offline"
 
 
 @dataclass(frozen=True)
@@ -98,6 +116,7 @@ class WorkspaceSnapshot:
     generated_at: str | None
     assets: tuple[Asset, ...]
     artifacts: dict[str, Artifact]
+    originals: dict[str, OriginalReference]
     keyframe_fingerprint: str | None
     sessions: tuple[SessionGroup, ...] = ()
     session_unassigned: tuple[UnassignedReference, ...] = ()

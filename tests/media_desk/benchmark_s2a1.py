@@ -45,6 +45,8 @@ class OriginalIoCounter:
             def counted(path, *args, _name=name, _original=original, **kwargs):
                 if self._inside(path):
                     self.counts[_name] += 1
+                    if os.path.normcase(str(path.absolute())) != self.root:
+                        self.counts[f"per_file_{_name}"] += 1
                 return _original(path, *args, **kwargs)
 
             setattr(Path, name, counted)
@@ -104,10 +106,40 @@ def run(root: Path, count: int, repeats: int, profile: bool) -> dict:
     client = TestClient(app)
     handler_ms = {}
     for url in ("/", "/library", "/api/index"):
-        tick = time.perf_counter()
-        response = client.get(url)
-        response.raise_for_status()
-        handler_ms[url] = round((time.perf_counter() - tick) * 1000, 3)
+        samples = []
+        for _index in range(5):
+            tick = time.perf_counter()
+            response = client.get(url)
+            response.raise_for_status()
+            samples.append((time.perf_counter() - tick) * 1000)
+        handler_ms[url] = {
+            "samples": [round(value, 3) for value in samples],
+            "p50": round(statistics.median(samples), 3),
+            "p95": round(_percentile(samples, 0.95), 3),
+        }
+
+    access_ms = {}
+    access_io: Counter[str] = Counter()
+    for label, media_type, headers in (
+        ("image_get", "image", {}),
+        ("video_range", "video", {"Range": "bytes=2-5"}),
+    ):
+        asset = next(item for item in app.state.snapshot.assets if item.media_type == media_type)
+        if asset.original is None:
+            continue
+        samples = []
+        for _index in range(5):
+            with OriginalIoCounter(local_root) as counter:
+                tick = time.perf_counter()
+                response = client.get(f"/artifacts/{asset.original.token}", headers=headers)
+                response.raise_for_status()
+                samples.append((time.perf_counter() - tick) * 1000)
+            access_io.update(counter.counts)
+        access_ms[label] = {
+            "samples": [round(value, 3) for value in samples],
+            "p50": round(statistics.median(samples), 3),
+            "p95": round(_percentile(samples, 0.95), 3),
+        }
 
     profile_top = None
     if profile:
@@ -131,6 +163,8 @@ def run(root: Path, count: int, repeats: int, profile: bool) -> dict:
         },
         "original_io_per_start": per_start,
         "first_response_ms": handler_ms,
+        "original_access_ms": access_ms,
+        "original_access_io_total": dict(access_io),
         "python_peak_tracemalloc_mib": round(peak_bytes / 1024 / 1024, 3),
         "profile_top": profile_top,
     }

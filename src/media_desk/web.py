@@ -6,10 +6,11 @@ import hmac
 from importlib.metadata import PackageNotFoundError, version
 import ipaddress
 import json
+import os
 from pathlib import Path
 import re
 import secrets
-from typing import Iterator
+from typing import BinaryIO, Iterator
 from urllib.parse import parse_qs, urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -25,8 +26,12 @@ from media_desk.config import (
     user_config_path,
 )
 from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_date, capture_label
-from media_desk.models import Artifact, Asset, WorkspaceSnapshot
-from media_desk.originals import MappingValidation, validate_mapping_candidate
+from media_desk.models import Artifact, Asset, OriginalReference, WorkspaceSnapshot
+from media_desk.originals import (
+    MappingValidation,
+    resolve_mapped_original,
+    validate_mapping_candidate,
+)
 from media_desk.workspace_status import WorkspaceValidation, validate_workspace
 
 
@@ -99,6 +104,7 @@ def _asset_payload(asset: Asset) -> dict:
         "preview_status": asset.preview_status,
         "preview_url": f"/artifacts/{asset.preview.token}" if asset.preview else None,
         "original_online": asset.original_online,
+        "original_access_state": asset.original_access_state,
         "original_url": f"/artifacts/{asset.original.token}" if asset.original else None,
         "sessions": [reference.__dict__ for reference in asset.sessions],
         "vision_result_count": len(asset.vision),
@@ -162,9 +168,9 @@ def _byte_range(value: str, size: int) -> tuple[int, int]:
     return start, min(end, size - 1)
 
 
-def _chunks(path: Path, start: int, end: int) -> Iterator[bytes]:
+def _chunks(stream: BinaryIO, start: int, end: int) -> Iterator[bytes]:
     remaining = end - start + 1
-    with path.open("rb") as stream:
+    try:
         stream.seek(start)
         while remaining:
             chunk = stream.read(min(1024 * 256, remaining))
@@ -172,27 +178,42 @@ def _chunks(path: Path, start: int, end: int) -> Iterator[bytes]:
                 break
             remaining -= len(chunk)
             yield chunk
+    finally:
+        stream.close()
 
 
-def _serve_original(request: Request, artifact: Artifact, resolved: Path):
+def _serve_original(request: Request, original: OriginalReference, resolved: Path):
     try:
-        size = resolved.stat().st_size
+        stream = resolved.open("rb")
+        size = os.fstat(stream.fileno()).st_size
     except OSError as exc:
         raise HTTPException(status_code=404, detail="Original is offline") from exc
     range_header = request.headers.get("range")
-    common = {"Accept-Ranges": "bytes", "Content-Disposition": "inline"}
-    if not range_header:
-        return FileResponse(resolved, media_type=artifact.media_type, headers=common)
-    start, end = _byte_range(range_header, size)
-    headers = {
-        **common,
-        "Content-Range": f"bytes {start}-{end}/{size}",
-        "Content-Length": str(end - start + 1),
+    common = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store",
+        "Content-Disposition": "inline",
     }
+    try:
+        if range_header:
+            start, end = _byte_range(range_header, size)
+            status_code = 206
+            headers = {
+                **common,
+                "Content-Range": f"bytes {start}-{end}/{size}",
+                "Content-Length": str(end - start + 1),
+            }
+        else:
+            start, end = 0, max(0, size - 1)
+            status_code = 200
+            headers = {**common, "Content-Length": str(size)}
+    except Exception:
+        stream.close()
+        raise
     return StreamingResponse(
-        _chunks(resolved, start, end),
-        status_code=206,
-        media_type=artifact.media_type,
+        _chunks(stream, start, end),
+        status_code=status_code,
+        media_type=original.media_type,
         headers=headers,
     )
 
@@ -809,7 +830,21 @@ def create_app(
         current = require_snapshot()
         selected = current.artifacts.get(token)
         if selected is None:
-            raise HTTPException(status_code=404, detail="Artifact not found")
+            original = current.originals.get(token)
+            if original is None:
+                raise HTTPException(status_code=404, detail="Artifact not found")
+            if (
+                original.workspace_id != current.workspace_id
+                or original.catalog_source_root != current.catalog_source_root
+            ):
+                raise HTTPException(status_code=404, detail="Artifact is unavailable")
+            resolved_original = resolve_mapped_original(
+                original.source_root,
+                original.relative_paths,
+            )
+            if resolved_original is None:
+                raise HTTPException(status_code=404, detail="Original is offline")
+            return _serve_original(request, original, resolved_original)
         try:
             resolved = selected.path.resolve(strict=True)
             allowed_root = selected.authorization_root.resolve(strict=True)
@@ -817,8 +852,6 @@ def create_app(
             raise HTTPException(status_code=404, detail="Artifact is unavailable") from exc
         if allowed_root not in resolved.parents or not resolved.is_file():
             raise HTTPException(status_code=404, detail="Artifact is unavailable")
-        if selected.kind == "original":
-            return _serve_original(request, selected, resolved)
         etag = f'"{token}"'
         headers = {"ETag": etag, "Cache-Control": "public, max-age=31536000, immutable"}
         if request.headers.get("if-none-match") == etag:

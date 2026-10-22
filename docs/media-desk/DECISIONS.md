@@ -29,7 +29,7 @@ schválení a **REJECTED** se nemá realizovat.
 | D-013 | Přenosné výběry/hodnocení/kolekce budou oddělené od inferenčních výstupů i lokálního configu. | **TARGET**, formát **PROPOSED** | dnes neimplementováno |
 | D-014 | Přímé editování `metadata/catalog.json` nebo změna `workspace_contract_version` kvůli mappingu. | **REJECTED pro nejbližší etapu** | porušilo by historii a kompatibilitu procesorů |
 | D-015 | Documentation First & Documentation Sync je závazný projektový proces. | **ACCEPTED + IMPLEMENTED** | `AGENTS.md`, `docs/development.md`; zavedeno 2026-10-22 v commitu `defb316` |
-| D-016 | S2a.1 oddělí katalogem autorizovanou source reference od aktuálně ověřeného originálu. Startup nesmí kvůli registraci provádět per-asset `resolve`/`stat`/`open`; confinement, symlink escape a otevření se provedou request-scoped při každém GET/Range. Staré tokeny se vážou na epochu aktivního rootu. | **ACCEPTED/TARGET — IMPLEMENTATION IN PROGRESS** | schválené zadání 2026-10-22; baseline a profil v `S2A1_STARTUP_PERFORMANCE.md` |
+| D-016 | S2a.1 odděluje katalogem autorizovanou source reference od aktuálně ověřeného originálu. Startup nesmí kvůli registraci provádět per-asset `resolve`/`stat`/`open`; confinement, symlink escape a otevření se provedou request-scoped při každém GET/Range. Staré tokeny se vážou na epochu aktivního rootu. | **ACCEPTED + IMPLEMENTED, FINAL VERIFICATION PENDING** | `models.py`, `contract.py`, `web.py`; baseline a průběžný after profil v `S2A1_STARTUP_PERFORMANCE.md` |
 
 ## Vyhodnocení otázek E1–E10
 
