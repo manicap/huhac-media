@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from media_desk.config import ORIGINALS_MAPPING_VERIFICATION, OriginalsMapping
 from media_desk.contract import ContractError, load_workspace
 
 
@@ -114,3 +115,72 @@ def test_foreign_platform_source_root_stays_browsable_offline(workspace_builder)
 
     assert asset.preview is not None
     assert not asset.original_online
+
+
+def test_foreign_platform_source_root_uses_exact_host_local_mapping(
+    workspace_builder, monkeypatch
+) -> None:
+    workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    catalog_path = root / "metadata/catalog.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    catalog["source_root"] = r"D:\Huhac\Media"
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+    mapping = OriginalsMapping(
+        workspace_builder.workspace_id,
+        catalog["source_root"],
+        workspace_builder.originals.resolve(),
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+    monkeypatch.setattr(
+        "media_desk.originals._sha256_file",
+        lambda _path: pytest.fail("workspace startup must not hash originals"),
+    )
+
+    snapshot = load_workspace(root, originals_mapping=mapping)
+
+    assert snapshot.assets[0].original_online
+    assert snapshot.assets[0].original is not None
+    assert snapshot.assets[0].original.authorization_root == workspace_builder.originals.resolve()
+    assert snapshot.originals_mapping_state == "valid_sampled"
+    assert snapshot.catalog_source_root == r"D:\Huhac\Media"
+
+
+def test_mapping_binding_mismatch_fails_closed_but_keeps_preview(workspace_builder) -> None:
+    workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    mapping = OriginalsMapping(
+        "another-workspace",
+        str(workspace_builder.originals.resolve()),
+        workspace_builder.originals.resolve(),
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+
+    snapshot = load_workspace(root, originals_mapping=mapping)
+
+    assert snapshot.originals_mapping_state == "binding_mismatch"
+    assert snapshot.assets[0].preview is not None
+    assert not snapshot.assets[0].original_online
+
+
+def test_temporarily_unavailable_mapping_is_not_removed_or_fallback(workspace_builder, tmp_path) -> None:
+    workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    mapping = OriginalsMapping(
+        workspace_builder.workspace_id,
+        str(workspace_builder.originals.resolve()),
+        tmp_path / "offline",
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+
+    snapshot = load_workspace(root, originals_mapping=mapping)
+
+    assert snapshot.originals_mapping_state == "unavailable"
+    assert snapshot.assets[0].preview is not None
+    assert not snapshot.assets[0].original_online

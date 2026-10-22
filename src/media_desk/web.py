@@ -201,7 +201,7 @@ def create_app(
     templates.env.filters["size_cs"] = _size_cs
     templates.env.filters["datetime_cs"] = _datetime_cs
     app.mount("/static", StaticFiles(directory=str(_PACKAGE_ROOT / "static")), name="static")
-    validation = validate_workspace(workspace, keyframe_fingerprint)
+    validation = validate_workspace(workspace, keyframe_fingerprint, settings.originals_mapping)
     snapshot = validation.snapshot
     app.state.snapshot = snapshot
     app.state.workspace_validation = validation

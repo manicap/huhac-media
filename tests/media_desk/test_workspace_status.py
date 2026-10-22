@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from media_desk.config import ORIGINALS_MAPPING_VERIFICATION, OriginalsMapping
 from media_desk.workspace_status import validate_workspace
 
 
@@ -25,6 +26,28 @@ def test_validator_uses_contract_and_accepts_offline_originals(workspace_builder
     assert result.valid is True
     assert result.snapshot is not None
     assert result.snapshot.assets[0].original_online is False
+
+
+def test_validator_keeps_workspace_connected_when_mapping_mount_is_offline(
+    workspace_builder, tmp_path: Path
+) -> None:
+    workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    mapping = OriginalsMapping(
+        workspace_builder.workspace_id,
+        str(workspace_builder.originals.resolve()),
+        tmp_path / "offline",
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+
+    result = validate_workspace(root, originals_mapping=mapping)
+
+    assert result.valid
+    assert result.snapshot is not None
+    assert result.snapshot.originals_mapping_state == "unavailable"
+    assert not result.snapshot.assets[0].original_online
 
 
 def test_invalid_contract_is_not_reported_as_unavailable(workspace_builder) -> None:

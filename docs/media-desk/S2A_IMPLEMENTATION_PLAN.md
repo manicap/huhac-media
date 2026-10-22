@@ -17,7 +17,10 @@
   změně workspace (`src/media_desk/config.py`).
 - **IMPLEMENTED:** bezpečný mapped-root resolver, přesný binding a deterministický
   `sha256-sample-v1` s maximálně 16 assety (`src/media_desk/originals.py`).
-- **NOT IMPLEMENTED:** contract/startup integrace a webové validate/save/clear flow.
+- **IMPLEMENTED:** fail-closed contract/startup integrace; validní binding mění
+  pouze kořen originálů, offline/mismatch zachová workspace a previews bez SHA
+  při startu (`src/media_desk/contract.py`, `workspace_status.py`).
+- **NOT IMPLEMENTED:** webové validate/save/clear flow.
 
 ## 1. Výsledek etapy
 

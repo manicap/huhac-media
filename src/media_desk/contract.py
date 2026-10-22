@@ -7,6 +7,7 @@ import re
 from typing import Any, Iterable
 
 from media_desk import SUPPORTED_WORKSPACE_CONTRACT_VERSION
+from media_desk.config import OriginalsMapping
 from media_desk.models import (
     Artifact,
     Asset,
@@ -17,6 +18,7 @@ from media_desk.models import (
     UnassignedReference,
     WorkspaceSnapshot,
 )
+from media_desk.originals import bind_mapping
 
 
 class ContractError(ValueError):
@@ -138,7 +140,7 @@ def _original(
     entry: dict[str, Any],
     sha256: str,
 ) -> Artifact | None:
-    if not isinstance(source_root_value, str) or not source_root_value:
+    if not isinstance(source_root_value, (str, Path)) or not str(source_root_value):
         return None
     source_root = Path(source_root_value)
     if not source_root.is_absolute():
@@ -475,6 +477,7 @@ def _apply_face_clusters(snapshot_assets: dict[str, Asset], workspace: Path, wor
 def load_workspace(
     workspace_path: Path,
     keyframe_fingerprint: str | None = None,
+    originals_mapping: OriginalsMapping | None = None,
 ) -> WorkspaceSnapshot:
     if keyframe_fingerprint is not None and not _SHA256.fullmatch(keyframe_fingerprint):
         raise ContractError("Keyframe fingerprint must be 64 lowercase hexadecimal characters")
@@ -507,6 +510,17 @@ def load_workspace(
         PurePosixPath(source_root).is_absolute() or PureWindowsPath(source_root).is_absolute()
     ):
         raise ContractError("Invalid asset catalog: source_root must be an absolute path")
+    mapping_validation = bind_mapping(
+        workspace_id=workspace_id,
+        source_root=source_root,
+        configured=originals_mapping,
+    )
+    if originals_mapping is None:
+        effective_source_root: str | Path | None = source_root
+    elif mapping_validation.valid and mapping_validation.resolved_root is not None:
+        effective_source_root = mapping_validation.resolved_root
+    else:
+        effective_source_root = None
 
     assets: list[Asset] = []
     artifacts: dict[str, Artifact] = {}
@@ -545,7 +559,11 @@ def load_workspace(
         preview, preview_status = _preview(
             workspace, workspace_id, version, entry, asset_id, sha256, keyframe_fingerprint
         )
-        original = _original(source_root, entry, sha256) if availability == "available" else None
+        original = (
+            _original(effective_source_root, entry, sha256)
+            if availability == "available" and effective_source_root is not None
+            else None
+        )
         asset = Asset(
             asset_id=asset_id,
             sha256=sha256,
@@ -590,4 +608,9 @@ def load_workspace(
         sessions=sessions,
         session_unassigned=session_unassigned,
         session_status=session_status,
+        catalog_source_root=source_root,
+        originals_mapping_state=mapping_validation.state,
+        originals_mapping_message=mapping_validation.message,
+        originals_mapping_sampled_assets=mapping_validation.sampled_assets,
+        originals_mapping_eligible_assets=mapping_validation.eligible_assets,
     )

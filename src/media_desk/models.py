@@ -102,3 +102,8 @@ class WorkspaceSnapshot:
     sessions: tuple[SessionGroup, ...] = ()
     session_unassigned: tuple[UnassignedReference, ...] = ()
     session_status: str = "unavailable"
+    catalog_source_root: str = ""
+    originals_mapping_state: str = "unconfigured"
+    originals_mapping_message: str = ""
+    originals_mapping_sampled_assets: int = 0
+    originals_mapping_eligible_assets: int = 0

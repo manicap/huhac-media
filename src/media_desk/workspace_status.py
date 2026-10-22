@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from media_desk.config import OriginalsMapping
 from media_desk.contract import ContractError, load_workspace
 from media_desk.models import WorkspaceSnapshot
 
@@ -28,6 +29,7 @@ class WorkspaceValidation:
 def validate_workspace(
     workspace: Path | None,
     keyframe_fingerprint: str | None = None,
+    originals_mapping: OriginalsMapping | None = None,
 ) -> WorkspaceValidation:
     """Validate an existing workspace exclusively through the public read-only contract."""
     if workspace is None:
@@ -56,7 +58,7 @@ def validate_workspace(
             resolved,
         )
     try:
-        snapshot = load_workspace(resolved, keyframe_fingerprint)
+        snapshot = load_workspace(resolved, keyframe_fingerprint, originals_mapping)
     except ContractError as exc:
         detail = str(exc).casefold()
         cause = exc.__cause__
