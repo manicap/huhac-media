@@ -1,5 +1,30 @@
 # Development
 
+## Documentation-first workflow
+
+Documentation is the primary record of approved architecture, public contracts,
+component ownership, and project status. Before a substantial change, read the
+relevant current documentation and compare it with code and tests. Historical
+task documents do not override newer approved decisions.
+
+If code and documentation conflict, record and evaluate the conflict before
+building on either interpretation. Do not silently choose one as authoritative.
+Material architectural decisions require a proposal and approval before code.
+
+Changes to architecture, public data contracts, persistence, component
+ownership, or supported deployment behavior must update the relevant
+documentation in the same change. Documentation must distinguish implemented
+behavior from accepted targets, proposals, absent functionality, and unverified
+assumptions.
+
+Before completing a substantial milestone, synchronize the relevant status,
+architecture, decision, roadmap, and user documents; verify their links,
+configuration examples, startup commands, and implementation claims; and review
+code and documentation for consistency. Small typo, CSS-only, or behavior-neutral
+refactoring changes need only proportionate documentation.
+
+Repository-wide agent instructions are in [`AGENTS.md`](../AGENTS.md).
+
 ## Environment
 
 ```powershell
