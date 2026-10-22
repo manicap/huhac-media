@@ -6,6 +6,8 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
+**Rozhodnutí aktualizována:** 2026-10-22 po schválení D-011, D-012 a D-009
+
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
 schválení a **REJECTED** se nemá realizovat.
@@ -20,12 +22,13 @@ schválení a **REJECTED** se nemá realizovat.
 | D-006 | Media Storage, Workspace, lokální instance config a budoucí uživatelská data jsou různé vrstvy. | **ACCEPTED** | odpovídá dnešnímu ownership; uživatelská vrstva je dosud **ABSENT** |
 | D-007 | Tři provozní scénáře A/B/C jsou cílový workflow. | **TARGET** | uživatelsky odsouhlasený baseline; aktuální pokrytí je A absent, B partial, C implemented |
 | D-008 | Cizí `source_root` se kvůli prohlížení nikdy automaticky nepřepisuje do sdíleného katalogu. | **ACCEPTED** | chrání více hostitelů a veřejnou historii; dnešní Media Desk katalog nezapisuje |
-| D-009 | Interní ingest DB logicky patří k workspace; současný multi-host zápis přes SMB/NFS není podporovaný cíl. | **ACCEPTED** | SQLite WAL a host lock: `src/huhac_media/storage/database.py:24-28`, `src/huhac_media/storage/workspace.py:89-129` |
+| D-009 | Interní ingest DB logicky patří k workspace; multi-host zápis přes SMB/NFS je nepodporovaný. Budoucí síťový model musí mít jediného writera a bezpečný backup. | **ACCEPTED** | schváleno 2026-10-22; SQLite WAL a host lock: `src/huhac_media/storage/database.py:24-28`, `src/huhac_media/storage/workspace.py:89-129` |
 | D-010 | Media Desk nebude dostávat SQLite jen „pro budoucnost“. | **ACCEPTED** | M1.3 potřebuje pouze config; `rg sqlite src/media_desk` nemá produkční DB použití |
-| D-011 | První mapping má být lokální adaptér vázaný na `workspace_id` a původní `source_root`, použitý jen pro read-only Media Desk. | **PROPOSED** | nejmenší změna bez migrace; čeká na schválení |
-| D-012 | Nový workspace má zakládat úzké ingest-owned init rozhraní, ne Media Desk přímými zápisy. | **PROPOSED** | zachová ownership; čeká na návrh rollbacku a schválení |
+| D-011 | S2a zavede lokální read-only mapping originálů pouze pro Media Desk, vázaný na `workspace_id` a přesnou původní hodnotu `source_root`. Mapping zůstane v per-user configu, použije path confinement, ochranu proti symlink escape a reprezentativní SHA-256 vzorek; běžný start neprovede full rehash. | **ACCEPTED/TARGET — NOT IMPLEMENTED** | schváleno 2026-10-22; přechodný kompatibilní adapter pro v1, nikoli definitivní storage architektura |
+| D-012 | Prázdný workspace bude v budoucnu zakládat samostatné ingest-owned rozhraní oddělené od importu a analýzy; Media Desk nebude přímo vytvářet producer-owned soubory. | **ACCEPTED/TARGET — NOT IMPLEMENTED** | schváleno 2026-10-22; zachovává ownership ingestu |
 | D-013 | Přenosné výběry/hodnocení/kolekce budou oddělené od inferenčních výstupů i lokálního configu. | **TARGET**, formát **PROPOSED** | dnes neimplementováno |
 | D-014 | Přímé editování `metadata/catalog.json` nebo změna `workspace_contract_version` kvůli mappingu. | **REJECTED pro nejbližší etapu** | porušilo by historii a kompatibilitu procesorů |
+| D-015 | Documentation First & Documentation Sync je závazný projektový proces. | **ACCEPTED + IMPLEMENTED** | `AGENTS.md`, `docs/development.md`; zavedeno 2026-10-22 v commitu `defb316` |
 
 ## Vyhodnocení otázek E1–E10
 
@@ -33,12 +36,13 @@ schválení a **REJECTED** se nemá realizovat.
   jsou doloženy v D-003 až D-005 a `ARCHITECTURE.md`.
 - **E2 — PARTIAL/UNVERIFIED:** ingest umí v rámci plného runu vytvořit i prázdný
   workspace, ale nemá samostatný veřejný init kontrakt a audit cestu nespustil.
-- **E3 — ABSENT:** žádný override neexistuje. D-011 je nejmenší návrh; společné
-  použití procesory zůstává otevřené.
-- **E4 — PROPOSED:** strukturální kontrola všech aktivních relativních cest,
-  deterministický reprezentativní SHA vzorek a volitelný full verify. Samotný
-  název/cesta není identita. Politika duplicitních source versions není schválena.
-- **E5 — UNVERIFIED:** podporovaný NAS writer model není vybrán; viz RFC.
+- **E3 — ACCEPTED/TARGET, ABSENT V KÓDU:** D-011 schvaluje lokální adapter jen
+  pro Media Desk. Společné použití procesory zůstává mimo S2a.
+- **E4 — ACCEPTED/TARGET:** před uložením mappingu proběhne strukturální kontrola
+  a deterministický reprezentativní SHA-256 vzorek. Výsledek musí být označen jako
+  vzorková, nikoli úplná kontrola integrity. Samotný název/cesta není identita.
+- **E5 — ACCEPTED OMEZENÍ:** multi-host zápis je nepodporovaný. Konkrétní budoucí
+  single-writer/backup deployment zůstává **UNVERIFIED**; viz RFC.
 - **E6 — IMPLEMENTED (negativní zjištění):** Media Desk má config, ne SQLite.
 - **E7 — TARGET/PROPOSED:** uživatelská data mají být přenosná a oddělená, ale
   schema, writer, záloha i verzování nejsou rozhodnuty.
@@ -50,9 +54,9 @@ schválení a **REJECTED** se nemá realizovat.
 - **E10 — PROPOSED:** adapter může zachovat v1 bez rehash/AI; kontrakt v2 je až
   možnost pro sdílenou, více-konzumentovou storage abstrakci po samostatném ADR.
 
-## Schvalovací brána
+## Stav schválení a další brána
 
-Před implementací S2a je nutné výslovně schválit nebo upravit D-011 a validační
-hranice v RFC. D-012 musí být schváleno před bootstrap etapou a writer deployment
-před jakoukoli síťovou zapisující etapou; mohou zatím zůstat odložené. Tento audit
-žádný návrh neimplementuje.
+D-011, D-012 a omezení D-009 byly schváleny 2026-10-22. Detailní implementační
+plán S2a je v [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md). S2a zatím
+není implementována; zahájení kódu vyžaduje samostatný pokyn. Writer deployment
+musí být navržen a schválen před jakoukoli síťovou zapisující etapou.

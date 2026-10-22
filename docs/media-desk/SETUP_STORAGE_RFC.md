@@ -1,6 +1,6 @@
 # RFC: setup workspace a Media Storage
 
-**Stav:** **PROPOSED — čeká na schválení, bez implementace**
+**Stav:** **S2a VARIANTA 2A SCHVÁLENA 2026-10-22 — bez implementace**
 
 **Auditováno:** 2026-10-22
 
@@ -11,6 +11,11 @@
 Umožnit tři workflow: nový archiv, připojení existujícího archivu pod jinými
 hostitelskými cestami a běžný opakovaný start. RFC nemění kontrakt v1, databáze,
 originály ani procesory a není oprávněním k implementaci Storage Manageru.
+
+Rozhodnutí D-011 vybralo variantu 2A jako přechodný kompatibilní adapter pouze
+pro Media Desk. D-012 potvrdilo ingest-owned inicializaci pro budoucí samostatnou
+etapu. Multi-host SQLite zápis přes SMB/NFS zůstává nepodporovaný. Varianty 2B,
+2C a konkrétní writer/backup deployment nejsou tímto schváleny.
 
 ## 1. Založení nového archivu
 
@@ -59,9 +64,11 @@ dostupných cest, velikost deterministického SHA vzorku a timestamp kontroly.
    absolutní cestu, `..`, backslash a symlink escape.
 3. Strukturálně ověřit existenci/typ/velikost; název není důkaz identity.
 4. Deterministicky vzorkovat assety napříč katalogem a porovnat SHA-256 s asset ID.
-   Velikost vzorku a práh musí být schváleny; audit je neurčuje.
-5. Nabídnout explicitní full verify mimo běžný start. Běžný start pouze levně
-   ověří binding a dostupnost, nehashuje celý archiv a nespouští AI.
+   Schválený plán S2a určuje nejvýše 16 dostupných unikátních assetů, rozložených
+   mezi image/video a rozsah velikostí; nejde o úplnou kontrolu integrity.
+5. Běžný start pouze levně ověří binding a dostupnost, nehashuje celý archiv a
+   nespouští AI. Explicitní full verify není součástí S2a; případně vyžaduje
+   samostatnou budoucí etapu.
 6. Při více aktivních source versions nehádat: zvolit stejnou deterministickou
    politiku jako konzument, nebo vrátit ambiguity. Toto je otevřené rozhodnutí.
 
@@ -131,8 +138,10 @@ postup je **UNVERIFIED** a musí vzniknout spolu s volbou deploymentu.
 | Local writer + publish | nový publish protocol/manifest/sync | runtime lokální, public data přenosná | staging + atomic generation switch | předchozí generace jako rollback | partial sync, crash, stale reader, restore | vysoká |
 | Backend-owner service | nové job API, auth, deployment a backup API | klienti jsou path-agnostic | authn/authz/TLS/rate limits | server-owned migration a restore | API, concurrency, failover, security | velmi vysoká |
 
-## Doporučení ke schválení
+## Schválený směr a zbývající rozhodnutí
 
-Schválit nejprve pouze variantu 2A jako S2a. Variantu 1C navrhnout následně jako
-samostatnou etapu. Writer/NAS model a rozšíření resolveru do procesorů ponechat
-otevřené, dokud nebudou popsány konkrétní deployment a failure scénáře.
+Varianta 2A je schválená jako S2a; detailní prováděcí plán je v
+[S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md). Princip varianty 1C je
+schválený jako D-012, ale její konkrétní rozhraní není součástí S2a. Writer/NAS
+model a rozšíření resolveru do procesorů zůstávají otevřené, dokud nebudou popsány
+konkrétní deployment a failure scénáře.

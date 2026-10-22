@@ -6,6 +6,8 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
+**Rozhodnutí aktualizována:** 2026-10-22 po schválení D-011, D-012 a D-009
+
 > **IMPLEMENTOVÁNO DNES** — Media Desk je lokální read-only konzument jednoho
 > veřejného workspace v1. Při startu načte snapshot a zapisuje pouze vlastní
 > per-user TOML konfiguraci. Media Ingest je samostatný writer vlastnící interní
@@ -77,10 +79,15 @@ lokální mapovací tabulka. Video Keyframes také přímo používá katalogov�
 `source_root` (`src/video_keyframes/contract.py:102-124`); řešení jen uvnitř
 Media Desku by automaticky nevyřešilo procesory ani ingest.
 
-**PROPOSED.** První bezpečná varianta je lokální, explicitně navázané mapování
-`workspace_id + catalog source_root → local media root`, nejprve pouze pro
-read-only Media Desk. Nesmí se zapsat zpět do sdíleného katalogu. Rozšíření na
-procesory vyžaduje samostatný společný adaptér nebo novou verzi kontraktu.
+**DECIDED/TARGET, NOT IMPLEMENTED.** S2a bude lokální, explicitně navázané
+mapování `workspace_id + catalog source_root → local media root` pouze pro
+read-only Media Desk. Před uložením použije reprezentativní SHA-256 vzorek,
+výslovně označený jako neúplná kontrola integrity. Běžný start nebude provádět
+full rehash. Mapping se nesmí zapsat do workspace ani sdíleného katalogu.
+
+S2a je přechodný kompatibilní adapter pro veřejný kontrakt v1, nikoli definitivní
+storage architektura nebo storage registry. Rozšíření na procesory či obecnou
+storage abstrakci vyžaduje nové rozhodnutí a samostatný návrh; S2a procesory nemění.
 
 ## Bezpečnost Media Desku
 
@@ -106,10 +113,11 @@ založí run/report a publikuje katalog (`src/huhac_media/cli.py:114-135`,
 ExifTool (`src/huhac_media/cli.py:96`), ale cesta nebyla auditním testem
 provedena end-to-end, proto je provozní použitelnost **UNVERIFIED**.
 
-**Cíl:** průvodce UI → backend s explicitní autoritou → validace prázdných či
+**DECIDED/TARGET:** průvodce UI → ingest-owned backend s explicitní autoritou → validace prázdných či
 existujících kořenů → atomické založení → lokální config → restart/readiness.
 Při selhání odstranit jen prokazatelně nově vytvořené prázdné artefakty, nikdy
-cizí adresář. Konkrétní inicializační API je **PROPOSED**.
+cizí adresář. Inicializace musí být oddělená od importu a analýzy; konkrétní API
+a rollback protokol zůstávají návrhem budoucí etapy.
 
 ### B. Připojení existujícího archivu na jiném OS
 
@@ -117,11 +125,12 @@ cizí adresář. Konkrétní inicializační API je **PROPOSED**.
 lokální TOML → restart funguje pro workspace. Preview zůstane dostupné. Druhý
 kořen Media Storage UI nepřijímá; originály z cizího `source_root` jsou offline.
 
-**Cíl:** uživatel zadá workspace i lokální kořen originálů → backend ověří
+**DECIDED/TARGET:** uživatel zadá workspace i lokální kořen originálů → backend ověří
 `workspace_id`, katalog, strukturální shodu a reprezentativní identitu → uloží
-host-specific mapping lokálně → další start mapping znovu ověří. Při chybě se
-nepřepíše poslední validní konfigurace a originály zůstanou offline. Hloubka
-identity checku je **PROPOSED**, nikoli rozhodnutá.
+host-specific mapping lokálně → další start levně ověří binding a dostupnost,
+nikoli SHA vzorek. Při chybě se
+nepřepíše poslední validní konfigurace a originály zůstanou offline. SHA-256
+vzorek nesmí být prezentován jako úplná integrita; běžný start nehashuje celý archiv.
 
 ### C. Běžné opakované spuštění
 

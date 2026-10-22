@@ -11,6 +11,8 @@
 - [ROADMAP.md](ROADMAP.md) — pořadí dalších etap a stop-gate;
 - [AUDIT_2026-10.md](AUDIT_2026-10.md) — auditní důkazy a gap analýza;
 - [SETUP_STORAGE_RFC.md](SETUP_STORAGE_RFC.md) — varianty setup/storage bez implementace.
+- [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md) — schválený rozsah a
+  detailní plán přechodného read-only mapování originálů; zatím bez implementace.
 - [Veřejný workspace kontrakt](../workspace-contract.md) a dokumentace
   [Media Ingest](../media-ingest.md), [Session Grouper](../session-grouper.md),
   [Video Keyframes](../video-keyframes.md), [Vision](../vision.md) a

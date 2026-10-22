@@ -6,26 +6,30 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
+**Roadmap aktualizována:** 2026-10-22 po architektonickém schválení
+
 Tato roadmapa nenahrazuje historické M2–M5 novými významy. Popisuje jen bezpečnou
 posloupnost pro tři schválené provozní scénáře.
 
 1. **Audit skutečnosti — COMPLETE.** Inventura M1–M1.3, ownership, cest,
    persistence a gapů je v `AUDIT_2026-10.md`.
-2. **Architektonické schválení — STOP GATE.** Pro nejbližší S2a schválit D-011
-   (lokální mapping) a jeho validační hranice. D-012 (ingest-owned init) a
-   podporovaný writer model mohou zůstat explicitně odložené, ale musí být
-   schváleny před etapou, která je použije. Do schválení S2a bez kódu.
-3. **Nejmenší bezpečná etapa S2a — PROPOSED.** Přidat pouze host-specific,
+2. **Architektonické schválení — COMPLETE 2026-10-22.** D-011, D-012 a zákaz
+   multi-host SQLite zápisu byly schváleny. Konkrétní budoucí writer/backup model
+   zůstává otevřený do síťové zapisující etapy.
+3. **Nejmenší bezpečná etapa S2a — ACCEPTED/PLANNED, NOT IMPLEMENTED.** Přidat pouze host-specific,
    read-only mapping originálů pro Media Desk. Mapping uložit lokálně vedle
    profilu, svázat s `workspace_id` a původním `source_root`, validovat bez zápisu
    do workspace a při chybě degradovat na offline originály. Žádné změny
-   procesorů, ingestu, veřejného katalogu ani DB.
+   procesorů, ingestu, veřejného katalogu ani DB. Prováděcí plán:
+   [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md). S2a je přechodný
+   adapter pro v1, nikoli cílová storage architektura.
 4. **S2b — PROPOSED.** Po provozním ověření rozhodnout, zda stejnou abstrakci
    potřebují Video Keyframes/ingest. Teprve pak navrhnout společný adapter nebo
    contract v2; bez automatické migrace.
-5. **S1 — PROPOSED.** Navrhnout a implementovat úzký ingest-owned `init` pro nový
+5. **S1 — ACCEPTED/TARGET, NOT IMPLEMENTED.** Navrhnout a implementovat úzký ingest-owned `init` pro nový
    archiv s idempotencí, explicitní autoritou, rollbackem a testem prázdného
-   adresáře. Web může toto rozhraní volat až po samostatném security review.
+   adresáře, oddělený od importu a analýzy. Web může toto rozhraní volat až po
+   samostatném návrhu a security review.
 6. **S3 hardening — PROPOSED.** Retry/reconnect, diagnostika mountu a mappingu,
    záloha konfigurace a definice podporovaného single-writer deploymentu.
 7. **Portable user data — DEFERRED.** Samostatné schema/ownership/backup ADR;
@@ -41,4 +45,7 @@ posloupnost pro tři schválené provozní scénáře.
   neunikne mimo root a zobrazí bezpečný offline/diagnostický stav.
 - `workspace_id`, asset SHA, katalogový `source_root`, analýzy a ingest DB zůstanou
   byte-for-byte beze změny.
-- Běžný start neprovádí full rehash. Volitelný hluboký verify je explicitní akce.
+- Běžný start neprovádí full rehash. Úplný verify není součástí S2a a případně
+  vyžaduje samostatnou budoucí etapu.
+- UI a dokumentace označí SHA-256 výsledek jako vzorkovou kontrolu, nikoli úplnou
+  kontrolu integrity archivu.

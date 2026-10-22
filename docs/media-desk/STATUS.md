@@ -6,6 +6,8 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
+**Rozhodnutí aktualizována:** 2026-10-22; S2a zůstává bez implementace
+
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3: read-only web nad jedním existujícím
 > workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
 > bezpečně uložená lokální cesta k workspace. Aktivní workspace se načítá při
@@ -26,7 +28,7 @@
 | M1.2: profesionální UI a branding | **IMPLEMENTED** | `src/media_desk/templates/base.html:13`, `src/media_desk/static/huhac-logo.png`, commit `7da319a` | Logo je lokální statický asset. |
 | M1.3: nastavení jednoho workspace | **IMPLEMENTED** | `src/media_desk/config.py:17`, `src/media_desk/config.py:87`, `src/media_desk/web.py:311`, `tests/media_desk/test_settings.py:73` | Ukládá jen per-user TOML; aktivace po restartu. |
 | Nový archiv z webu | **ABSENT** | setup přijímá jen existující workspace: `src/media_desk/workspace_status.py:28` | Media Desk nevytváří workspace ani Media Storage. |
-| Přemapování originálů pro jiný host/OS | **ABSENT** | `src/media_desk/contract.py:136`, `tests/media_desk/test_media_desk_contract.py:105` | Cizí absolutní `source_root` vede k explicitně offline originálům. |
+| Přemapování originálů pro jiný host/OS | **ACCEPTED/PLANNED, ABSENT V KÓDU** | D-011; `src/media_desk/contract.py:136`, `tests/media_desk/test_media_desk_contract.py:105` | S2a je schválený přechodný read-only adapter; dnes cizí `source_root` stále znamená offline originál. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Uživatelská data (výběry, hodnocení, kolekce) | **ABSENT** | `docs/media-desk/README.md` | Není úložiště ani databáze Media Desku. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -50,8 +52,8 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 - **IMPLEMENTED:** preview a metadata z přenosného workspace zůstávají dostupné,
   i když originál není dosažitelný; stav je explicitně offline.
-- **ABSENT:** není lokální override `source_root`, storage identity ani mapování
-  Windows ↔ Linux mount pointu.
+- **ACCEPTED/PLANNED, ABSENT V KÓDU:** lokální override `source_root` pro Media
+  Desk je schválen jako přechodná S2a; Windows ↔ Linux mapping dnes ještě nefunguje.
 - **ABSENT:** web neumí vytvořit Media Storage nebo nový workspace a nespouští
   ingest ani procesory.
 - **DECIDED/TARGET:** veřejný `workspace_contract_version: 1` a historická data se
