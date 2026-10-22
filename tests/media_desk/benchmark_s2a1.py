@@ -141,6 +141,58 @@ def run(root: Path, count: int, repeats: int, profile: bool) -> dict:
             "p95": round(_percentile(samples, 0.95), 3),
         }
 
+    failure_ms = {}
+    image = next(item for item in app.state.snapshot.assets if item.media_type == "image")
+    if image.original is not None:
+        url = f"/artifacts/{image.original.token}"
+
+        def measure_failure(label: str) -> None:
+            samples = []
+            statuses = []
+            for _index in range(5):
+                tick = time.perf_counter()
+                response = client.get(url)
+                samples.append((time.perf_counter() - tick) * 1000)
+                statuses.append(response.status_code)
+            failure_ms[label] = {
+                "statuses": statuses,
+                "p50": round(statistics.median(samples), 3),
+                "p95": round(_percentile(samples, 0.95), 3),
+            }
+
+        target = local_root.joinpath(*image.original.relative_paths[0].split("/"))
+        missing = target.with_name(target.name + ".missing")
+        target.rename(missing)
+        try:
+            measure_failure("missing_file")
+        finally:
+            missing.rename(target)
+
+        offline = local_root.with_name(local_root.name + ".offline")
+        local_root.rename(offline)
+        try:
+            measure_failure("offline_root")
+        finally:
+            offline.rename(local_root)
+
+        outside = root / "outside-symlink-target.bin"
+        content = target.read_bytes()
+        outside.write_bytes(b"outside")
+        target.unlink()
+        try:
+            target.symlink_to(outside)
+        except OSError:
+            failure_ms["symlink_escape"] = {"status": "not available on this host"}
+            target.write_bytes(content)
+        else:
+            try:
+                measure_failure("symlink_escape")
+            finally:
+                target.unlink()
+                target.write_bytes(content)
+        finally:
+            outside.unlink(missing_ok=True)
+
     profile_top = None
     if profile:
         profiler = cProfile.Profile()
@@ -165,6 +217,7 @@ def run(root: Path, count: int, repeats: int, profile: bool) -> dict:
         "first_response_ms": handler_ms,
         "original_access_ms": access_ms,
         "original_access_io_total": dict(access_io),
+        "failure_access_ms": failure_ms,
         "python_peak_tracemalloc_mib": round(peak_bytes / 1024 / 1024, 3),
         "profile_top": profile_top,
     }

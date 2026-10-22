@@ -92,7 +92,7 @@ storage abstrakci vyžaduje nové rozhodnutí a samostatný návrh; S2a procesor
 Video Keyframes nadále přímo používá katalogový `source_root`
 (`src/video_keyframes/contract.py:102-124`).
 
-**IMPLEMENTED S2a.1, FINAL VERIFICATION PENDING.** D-016 odděluje katalogem
+**IMPLEMENTED S2a.1.** D-016 odděluje katalogem
 autorizovanou source reference od aktuálně ověřeného souboru. Snapshot a UI
 nesmějí vyžadovat per-asset I/O k originálům. Každý GET/Range musí naopak znovu
 ověřit aktivní binding, bezpečnou relativní cestu, canonical confinement a
@@ -100,7 +100,7 @@ symlink escape a použít jeden request-scoped otevřený soubor. Opaque token
 obsahuje epochu odvozenou z `workspace_id`, katalogového `source_root` a aktivního
 server-side rootu; token z předchozího mappingu proto nový snapshot neregistruje.
 API stav `unchecked` znamená pouze autorizovanou katalogovou referenci, nikoli
-potvrzenou dostupnost souboru. Baseline a průběžné měření jsou v
+potvrzenou dostupnost souboru. Baseline a finální měření jsou v
 [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
 
 ## Bezpečnost Media Desku
@@ -138,24 +138,20 @@ a rollback protokol zůstávají návrhem budoucí etapy.
 
 ### B. Připojení existujícího archivu na jiném OS
 
-**Dnes:** UI → `/settings/validate` → `load_workspace` → `/settings/save` →
-lokální TOML → restart funguje pro workspace. Preview zůstane dostupné. Druhý
-kořen Media Storage UI nepřijímá; originály z cizího `source_root` jsou offline.
-
-**DECIDED/TARGET:** uživatel zadá workspace i lokální kořen originálů → backend ověří
-`workspace_id`, katalog, strukturální shodu a reprezentativní identitu → uloží
-host-specific mapping lokálně → další start levně ověří binding a dostupnost,
-nikoli SHA vzorek. Při chybě se
-nepřepíše poslední validní konfigurace a originály zůstanou offline. SHA-256
-vzorek nesmí být prezentován jako úplná integrita; běžný start nehashuje celý archiv.
+**IMPLEMENTED:** UI přijme workspace i lokální kořen originálů. Backend ověří
+`workspace_id`, přesný původní `source_root`, confinement a reprezentativní
+SHA-256 vzorek, potom mapping atomicky uloží jen do lokálního profilu. Další
+start levně ověří binding a root, ale neprochází ani nehashuje jednotlivé
+originály. Konkrétní soubor se ověří až při GET/Range. Chybný kandidát nepřepíše
+poslední platnou konfiguraci; dočasná nedostupnost ji nemaže. SHA-256 vzorek je
+výslovně neúplná kontrola integrity. Preview z workspace zůstává dostupné.
 
 ### C. Běžné opakované spuštění
 
-**Dnes:** profil se načte podle precedence → workspace se resolve/validuje → vznikne
-snapshot → `/health` je `ok`; nedostupný mount vrátí non-ready 503 a setup/error
-UI bez zápisu (`src/media_desk/web.py:204-218`, `src/media_desk/web.py:662-674`).
-Jde o **IMPLEMENTED** scénář pro jeden workspace bez hot reloadu.
-
-**Cíl navíc:** po zavedení mappingu ověřit také jeho binding a dostupnost; při
-dočasném výpadku zachovat config, nabídnout retry a nikdy automaticky nepřepsat
-sdílený `source_root`.
+**IMPLEMENTED:** profil se načte podle precedence, workspace se resolve/validuje
+a mapping ověří pouze binding a dostupnost rootu. Snapshot registruje unchecked
+source reference bez per-file origin I/O; `/health` je `ok`. Nedostupný workspace
+vrátí non-ready 503 a setup/error UI bez zápisu. Nedostupný mapped root zachová
+profil i browsable metadata/previews, pouze originály bezpečně degraduje na
+offline. Jde o jeden workspace bez hot reloadu a bez přepisu sdíleného
+`source_root`.

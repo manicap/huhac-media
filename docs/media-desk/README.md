@@ -247,7 +247,9 @@ every workspace file's content, size, and modification time.
 - SHA-256 sampling does not prove full archive integrity. Unsampled or later
   changed files can become unavailable when opened. Historická S2a baseline
   canonicalizovala každý originál při startu; S2a.1 tuto kontrolu přesouvá na
-  konkrétní GET/Range. Aktuální měření jsou v `S2A1_STARTUP_PERFORMANCE.md`.
+  konkrétní GET/Range. Na syntetickém 10k katalogu se p50 startu snížil z
+  25,77 s na 7,75 s (3,32×) a start neprovádí per-file I/O originálů. Aktuální
+  metodika a omezení jsou v `S2A1_STARTUP_PERFORMANCE.md`.
 - Session relationships are labelled as probable time continuity, never as
   identified events. Faces clusters remain anonymous similarity groups.
 - Multiple valid Session Grouper results produce an ambiguous state instead of

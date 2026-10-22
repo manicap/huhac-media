@@ -1,6 +1,6 @@
 # S2a.1 — profil a optimalizace startu
 
-**Stav:** **IMPLEMENTED / FINAL VERIFICATION IN PROGRESS**
+**Stav:** **IMPLEMENTED / COMPLETE 2026-10-22**
 
 **Baseline commit:** `159fc910e806019494e179b596531040cab9127a`
 
@@ -53,9 +53,13 @@ originálu při tvorbě snapshotu. `_processor_results` je sekundární náklad;
 nejprve odstraní per-asset I/O originálů a po změně znovu změří jeho relativní
 podíl.
 
-První odpovědi po baseline startupu: `/` 264,3 ms, `/library` 18,5 ms,
-`/api/index` 17,6 ms. Jde o jednotlivý smoke, nikoli p50/p95; finální benchmark
-doplní opakované hodnoty i přístup k jednomu originálu.
+Samostatné pětiběhové baseline měření `create_app` doplnilo velikostní řadu:
+
+| Assety | p50 před | p95 před |
+|---:|---:|---:|
+| 100 | 323,9 ms | 420,6 ms |
+| 1 000 | 2 753,2 ms | 3 223,6 ms |
+| 10 000 | 25 767,3 ms | 28 105,8 ms |
 
 ## Schválený směr
 
@@ -65,18 +69,69 @@ nebo Range požadavku znovu odvodí z aktivního server-side rootu, canonicalizu
 ověří confinement a teprve potom jednou otevře. `original_online` před tímto
 request-scoped ověřením nesmí být `true`.
 
-## Průběžný after profil
+## Finální after profil
 
-Na stejném uchovaném 10k datasetu po zavedení lazy reference byly tři startupy
-6 495 / 6 150 / 5 133 ms, p50 **6 150 ms**, p95 **6 495 ms**. To je proti
-baseline p50 zrychlení **4,19×**. Startup provedl jediný `resolve` samotného mapped
-rootu při bindingu a **0 per-file resolve/stat/open/SHA** originálů. Orientační
-peak nových Python alokací klesl na **31,72 MiB**.
+Pět opakování na stejných uchovaných datasetech:
+
+| Assety | p50 po | p95 po | Zrychlení p50 |
+|---:|---:|---:|---:|
+| 100 | 130,0 ms | 363,0 ms | 2,49× |
+| 1 000 | 861,6 ms | 1 362,3 ms | 3,20× |
+| 10 000 | 7 752,8 ms | 8 192,8 ms | **3,32×** |
+
+Startup provedl jediný `resolve` samotného mapped rootu při bindingu a **0
+per-file resolve/stat/is_file/open/SHA** originálů. Orientační peak nových Python
+alokací pro 10 000 položek klesl z **44,34 MiB** na **31,72 MiB**. Hodnota je
+`tracemalloc` peak, nikoli procesní RSS.
 
 After `cProfile` už neukazuje filesystem přístup originálů mezi hlavními náklady.
 Nejdražší je nyní stávající `_processor_results` (4,204 s profilovaného běhu)
 kvůli kontrolám analysis adresářů; jeho změna není nutná ke splnění cíle >3× a
 není součástí bezpečnostní změny S2a.1.
 
-Finální benchmark doplní opakované HTTP a origin access p50/p95, bezpečnostní
-testy a zbytková omezení.
+## HTTP a request-scoped origin access
+
+Pět požadavků na 10k snapshot; p95 je maximum z pěti vzorků. První požadavek
+zahrnuje inicializaci `TestClient`, proto je zejména baseline p95 záměrně
+konzervativní.
+
+| Operace | p50 před | p95 před | p50 po | p95 po |
+|---|---:|---:|---:|---:|
+| `/` | 74,0 ms | 2 154,5 ms | 44,5 ms | 337,9 ms |
+| `/library` | 48,2 ms | 104,2 ms | 10,2 ms | 32,2 ms |
+| `/api/index` | 39,7 ms | 83,5 ms | 18,0 ms | 29,1 ms |
+| image GET | 15,7 ms | 27,4 ms | 21,5 ms | 82,6 ms |
+| video Range | 20,3 ms | 23,7 ms | 14,8 ms | 109,7 ms |
+
+Deset origin požadavků po změně provedlo očekávaných deset per-file
+canonicalizací, deset `is_file` a deset otevření. Dvě volání `resolve` na
+požadavek odpovídají canonicalizaci rootu a kandidáta. Invalidní Range se
+odmítne a otevřený descriptor se uzavře; validní full GET i Range streamují z
+jediného již ověřeného descriptoru bez opětovného otevření cesty.
+
+## Bezpečnostní a provozní ověření
+
+- chybějící soubor po startu: vždy HTTP 404, p50 13,2 ms, p95 24,3 ms;
+- dočasně nedostupný mapped root: vždy HTTP 404, p50 8,8 ms, p95 17,1 ms;
+- nedostupnost nemaže uložené mapování a metadata/previews zůstávají čitelné;
+- změna mapping rootu mění binding epochu, takže starý opaque token nový snapshot
+  nepřijme;
+- testy blokují file i directory symlink escape a traversal; na tomto Windows
+  hostu byly symlink případy přeskočeny kvůli chybějícímu oprávnění, POSIX testy
+  zůstávají součástí sady;
+- SHA-256 vzorek běží jen při vytvoření/změně mapování, nikoli při startupu nebo
+  běžném otevření souboru.
+
+Vizuální kontrola při 1024 × 576 potvrdila jeden svislý scroll kontejner
+`.app-main`, nulový horizontální overflow a správný stav „ověří se při otevření“
+v Knihovně i detailu.
+
+## Omezení měření
+
+Měření proběhlo na Windows a lokálním NTFS s teplou OS cache. Síťový NAS/SMB,
+řízený cold-cache běh a nativní Linux na tomto hostu nebyly dostupné. Přenosnost
+Windows/POSIX cest je pokryta parametrizovanými testy, nikoli nativním Linux
+během. Mezi `resolve` a `open` zůstává na nepřátelském či souběžně měněném
+filesystemu zbytkové TOCTOU okno; po otevření se už streamuje z jediného
+descriptoru. S2a.1 nemění Media Ingest, procesory, SQLite ani veřejný kontrakt
+`workspace_contract_version: 1`.

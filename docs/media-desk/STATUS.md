@@ -6,9 +6,11 @@
 
 **Implementační commity S2a:** `cafcdb7`, `5b0b497`, `333571a`, `afff7f5`
 
-**Stav aktualizován:** 2026-10-22; S2a dokončena
+**Implementační commity S2a.1:** `921f48c`, `18c0919`
 
-> **IMPLEMENTOVÁNO DNES** — M1 až M1.3 a S2a: read-only web nad jedním existujícím
+**Stav aktualizován:** 2026-10-22; S2a.1 dokončena
+
+> **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a a S2a.1: read-only web nad jedním existujícím
 > workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
 > bezpečně uložená lokální cesta k workspace i host-local mapování originálů.
 > Aktivní workspace a mapping se načítají při
@@ -29,7 +31,7 @@
 | M1.3: nastavení jednoho workspace | **IMPLEMENTED** | `src/media_desk/config.py:17`, `src/media_desk/config.py:87`, `src/media_desk/web.py:311`, `tests/media_desk/test_settings.py:73` | Ukládá jen per-user TOML; aktivace po restartu. |
 | Nový archiv z webu | **ABSENT** | setup přijímá jen existující workspace: `src/media_desk/workspace_status.py:28` | Media Desk nevytváří workspace ani Media Storage. |
 | Přemapování originálů pro jiný host/OS | **IMPLEMENTED** | `src/media_desk/originals.py`, `contract.py`, `web.py`; `tests/media_desk/test_settings.py` | UI mapping validuje nejvýše 16členným SHA-256 vzorkem, atomicky uloží a po restartu bezpečně použije. |
-| S2a.1 lazy origin access | **IMPLEMENTED, FINAL VERIFICATION PENDING** | `models.py`, `contract.py`, `web.py`; `test_web.py`; `S2A1_STARTUP_PERFORMANCE.md` | Snapshot registruje unchecked source reference bez per-file I/O; GET/Range provádí request-scoped ověření a otevření. |
+| S2a.1 lazy origin access | **IMPLEMENTED** | `models.py`, `contract.py`, `web.py`; `test_web.py`; `S2A1_STARTUP_PERFORMANCE.md` | Snapshot registruje unchecked source reference bez per-file I/O; GET/Range provádí request-scoped ověření a otevření. 10k p50: 25,77 s → 7,75 s (3,32×). |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Uživatelská data (výběry, hodnocení, kolekce) | **ABSENT** | `docs/media-desk/README.md` | Není úložiště ani databáze Media Desku. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -55,9 +57,10 @@ až po restartu (`src/media_desk/web.py:361-365`).
   i když originál není dosažitelný; stav je explicitně offline.
 - **IMPLEMENTED:** lokální override `source_root` pro Media Desk funguje jako
   přechodná S2a mezi Windows/POSIX cestami; není obecnou storage architekturou.
-- **LIMIT:** 10k syntetický katalog na tomto Windows hostu vyžadoval 18,13 s pro
-  explicitní validaci a 22,95 s pro vytvoření aplikace kvůli confinement kontrole každé
-  dostupné cesty; startup provedl 0 hashů.
+- **IMPLEMENTED:** S2a.1 odstranila per-file origin I/O ze startupu. 10k
+  syntetický katalog na tomto Windows hostu má p50 `create_app` 7,75 s proti
+  baseline 25,77 s (3,32×); při startupu je 0 per-file
+  resolve/stat/is_file/open/SHA operací originálů.
 - **ABSENT:** web neumí vytvořit Media Storage nebo nový workspace a nespouští
   ingest ani procesory.
 - **DECIDED/TARGET:** veřejný `workspace_contract_version: 1` a historická data se
@@ -67,10 +70,11 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 ## Stav testů
 
-Finální FAST sada po S2a: **179 passed, 5 skipped, 33 deselected** za 29,63 s.
-S2a symlink testy jsou na tomto Windows hostu přeskočeny bez oprávnění symlink
-vytvořit; povinné POSIX varianty zůstávají v testech. Reprodukovatelné 10k měření
-`tests/media_desk/benchmark_s2a.py`: validace **18 134 ms**, 16 SHA-256 volání;
-startup aplikace **22 951 ms**, 0 SHA-256 volání; online **10 000/10 000** originálů.
-Windows i POSIX `source_root` jsou pokryty parametrizovaným end-to-end testem na
-Windows hostu. Nativní Linux běh zde nebyl dostupný (není instalovaná WSL distribuce).
+Cílená Media Desk sada po S2a.1: **64 passed, 5 skipped** za 38,77 s. Finální
+FAST sada: **183 passed, 6 skipped, 33 deselected** za 13,60 s. Bezpečnostní
+podmnožina implementačního kroku: **31 passed, 4 skipped**. S2a symlink testy
+jsou na tomto Windows hostu přeskočeny bez oprávnění symlink vytvořit; povinné
+POSIX varianty zůstávají v testech. Reprodukovatelné finální 10k měření je v
+`S2A1_STARTUP_PERFORMANCE.md`. Windows i POSIX `source_root` jsou pokryty
+parametrizovaným testem na Windows hostu. Nativní Linux běh zde nebyl dostupný
+(není instalovaná WSL distribuce).

@@ -10,6 +10,11 @@
 
 **Rozhodnutí:** D-011, D-009 a D-014 v [DECISIONS.md](DECISIONS.md)
 
+> **Následná změna S2a.1:** D-016 nahradila startupové ověřování každého
+> kandidáta lazy request-scoped kontrolou. Tento dokument zachovává historickou
+> akceptaci S2a; aktuální chování a měření popisuje
+> [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
+
 ## Stav realizace
 
 - **IMPLEMENTED:** privátní `OriginalsMapping` schema v per-user profilu,
