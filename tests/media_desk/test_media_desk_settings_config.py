@@ -8,7 +8,10 @@ import pytest
 from media_desk.cli import main
 from media_desk.config import (
     ConfigurationError,
+    ORIGINALS_MAPPING_VERIFICATION,
+    OriginalsMapping,
     load_settings,
+    save_profile,
     save_profile_workspace,
     user_config_path,
 )
@@ -95,6 +98,114 @@ def test_profile_workspace_round_trip_is_atomic(tmp_path: Path) -> None:
     assert settings.workspace == target
     assert settings.workspace_source == "profile"
     assert list(profile.glob("*.tmp")) == []
+
+
+def test_profile_mapping_round_trip_is_host_local(tmp_path: Path) -> None:
+    profile = tmp_path / "profile"
+    workspace = tmp_path / "workspace"
+    originals = tmp_path / "originals"
+    mapping = OriginalsMapping(
+        workspace_id="workspace-test",
+        source_root=r"D:\Huhac\Media",
+        local_root=originals.resolve(),
+        verification=ORIGINALS_MAPPING_VERIFICATION,
+        verified_assets=16,
+        eligible_assets=120,
+    )
+
+    save_profile(profile / "config.toml", workspace=workspace, originals_mapping=mapping)
+    settings = _load(profile)
+
+    assert settings.originals_mapping == mapping
+    assert "[media_desk.originals_mapping]" in (profile / "config.toml").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_mapping_is_not_loaded_from_explicit_config(tmp_path: Path) -> None:
+    explicit = tmp_path / "explicit.toml"
+    explicit.write_text(
+        """[media_desk]
+workspace = "explicit"
+[media_desk.originals_mapping]
+workspace_id = "workspace-test"
+source_root = "D:\\\\Media"
+local_root = "/mnt/media"
+verification = "sha256-sample-v1"
+verified_assets = 1
+eligible_assets = 1
+""",
+        encoding="utf-8",
+    )
+
+    settings = _load(tmp_path / "profile", config_path=explicit)
+
+    assert settings.workspace == Path("explicit")
+    assert settings.originals_mapping is None
+
+
+@pytest.mark.parametrize(
+    "mapping_line,match",
+    [
+        ('verification = "unknown"', "Unsupported originals mapping verification"),
+        ('local_root = "relative"', "absolute host path"),
+        ("verified_assets = 0", "positive integer"),
+        ("eligible_assets = 0", "include every verified asset"),
+    ],
+)
+def test_invalid_profile_mapping_is_rejected(
+    tmp_path: Path, mapping_line: str, match: str
+) -> None:
+    values = {
+        "verification": 'verification = "sha256-sample-v1"',
+        "local_root": f'local_root = {str(tmp_path.resolve())!r}',
+        "verified_assets": "verified_assets = 1",
+        "eligible_assets": "eligible_assets = 1",
+    }
+    key = mapping_line.split(" =", 1)[0]
+    values[key] = mapping_line
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "config.toml").write_text(
+        "\n".join(
+            (
+                '[media_desk]',
+                'workspace = "workspace"',
+                '[media_desk.originals_mapping]',
+                'workspace_id = "workspace-test"',
+                'source_root = "D:\\\\Media"',
+                values["local_root"],
+                values["verification"],
+                values["verified_assets"],
+                values["eligible_assets"],
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match=match):
+        _load(profile)
+
+
+def test_workspace_change_clears_mapping_but_same_workspace_preserves_it(tmp_path: Path) -> None:
+    profile = tmp_path / "profile/config.toml"
+    first = tmp_path / "workspace-one"
+    mapping = OriginalsMapping(
+        "workspace-test",
+        r"D:\Media",
+        tmp_path.resolve(),
+        ORIGINALS_MAPPING_VERIFICATION,
+        1,
+        1,
+    )
+    save_profile(profile, workspace=first, originals_mapping=mapping)
+
+    save_profile_workspace(profile, first)
+    assert _load(profile.parent).originals_mapping == mapping
+
+    save_profile_workspace(profile, tmp_path / "workspace-two")
+    assert _load(profile.parent).originals_mapping is None
 
 
 def test_failed_replace_keeps_original_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

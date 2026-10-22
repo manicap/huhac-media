@@ -28,7 +28,7 @@
 | M1.2: profesionální UI a branding | **IMPLEMENTED** | `src/media_desk/templates/base.html:13`, `src/media_desk/static/huhac-logo.png`, commit `7da319a` | Logo je lokální statický asset. |
 | M1.3: nastavení jednoho workspace | **IMPLEMENTED** | `src/media_desk/config.py:17`, `src/media_desk/config.py:87`, `src/media_desk/web.py:311`, `tests/media_desk/test_settings.py:73` | Ukládá jen per-user TOML; aktivace po restartu. |
 | Nový archiv z webu | **ABSENT** | setup přijímá jen existující workspace: `src/media_desk/workspace_status.py:28` | Media Desk nevytváří workspace ani Media Storage. |
-| Přemapování originálů pro jiný host/OS | **ACCEPTED/PLANNED, ABSENT V KÓDU** | D-011; `src/media_desk/contract.py:136`, `tests/media_desk/test_media_desk_contract.py:105` | S2a je schválený přechodný read-only adapter; dnes cizí `source_root` stále znamená offline originál. |
+| Přemapování originálů pro jiný host/OS | **PARTIAL** | privátní config schema: `src/media_desk/config.py`; resolver je dosud absent | S2a ukládací model existuje, ale není aktivní; cizí `source_root` stále znamená offline originál. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Uživatelská data (výběry, hodnocení, kolekce) | **ABSENT** | `docs/media-desk/README.md` | Není úložiště ani databáze Media Desku. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |

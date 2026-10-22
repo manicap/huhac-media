@@ -14,6 +14,19 @@ class ConfigurationError(ValueError):
     pass
 
 
+ORIGINALS_MAPPING_VERIFICATION = "sha256-sample-v1"
+
+
+@dataclass(frozen=True)
+class OriginalsMapping:
+    workspace_id: str
+    source_root: str
+    local_root: Path
+    verification: str
+    verified_assets: int
+    eligible_assets: int
+
+
 def user_config_path(
     *,
     config_dir: Path | None = None,
@@ -78,6 +91,7 @@ class Settings:
     host_source: str = "default"
     port_source: str = "default"
     keyframe_fingerprint_source: str = "default"
+    originals_mapping: OriginalsMapping | None = None
 
     @property
     def workspace_editable(self) -> bool:
@@ -148,38 +162,78 @@ def load_settings(
     if fingerprint is not None and not isinstance(fingerprint, str):
         raise ConfigurationError("Keyframe fingerprint must be a string")
 
+    originals_mapping = _parse_originals_mapping(profile.get("originals_mapping"))
+
     return Settings(
-        Path(workspace_value).expanduser() if workspace_value else None,
-        host_value,
-        parsed_port,
-        fingerprint,
-        profile_path,
-        workspace_source,
-        host_source,
-        port_source,
-        fingerprint_source,
+        workspace=Path(workspace_value).expanduser() if workspace_value else None,
+        host=host_value,
+        port=parsed_port,
+        keyframe_fingerprint=fingerprint,
+        profile_config_path=profile_path,
+        workspace_source=workspace_source,
+        host_source=host_source,
+        port_source=port_source,
+        keyframe_fingerprint_source=fingerprint_source,
+        originals_mapping=originals_mapping,
     )
 
 
-def save_profile_workspace(config_path: Path, workspace: Path) -> None:
-    """Atomically persist the validated workspace while preserving supported preferences."""
-    path = Path(config_path)
-    existing = _read_config(path, required=False)
-    values: dict[str, object] = {"workspace": str(workspace)}
-    for key in ("host", "port", "keyframe_fingerprint"):
-        if key in existing:
-            values[key] = existing[key]
-    lines = ["[media_desk]"]
-    for key in ("workspace", "host", "port", "keyframe_fingerprint"):
-        if key not in values:
-            continue
-        value = values[key]
-        if isinstance(value, bool) or not isinstance(value, (str, int)):
-            raise ConfigurationError(f"Unsupported profile value for {key}")
-        rendered = str(value) if isinstance(value, int) else json.dumps(value, ensure_ascii=False)
-        lines.append(f"{key} = {rendered}")
-    content = "\n".join(lines) + "\n"
+def _parse_originals_mapping(value: object) -> OriginalsMapping | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ConfigurationError("Config [media_desk.originals_mapping] must be a table")
+    expected = {
+        "workspace_id",
+        "source_root",
+        "local_root",
+        "verification",
+        "verified_assets",
+        "eligible_assets",
+    }
+    if set(value) != expected:
+        raise ConfigurationError("Config originals_mapping has unsupported or missing fields")
+    workspace_id = value["workspace_id"]
+    source_root = value["source_root"]
+    local_root_value = value["local_root"]
+    verification = value["verification"]
+    verified_assets = value["verified_assets"]
+    eligible_assets = value["eligible_assets"]
+    if not isinstance(workspace_id, str) or not workspace_id:
+        raise ConfigurationError("Mapping workspace_id must be a non-empty string")
+    if not isinstance(source_root, str) or not source_root:
+        raise ConfigurationError("Mapping source_root must be a non-empty string")
+    if not isinstance(local_root_value, str) or not local_root_value:
+        raise ConfigurationError("Mapping local_root must be a non-empty path string")
+    local_root = Path(local_root_value).expanduser()
+    if not local_root.is_absolute():
+        raise ConfigurationError("Mapping local_root must be an absolute host path")
+    if verification != ORIGINALS_MAPPING_VERIFICATION:
+        raise ConfigurationError("Unsupported originals mapping verification")
+    if (
+        isinstance(verified_assets, bool)
+        or not isinstance(verified_assets, int)
+        or verified_assets < 1
+    ):
+        raise ConfigurationError("Mapping verified_assets must be a positive integer")
+    if (
+        isinstance(eligible_assets, bool)
+        or not isinstance(eligible_assets, int)
+        or eligible_assets < verified_assets
+    ):
+        raise ConfigurationError("Mapping eligible_assets must include every verified asset")
+    return OriginalsMapping(
+        workspace_id=workspace_id,
+        source_root=source_root,
+        local_root=local_root,
+        verification=verification,
+        verified_assets=verified_assets,
+        eligible_assets=eligible_assets,
+    )
 
+
+def _atomic_write(path: Path, content: str) -> None:
+    path = Path(path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -211,3 +265,52 @@ def save_profile_workspace(config_path: Path, workspace: Path) -> None:
             except OSError:
                 pass
         raise ConfigurationError(f"Cannot save config: {exc}") from exc
+
+
+def save_profile(
+    config_path: Path,
+    *,
+    workspace: Path,
+    originals_mapping: OriginalsMapping | None,
+) -> None:
+    """Atomically persist the profile and its optional host-local mapping."""
+    path = Path(config_path)
+    existing = _read_config(path, required=False)
+    values: dict[str, object] = {"workspace": str(workspace)}
+    for key in ("host", "port", "keyframe_fingerprint"):
+        if key in existing:
+            values[key] = existing[key]
+    lines = ["[media_desk]"]
+    for key in ("workspace", "host", "port", "keyframe_fingerprint"):
+        if key not in values:
+            continue
+        value = values[key]
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise ConfigurationError(f"Unsupported profile value for {key}")
+        rendered = str(value) if isinstance(value, int) else json.dumps(value, ensure_ascii=False)
+        lines.append(f"{key} = {rendered}")
+    if originals_mapping is not None:
+        lines.extend(
+            (
+                "",
+                "[media_desk.originals_mapping]",
+                f"workspace_id = {json.dumps(originals_mapping.workspace_id, ensure_ascii=False)}",
+                f"source_root = {json.dumps(originals_mapping.source_root, ensure_ascii=False)}",
+                f"local_root = {json.dumps(str(originals_mapping.local_root), ensure_ascii=False)}",
+                f"verification = {json.dumps(originals_mapping.verification)}",
+                f"verified_assets = {originals_mapping.verified_assets}",
+                f"eligible_assets = {originals_mapping.eligible_assets}",
+            )
+        )
+    _atomic_write(path, "\n".join(lines) + "\n")
+
+
+def save_profile_workspace(config_path: Path, workspace: Path) -> None:
+    """Persist a workspace, retaining a mapping only when its workspace is unchanged."""
+    path = Path(config_path)
+    existing = _read_config(path, required=False)
+    mapping = _parse_originals_mapping(existing.get("originals_mapping"))
+    existing_workspace = existing.get("workspace")
+    if not isinstance(existing_workspace, str) or Path(existing_workspace) != Path(workspace):
+        mapping = None
+    save_profile(path, workspace=workspace, originals_mapping=mapping)

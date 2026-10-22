@@ -10,6 +10,14 @@
 
 **Rozhodnutí:** D-011, D-009 a D-014 v [DECISIONS.md](DECISIONS.md)
 
+## Stav realizace
+
+- **IMPLEMENTED:** privátní `OriginalsMapping` schema v per-user profilu,
+  atomický save, validace polí, profile-only načítání a vyčištění mappingu při
+  změně workspace (`src/media_desk/config.py`).
+- **NOT IMPLEMENTED:** resolver, SHA vzorek, contract/startup integrace a webové
+  validate/save/clear flow.
+
 ## 1. Výsledek etapy
 
 Media Desk umožní k jednomu aktivnímu workspace uložit host-specific kořen
