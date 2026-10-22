@@ -1,7 +1,6 @@
-# HUHÁČ Media Desk (M1–M1.3)
+# HUHÁČ Media Desk (M1–M1.3 + S2a)
 
-**Dokumentace auditována:** 2026-10-22 na větvi `mediadesk`, aplikační revize
-`4397b9289de8689ed9282d9cbce842f3de4a60c2`.
+**Dokumentace synchronizována:** 2026-10-22 na větvi `mediadesk` po implementaci S2a.
 
 ## Začni zde — aktuální autoritativní dokumentace
 
@@ -12,7 +11,7 @@
 - [AUDIT_2026-10.md](AUDIT_2026-10.md) — auditní důkazy a gap analýza;
 - [SETUP_STORAGE_RFC.md](SETUP_STORAGE_RFC.md) — varianty setup/storage bez implementace.
 - [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md) — schválený rozsah a
-  detailní plán přechodného read-only mapování originálů; zatím bez implementace.
+  dokončené ověření přechodného read-only mapování originálů.
 - [Veřejný workspace kontrakt](../workspace-contract.md) a dokumentace
   [Media Ingest](../media-ingest.md), [Session Grouper](../session-grouper.md),
   [Video Keyframes](../video-keyframes.md), [Vision](../vision.md) a
@@ -82,6 +81,22 @@ is `%APPDATA%\HUHAC\MediaDesk\config.toml` on Windows and
 `${XDG_CONFIG_HOME:-~/.config}/huhac/media-desk/config.toml` on Linux. The
 workspace remains read-only; only this application config is written.
 
+### Originály na jiném hostiteli nebo OS (S2a)
+
+Pokud je katalogový `source_root` cesta z jiného hostitele (například Windows
+`D:\Archiv`, zatímco Media Desk běží na Linuxu), otevřete **Nastavení → Lokální
+mapování zdroje** a zadejte lokální kořen se stejnými relativními soubory.
+**Ověřit mapování** provede deterministickou SHA-256 kontrolu nejvýše 16
+dostupných assetů. Jde o reprezentativní vzorek, nikoli úplnou kontrolu integrity.
+**Uložit mapování** kandidáta znovu ověří a atomicky zapíše jen per-user profil;
+mapování se použije po restartu.
+
+Neúspěšná validace poslední platné mapování nezmění. Dočasně nedostupný disk nebo
+NAS uložené mapování automaticky nesmaže; workspace, metadata a previews zůstanou
+dostupné a mapped originály jsou dočasně offline. Běžný start SHA-256 vzorek
+neopakuje. Mapping je přesně vázaný na `workspace_id` a původní text
+`source_root`; není přenášen v workspace ani čten z explicitního `--config`.
+
 `--workspace PATH` is still supported for temporary or managed launches. A
 workspace supplied by CLI, environment, or explicit `--config` has higher
 priority, so the web UI shows its source and locks profile editing.
@@ -134,6 +149,9 @@ metadata browsable.
 - `GET /settings` — active path, source, status and application information;
 - `POST /settings/validate` — read-only validation of one submitted path;
 - `POST /settings/save` — revalidation and atomic per-user config update;
+- `POST /settings/originals/validate` — read-only SHA-256 sample validation;
+- `POST /settings/originals/save` — revalidation and atomic profile-only mapping update;
+- `POST /settings/originals/clear` — explicit removal of the local mapping;
 - `GET /assets/{sha256}` — asset detail;
 - `GET /api/assets?limit=50&cursor=...` — snapshot-bound batches; legacy
   `page`/`page_size` remains compatible;
@@ -174,6 +192,12 @@ paths. Workspace-relative paths reject traversal and resolved symlink escapes;
 only public preview/keyframe namespaces and validated active originals can be
 served.
 
+Mapped originals accept only relative POSIX catalog paths without `..` or
+backslashes. Candidate construction and every artifact request resolve the
+filesystem path and require it to remain below the canonical local root, so a
+static symlink escape is rejected. This path-based layer does not claim to solve
+hostile local-filesystem TOCTOU replacement.
+
 Keep the default loopback bind. Settings POST requests require a loopback bind,
 loopback `Host`, same-origin `Origin` when present, and a SameSite/HttpOnly CSRF
 cookie token. A non-loopback bind remains usable for read-only viewing when
@@ -205,11 +229,17 @@ every workspace file's content, size, and modification time.
 - No authentication; loopback is the safe default and LAN exposure is not an
   M1 deployment mode.
 - No import, upload, processing orchestration, favorites, ratings, collections,
-  storage remapping, relocation, or editor integration.
+  general storage registry, relocation workflow, or editor integration. S2a
+  maps one originals root only for Media Desk.
 - Multiple analysis configurations are displayed with their fingerprints;
   video thumbnail selection requires an explicit keyframe fingerprint.
 - Original availability is checked on the backend host. A browser client does
   not receive or reinterpret host filesystem paths.
+- SHA-256 sampling does not prove full archive integrity. Unsampled or later
+  changed files can become unavailable when opened. A 10k synthetic catalog on
+  the verification Windows host took 18.1 s to validate and 23.0 s to create the
+  application; startup performed zero hashes, but still canonicalized every
+  available path.
 - Session relationships are labelled as probable time continuity, never as
   identified events. Faces clusters remain anonymous similarity groups.
 - Multiple valid Session Grouper results produce an ambiguous state instead of

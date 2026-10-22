@@ -4,17 +4,17 @@
 
 **Větev:** `mediadesk`
 
-**Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
+**Implementační commity S2a:** `cafcdb7`, `5b0b497`, `333571a`, `afff7f5`
 
-**Rozhodnutí aktualizována:** 2026-10-22; S2a zůstává bez implementace
+**Stav aktualizován:** 2026-10-22; S2a dokončena
 
-> **IMPLEMENTOVÁNO DNES** — M1 až M1.3: read-only web nad jedním existujícím
+> **IMPLEMENTOVÁNO DNES** — M1 až M1.3 a S2a: read-only web nad jedním existujícím
 > workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
-> bezpečně uložená lokální cesta k workspace. Aktivní workspace se načítá při
+> bezpečně uložená lokální cesta k workspace i host-local mapování originálů.
+> Aktivní workspace a mapping se načítají při
 > startu procesu. Důkazy jsou níže a v [auditu](AUDIT_2026-10.md).
 
-> **CÍLOVÝ WORKFLOW, DOSUD NEIMPLEMENTOVÁNO** — webové založení nového archivu,
-> host-specific mapování originálů při připojení z jiného OS a správa lifecycle
+> **CÍLOVÝ WORKFLOW, DOSUD NEIMPLEMENTOVÁNO** — webové založení nového archivu a správa lifecycle
 > úložišť. Tři schválené uživatelské scénáře jsou cílem, nikoli tvrzením o dnešní
 > funkčnosti. Varianty vyžadují rozhodnutí v [RFC](SETUP_STORAGE_RFC.md).
 
@@ -28,7 +28,7 @@
 | M1.2: profesionální UI a branding | **IMPLEMENTED** | `src/media_desk/templates/base.html:13`, `src/media_desk/static/huhac-logo.png`, commit `7da319a` | Logo je lokální statický asset. |
 | M1.3: nastavení jednoho workspace | **IMPLEMENTED** | `src/media_desk/config.py:17`, `src/media_desk/config.py:87`, `src/media_desk/web.py:311`, `tests/media_desk/test_settings.py:73` | Ukládá jen per-user TOML; aktivace po restartu. |
 | Nový archiv z webu | **ABSENT** | setup přijímá jen existující workspace: `src/media_desk/workspace_status.py:28` | Media Desk nevytváří workspace ani Media Storage. |
-| Přemapování originálů pro jiný host/OS | **IMPLEMENTED, FINAL VERIFICATION PENDING** | `src/media_desk/originals.py`, `contract.py`, `web.py`; `tests/media_desk/test_settings.py` | UI mapping validuje SHA-256 vzorkem, atomicky uloží a po restartu bezpečně použije; finální regrese a měření ještě probíhají. |
+| Přemapování originálů pro jiný host/OS | **IMPLEMENTED** | `src/media_desk/originals.py`, `contract.py`, `web.py`; `tests/media_desk/test_settings.py` | UI mapping validuje nejvýše 16členným SHA-256 vzorkem, atomicky uloží a po restartu bezpečně použije. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Uživatelská data (výběry, hodnocení, kolekce) | **ABSENT** | `docs/media-desk/README.md` | Není úložiště ani databáze Media Desku. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -52,8 +52,11 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 - **IMPLEMENTED:** preview a metadata z přenosného workspace zůstávají dostupné,
   i když originál není dosažitelný; stav je explicitně offline.
-- **ACCEPTED/PLANNED, ABSENT V KÓDU:** lokální override `source_root` pro Media
-  Desk je schválen jako přechodná S2a; Windows ↔ Linux mapping dnes ještě nefunguje.
+- **IMPLEMENTED:** lokální override `source_root` pro Media Desk funguje jako
+  přechodná S2a mezi Windows/POSIX cestami; není obecnou storage architekturou.
+- **LIMIT:** 10k syntetický katalog na tomto Windows hostu vyžadoval 18,13 s pro
+  explicitní validaci a 22,95 s pro vytvoření aplikace kvůli confinement kontrole každé
+  dostupné cesty; startup provedl 0 hashů.
 - **ABSENT:** web neumí vytvořit Media Storage nebo nový workspace a nespouští
   ingest ani procesory.
 - **DECIDED/TARGET:** veřejný `workspace_contract_version: 1` a historická data se
@@ -63,8 +66,10 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 ## Stav testů
 
-V tomto dokumentačním auditu nebyly regresní ani AI testy znovu spuštěny. Poslední
-lokálně doložený běh před auditem na stejném commitu M1.3: `tests/media_desk` —
-**39 passed, 2 skipped**; FAST sada — **158 passed, 3 skipped, 33 deselected**.
-Skips souvisely s oprávněním vytvářet symlinky na Windows. Jde o historický
-výsledek, nikoli nové měření tohoto auditu.
+Finální FAST sada po S2a: **179 passed, 5 skipped, 33 deselected** za 29,63 s.
+S2a symlink testy jsou na tomto Windows hostu přeskočeny bez oprávnění symlink
+vytvořit; povinné POSIX varianty zůstávají v testech. Reprodukovatelné 10k měření
+`tests/media_desk/benchmark_s2a.py`: validace **18 134 ms**, 16 SHA-256 volání;
+startup aplikace **22 951 ms**, 0 SHA-256 volání; online **10 000/10 000** originálů.
+Windows i POSIX `source_root` jsou pokryty parametrizovaným end-to-end testem na
+Windows hostu. Nativní Linux běh zde nebyl dostupný (není instalovaná WSL distribuce).

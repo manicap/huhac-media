@@ -1,6 +1,6 @@
 # S2a — implementační plán lokálního mapování originálů
 
-**Stav:** **ACCEPTED/PLANNED — NOT IMPLEMENTED**
+**Stav:** **IMPLEMENTED — COMPLETE 2026-10-22**
 
 **Připraveno:** 2026-10-22
 
@@ -23,12 +23,15 @@
 - **IMPLEMENTED:** chráněné webové validate/save/clear flow v Nastavení; save
   kandidáta znovu validuje, neúspěch původní profil nemění a aktivace vyžaduje
   restart (`src/media_desk/web.py`, `templates/settings.html`).
-- **PROBÍHÁ ZÁVĚREČNÉ OVĚŘENÍ:** souhrnná regrese, 10k měření a finální
-  synchronizace dokumentace.
+- **VERIFIED:** FAST regrese 179 passed / 5 skipped / 33 deselected; 10k benchmark
+  ověřil 16 hashů při explicitní validaci, 0 při startupu a 10 000 dostupných
+  originálů. Validace trvala 18 134 ms a vytvoření aplikace 22 951 ms na
+  ověřovacím Windows hostu. Vizuální kontrola při 1024 × 576 neukázala
+  horizontální overflow.
 
 ## 1. Výsledek etapy
 
-Media Desk umožní k jednomu aktivnímu workspace uložit host-specific kořen
+Media Desk umožňuje k jednomu aktivnímu workspace uložit host-specific kořen
 originálů. Lokální mapping nahradí katalogový absolutní `source_root` pouze při
 read-only otevírání originálů v Media Desku. Workspace, veřejný kontrakt v1,
 originály, ingest SQLite a výstupy procesorů zůstanou beze změny.

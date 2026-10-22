@@ -42,6 +42,15 @@ _SOURCE_LABELS = {
     "env": "ENV",
     "explicit_config": "explicitní config",
 }
+_MAPPING_STATE_LABELS = {
+    "unconfigured": "Nenastaveno",
+    "valid_sampled": "Ověřeno vzorkem",
+    "unavailable": "Nedostupné",
+    "binding_mismatch": "Jiné úložiště",
+    "storage_mismatch": "Neshoda dat",
+    "no_verifiable_assets": "Bez ověřitelného vzorku",
+    "invalid": "Neplatné",
+}
 
 
 def _app_version() -> str:
@@ -262,6 +271,17 @@ def create_app(
                 current_snapshot.originals_mapping_state
                 if current_snapshot is not None
                 else "unconfigured" if configured_mapping is None else "unavailable"
+            ),
+            "mapping_state_label": _MAPPING_STATE_LABELS.get(
+                current_snapshot.originals_mapping_state
+                if current_snapshot is not None
+                else "unconfigured" if configured_mapping is None else "unavailable",
+                "Neznámé",
+            ),
+            "mapping_validation_label": (
+                _MAPPING_STATE_LABELS.get(mapping_validation.state, "Neznámé")
+                if mapping_validation is not None
+                else ""
             ),
             "mapping_message": (
                 current_snapshot.originals_mapping_message

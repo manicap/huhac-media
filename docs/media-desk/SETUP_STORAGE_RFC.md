@@ -1,10 +1,10 @@
 # RFC: setup workspace a Media Storage
 
-**Stav:** **S2a VARIANTA 2A SCHVÁLENA 2026-10-22 — bez implementace**
+**Stav:** **S2a VARIANTA 2A IMPLEMENTOVÁNA 2026-10-22; další varianty otevřené**
 
 **Auditováno:** 2026-10-22
 
-**Větev / commit:** `mediadesk` / `4397b9289de8689ed9282d9cbce842f3de4a60c2`
+**Větev:** `mediadesk`
 
 ## Cíl a hranice
 
@@ -140,7 +140,7 @@ postup je **UNVERIFIED** a musí vzniknout spolu s volbou deploymentu.
 
 ## Schválený směr a zbývající rozhodnutí
 
-Varianta 2A je schválená jako S2a; detailní prováděcí plán je v
+Varianta 2A je dokončena jako S2a; implementace a důkazy jsou v
 [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.md). Princip varianty 1C je
 schválený jako D-012, ale její konkrétní rozhraní není součástí S2a. Writer/NAS
 model a rozšíření resolveru do procesorů zůstávají otevřené, dokud nebudou popsány

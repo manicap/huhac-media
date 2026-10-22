@@ -74,20 +74,23 @@ Windows cesta na Linuxu (a opačně) se proto bezpečně nepoužije a originál 
 offline; preview z workspace je dál zobrazitelné
 (`tests/media_desk/test_media_desk_contract.py:105-116`).
 
-**ABSENT.** Neexistuje `source_root` override, logický storage identifikátor ani
-lokální mapovací tabulka. Video Keyframes také přímo používá katalogový
-`source_root` (`src/video_keyframes/contract.py:102-124`); řešení jen uvnitř
-Media Desku by automaticky nevyřešilo procesory ani ingest.
-
-**DECIDED/TARGET, NOT IMPLEMENTED.** S2a bude lokální, explicitně navázané
+**IMPLEMENTED PRO MEDIA DESK.** S2a je lokální, explicitně navázané
 mapování `workspace_id + catalog source_root → local media root` pouze pro
-read-only Media Desk. Před uložením použije reprezentativní SHA-256 vzorek,
-výslovně označený jako neúplná kontrola integrity. Běžný start nebude provádět
+read-only Media Desk. Před uložením používá deterministický reprezentativní
+SHA-256 vzorek nejvýše 16 dostupných assetů,
+výslovně označený jako neúplná kontrola integrity. Běžný start neprovádí
 full rehash. Mapping se nesmí zapsat do workspace ani sdíleného katalogu.
+
+Binding a auditní počty jsou pouze v per-user profilu. Nedostupný kořen mapping
+automaticky nemaže; binding mismatch či nedostupnost vypnou mapped originály,
+zatímco metadata a previews zůstávají dostupné. Každý kandidát i každý požadavek
+na artifact znovu ověřuje canonical containment a odmítá symlink escape.
 
 S2a je přechodný kompatibilní adapter pro veřejný kontrakt v1, nikoli definitivní
 storage architektura nebo storage registry. Rozšíření na procesory či obecnou
 storage abstrakci vyžaduje nové rozhodnutí a samostatný návrh; S2a procesory nemění.
+Video Keyframes nadále přímo používá katalogový `source_root`
+(`src/video_keyframes/contract.py:102-124`).
 
 ## Bezpečnost Media Desku
 
@@ -99,6 +102,9 @@ storage abstrakci vyžaduje nové rozhodnutí a samostatný návrh; S2a procesor
   `Origin`, omezené tělo, přesnou sadu polí a CSRF token
   (`src/media_desk/web.py:264-303`).
 - **IMPLEMENTED:** LAN bind dovolí read-only prohlížení, ale blokuje změnu configu.
+- **IMPLEMENTED:** S2a validate/save/clear používají stejnou
+  loopback/Host/Origin/CSRF hranici; save vždy znovu provede SHA-256 vzorek a
+  chybný kandidát nezmění poslední platný profil.
 - **ABSENT:** autentizace a TLS; bezpečný default je `127.0.0.1`.
 
 ## Tři provozní scénáře

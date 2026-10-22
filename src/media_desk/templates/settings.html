@@ -49,7 +49,7 @@
   <section class="panel settings-originals">
     <div class="section-title">
       <div><p class="eyebrow">ORIGIN&Aacute;LY</p><h2>Lok&aacute;ln&iacute; mapov&aacute;n&iacute; zdroje</h2></div>
-      <span class="status-badge status-{{ mapping_state }}">{{ mapping_state }}</span>
+      <span class="status-badge status-{{ mapping_state }}">{{ mapping_state_label }}</span>
     </div>
     <dl class="settings-facts">
       <div><dt>P&#367;vodn&iacute; source_root</dt><dd class="path-value">{{ mapping_source_root or '&mdash;'|safe }}</dd></div>
@@ -68,7 +68,7 @@
       </form>
       {% if mapping_validation %}
         <div class="validation-result status-{{ mapping_validation.state }}">
-          <strong>{{ mapping_validation.state }}</strong><span>{{ mapping_validation.message }}</span>
+          <strong>{{ mapping_validation_label }}</strong><span>{{ mapping_validation.message }}</span>
           <span>Vzorek: {{ mapping_validation.matched_assets }} / {{ mapping_validation.sampled_assets }}, dostupn&yacute;ch {{ mapping_validation.accessible_assets }} z {{ mapping_validation.eligible_assets }}.</span>
         </div>
         {% if mapping_validation.valid %}
