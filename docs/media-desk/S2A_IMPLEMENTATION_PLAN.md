@@ -15,8 +15,9 @@
 - **IMPLEMENTED:** privátní `OriginalsMapping` schema v per-user profilu,
   atomický save, validace polí, profile-only načítání a vyčištění mappingu při
   změně workspace (`src/media_desk/config.py`).
-- **NOT IMPLEMENTED:** resolver, SHA vzorek, contract/startup integrace a webové
-  validate/save/clear flow.
+- **IMPLEMENTED:** bezpečný mapped-root resolver, přesný binding a deterministický
+  `sha256-sample-v1` s maximálně 16 assety (`src/media_desk/originals.py`).
+- **NOT IMPLEMENTED:** contract/startup integrace a webové validate/save/clear flow.
 
 ## 1. Výsledek etapy
 
