@@ -8,7 +8,7 @@
 
 **Implementační commity S2a.1:** `921f48c`, `18c0919`
 
-**Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`
+**Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`, `da416df`
 
 **Stav aktualizován:** 2026-10-23; S2b dokončena
 

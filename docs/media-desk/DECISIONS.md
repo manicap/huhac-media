@@ -39,8 +39,9 @@ schválení a **REJECTED** se nemá realizovat.
 
 - **E1 — IMPLEMENTED:** cesty, precedence, atomický profil, restart a ochrany HTTP
   jsou doloženy v D-003 až D-005 a `ARCHITECTURE.md`.
-- **E2 — PARTIAL/UNVERIFIED:** ingest umí v rámci plného runu vytvořit i prázdný
-  workspace, ale nemá samostatný veřejný init kontrakt a audit cestu nespustil.
+- **E2 — IMPLEMENTED PRO S2b:** samostatné ingest-owned JSON CLI vytváří ready
+  prázdný workspace bez importu a analýzy; crash/retry a webový workflow jsou
+  doloženy v `S2B_VERIFICATION.md`. Nativní Linux smoke zůstává **UNVERIFIED**.
 - **E3 — IMPLEMENTED PRO MEDIA DESK:** D-011 je realizováno lokálním adapterem.
   Společné použití procesory zůstává mimo S2a.
 - **E4 — IMPLEMENTED:** před uložením mappingu proběhne strukturální kontrola
