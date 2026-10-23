@@ -17,6 +17,11 @@ pro Media Desk. D-012 potvrdilo ingest-owned inicializaci pro budoucí samostatn
 etapu. Multi-host SQLite zápis přes SMB/NFS zůstává nepodporovaný. Varianty 2B,
 2C a konkrétní writer/backup deployment nejsou tímto schváleny.
 
+Detailní návrh této budoucí inicializace je nyní veden jako **S2b — PROPOSED /
+AWAITING APPROVAL** v [S2B_DESIGN.md](S2B_DESIGN.md), s failure matrix a
+implementačním plánem. Nové označení S2b nahrazuje starší pracovní označení S1;
+dosavadní shared-resolver návrh není zahájen ani schválen.
+
 ## 1. Založení nového archivu
 
 | Varianta | Popis | Výhoda | Riziko / dopad | Verdikt |

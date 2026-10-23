@@ -28,13 +28,18 @@ posloupnost pro tři schválené provozní scénáře.
    otevření konkrétního souboru probíhají v GET/Range požadavku. Na syntetickém
    10k katalogu klesl p50 startu z 25,77 s na 7,75 s (3,32×) a startup provádí
    0 per-file I/O originálů. Důkazy: [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
-4. **S2b — PROPOSED.** Po provozním ověření rozhodnout, zda stejnou abstrakci
-   potřebují Video Keyframes/ingest. Teprve pak navrhnout společný adapter nebo
-   contract v2; bez automatické migrace.
-5. **S1 — ACCEPTED/TARGET, NOT IMPLEMENTED.** Navrhnout a implementovat úzký ingest-owned `init` pro nový
-   archiv s idempotencí, explicitní autoritou, rollbackem a testem prázdného
-   adresáře, oddělený od importu a analýzy. Web může toto rozhraní volat až po
-   samostatném návrhu a security review.
+4. **S2b — PROPOSED / AWAITING APPROVAL, NOT IMPLEMENTED.** Nové zadání tímto
+   názvem označuje úzký ingest-owned `init` nového archivu, dříve vedený jako S1.
+   Návrh zahrnuje JSON CLI, idempotenci, crash recovery, prázdný katalog,
+   lokální-only workspace a chráněnou Media Desk orchestraci. Viz
+   [S2B_DESIGN.md](S2B_DESIGN.md),
+   [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md) a
+   [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md). Před kódem je nutné
+   schválit D-017 až D-020.
+5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
+   označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
+   abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou
+   schválené.
 6. **S3 hardening — PROPOSED.** Retry/reconnect, diagnostika mountu a mappingu,
    záloha konfigurace a definice podporovaného single-writer deploymentu.
 7. **Portable user data — DEFERRED.** Samostatné schema/ownership/backup ADR;

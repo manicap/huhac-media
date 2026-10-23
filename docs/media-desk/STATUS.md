@@ -8,7 +8,7 @@
 
 **Implementační commity S2a.1:** `921f48c`, `18c0919`
 
-**Stav aktualizován:** 2026-10-22; S2a.1 dokončena
+**Stav aktualizován:** 2026-10-23; návrh S2b čeká na schválení
 
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a a S2a.1: read-only web nad jedním existujícím
 > workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
@@ -32,6 +32,7 @@
 | Nový archiv z webu | **ABSENT** | setup přijímá jen existující workspace: `src/media_desk/workspace_status.py:28` | Media Desk nevytváří workspace ani Media Storage. |
 | Přemapování originálů pro jiný host/OS | **IMPLEMENTED** | `src/media_desk/originals.py`, `contract.py`, `web.py`; `tests/media_desk/test_settings.py` | UI mapping validuje nejvýše 16členným SHA-256 vzorkem, atomicky uloží a po restartu bezpečně použije. |
 | S2a.1 lazy origin access | **IMPLEMENTED** | `models.py`, `contract.py`, `web.py`; `test_web.py`; `S2A1_STARTUP_PERFORMANCE.md` | Snapshot registruje unchecked source reference bez per-file I/O; GET/Range provádí request-scoped ověření a otevření. 10k p50: 25,77 s → 7,75 s (3,32×). |
+| S2b: inicializace nového archivu | **PROPOSED / AWAITING APPROVAL — NOT IMPLEMENTED** | `S2B_DESIGN.md`, `S2B_FAILURE_MATRIX.md`, `S2B_IMPLEMENTATION_PLAN.md` | D-012 schvaluje ingest ownership; CLI, ready layout, path a network policy čekají na D-017 až D-020. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Uživatelská data (výběry, hodnocení, kolekce) | **ABSENT** | `docs/media-desk/README.md` | Není úložiště ani databáze Media Desku. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -63,6 +64,8 @@ až po restartu (`src/media_desk/web.py:361-365`).
   resolve/stat/is_file/open/SHA operací originálů.
 - **ABSENT:** web neumí vytvořit Media Storage nebo nový workspace a nespouští
   ingest ani procesory.
+- **PROPOSED:** S2b tento gap řeší ingest-owned init rozhraním, ale žádný příkaz,
+  HTTP endpoint ani nový zapisující workflow zatím v kódu není.
 - **DECIDED/TARGET:** veřejný `workspace_contract_version: 1` a historická data se
   v následující etapě nesmějí měnit ani migrovat bez zvláštního schválení.
 - **UNVERIFIED:** přímý zapisující provoz ingest SQLite/WAL na konkrétním SMB/NFS
