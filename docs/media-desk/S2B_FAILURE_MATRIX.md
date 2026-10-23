@@ -1,6 +1,6 @@
 # S2b — failure a recovery matrix
 
-**Stav:** **PROPOSED / AWAITING APPROVAL — NOT IMPLEMENTED**
+**Stav:** **ACCEPTED / IMPLEMENTATION AUTHORIZED — NOT IMPLEMENTED**
 
 **Návaznost:** [S2B_DESIGN.md](S2B_DESIGN.md), D-009, D-012
 

@@ -136,7 +136,7 @@ Při selhání odstranit jen prokazatelně nově vytvořené prázdné artefakty
 cizí adresář. Inicializace musí být oddělená od importu a analýzy; konkrétní API
 a rollback protokol zůstávají návrhem budoucí etapy.
 
-**PROPOSED / AWAITING APPROVAL (S2b):** veřejnou hranicí bude JSON CLI vlastněné
+**ACCEPTED/TARGET (S2b, dosud neimplementováno):** veřejnou hranicí bude JSON CLI vlastněné
 Media Ingestem. Read-only preflight nic nerezervuje; confirmed init zopakuje
 validace, atomicky rezervuje operaci, vytvoří privátní SQLite stav a prázdný
 katalog a publikuje `workspace.json` poslední. Media Desk až potom provede
@@ -145,9 +145,11 @@ read-only postcondition validaci, uloží lokální profil a vyžádá restart.
 ke schválení jsou v [S2B_DESIGN.md](S2B_DESIGN.md) a
 [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md).
 
-Návrh je přísnější než dnešní plný ingest: nový Workspace a Media Storage se
+Schválený návrh je přísnější než dnešní plný ingest: nový Workspace a Media Storage se
 nesmějí překrývat a workspace musí být na prokazatelně lokálním filesystemu.
-Toto zatím není implementované ani schválené podporované chování.
+Lokální-only workspace je bezpečnostní omezení etapy S2b, nikoli definitivní
+omezení Media Pipeline. Přenosná knihovna a případné centrální úložiště metadat
+zůstávají otevřeným tématem. Chování zatím není implementované.
 
 ### B. Připojení existujícího archivu na jiném OS
 

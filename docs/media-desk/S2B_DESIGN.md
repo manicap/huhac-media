@@ -1,6 +1,6 @@
 # S2b — návrh inicializace nového archivu
 
-**Stav:** **PROPOSED / AWAITING APPROVAL — NOT IMPLEMENTED**
+**Stav:** **ACCEPTED / IMPLEMENTATION AUTHORIZED — NOT IMPLEMENTED**
 
 **Připraveno:** 2026-10-23
 
@@ -25,7 +25,7 @@ Navrhuje se:
   dokud nedostane samostatně schválený rozsah;
 - nejde o schválení ani zahájení tohoto resolveru, kontraktu v2 nebo S2c.
 
-Přejmenování je **PROPOSED** a je jedním z bodů ke schválení.
+Přejmenování bylo schváleno v D-017 dne 2026-10-23.
 
 ## 2. Ověřený současný stav
 
@@ -320,6 +320,10 @@ warning; skutečné `mkdir/open/replace/fsync` může stále selhat.
 Klasifikace mountu je obranný filtr, ne důkaz správných lock/rename semantics.
 Multi-host SQLite zápis zůstává nepodporovaný podle D-009.
 
+Lokální-only workspace je schválené bezpečnostní omezení této etapy S2b,
+nikoli definitivní omezení Media Pipeline. Budoucí přenosná knihovna a případné
+centrální úložiště metadat zůstávají otevřenými tématy pro samostatné rozhodnutí.
+
 ## 7. Media Desk workflow
 
 ### 7.1 První obrazovka
@@ -424,7 +428,7 @@ nezná lokální S2a mapping. Inicializace neslibuje přenosnou storage architek
 - automatické mazání, rollback cizích dat nebo adopce neprázdného cíle;
 - změna veřejného asset schema nebo `workspace_contract_version: 1`.
 
-## 11. Body ke schválení
+## 11. Schválená rozhodnutí
 
 1. **Nomenklatura:** S2b znamená inicializaci; původní „shared resolver S2b“ se
    odloží bez čísla.
@@ -436,4 +440,5 @@ nezná lokální S2a mapping. Inicializace neslibuje přenosnou storage architek
    na prokazatelně lokálním filesystemu; network/unknown workspace je v S2b
    odmítnut.
 
-Bez schválení těchto bodů se implementace nezahajuje.
+Body D-017 až D-020 byly schváleny 2026-10-23. Implementace musí dodržet detailní
+plán a akceptaci; do té doby se zde popsané chování neoznačuje jako implementované.

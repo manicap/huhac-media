@@ -6,7 +6,7 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-22 po schválení D-011, D-012 a D-009
+**Rozhodnutí aktualizována:** 2026-10-23 po schválení D-017 až D-020
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -30,10 +30,10 @@ schválení a **REJECTED** se nemá realizovat.
 | D-014 | Přímé editování `metadata/catalog.json` nebo změna `workspace_contract_version` kvůli mappingu. | **REJECTED pro nejbližší etapu** | porušilo by historii a kompatibilitu procesorů |
 | D-015 | Documentation First & Documentation Sync je závazný projektový proces. | **ACCEPTED + IMPLEMENTED** | `AGENTS.md`, `docs/development.md`; zavedeno 2026-10-22 v commitu `defb316` |
 | D-016 | S2a.1 odděluje katalogem autorizovanou source reference od aktuálně ověřeného originálu. Startup nesmí kvůli registraci provádět per-asset `resolve`/`stat`/`open`; confinement, symlink escape a otevření se provedou request-scoped při každém GET/Range. Staré tokeny se vážou na epochu aktivního rootu. | **ACCEPTED + IMPLEMENTED** | `models.py`, `contract.py`, `web.py`; finální profil a bezpečnostní důkazy v `S2A1_STARTUP_PERFORMANCE.md` |
-| D-017 | Označení S2b se použije pro ingest-owned inicializaci nového archivu; dříve stejně označené rozšíření shared storage resolveru zůstane odložené bez čísla. | **PROPOSED / AWAITING APPROVAL** | nové zadání vs. dosavadní `ROADMAP.md`; viz `S2B_DESIGN.md` |
-| D-018 | Jedinou veřejnou integrační hranicí S2b bude versioned JSON CLI `huhac-media init`; Media Desk nebude importovat privátní ingest Python API. | **PROPOSED / AWAITING APPROVAL** | zachová producer ownership a procesní hranici; `S2B_DESIGN.md` §3 |
-| D-019 | Ready prázdný workspace v1 obsahuje SQLite workspace row a init run, prázdný atomický katalog `assets: []` a manifest publikovaný jako poslední readiness bod. | **PROPOSED / AWAITING APPROVAL** | dnešní samostatný bootstrap není Desk-ready; prázdný plný ingest byl diagnosticky ověřen |
-| D-020 | S2b zakáže oba směry překryvu Media Storage/Workspace a povolí workspace pouze na prokazatelně lokálním filesystemu; network i unknown workspace FS fail-closed. | **PROPOSED / AWAITING APPROVAL** | D-009 a failure/security model v `S2B_FAILURE_MATRIX.md` |
+| D-017 | Označení S2b se použije pro ingest-owned inicializaci nového archivu; dříve stejně označené rozšíření shared storage resolveru zůstane odložené bez čísla. | **ACCEPTED/TARGET — NOT IMPLEMENTED** | schváleno 2026-10-23; viz `S2B_DESIGN.md` |
+| D-018 | Jedinou veřejnou integrační hranicí S2b bude verzované JSON CLI `huhac-media init`; Media Desk nebude importovat privátní ingest Python API ani parsovat textové hlášky. | **ACCEPTED/TARGET — NOT IMPLEMENTED** | schváleno 2026-10-23; zachová producer ownership a procesní hranici |
+| D-019 | Ready prázdný workspace v1 obsahuje SQLite workspace row a init run, prázdný atomický katalog `assets: []` a manifest publikovaný jako poslední readiness bod. | **ACCEPTED/TARGET — NOT IMPLEMENTED** | schváleno 2026-10-23; dnešní samostatný bootstrap není Desk-ready |
+| D-020 | S2b zakáže oba směry překryvu Media Storage/Workspace a povolí workspace pouze na prokazatelně lokálním filesystemu; network i unknown workspace FS fail-closed. Jde o bezpečnostní omezení etapy S2b, nikoli definitivní omezení Media Pipeline. | **ACCEPTED/TARGET — NOT IMPLEMENTED** | schváleno 2026-10-23; přenosná knihovna a případné centrální metadata zůstávají otevřeným tématem |
 
 ## Vyhodnocení otázek E1–E10
 
@@ -67,6 +67,6 @@ plán a výsledek S2a je v [S2A_IMPLEMENTATION_PLAN.md](S2A_IMPLEMENTATION_PLAN.
 S2a je dokončena. Writer deployment musí být navržen a schválen před jakoukoli
 síťovou zapisující etapou; dokončení S2a tuto bránu nemění.
 
-Detailní návrh initu je v [S2B_DESIGN.md](S2B_DESIGN.md) a čeká na schválení
-D-017 až D-020. D-012 schvaluje pouze ownership a oddělení initu od importu;
-neschvaluje konkrétní CLI, ready layout ani filesystem policy.
+Detailní návrh initu je v [S2B_DESIGN.md](S2B_DESIGN.md). D-017 až D-020 byly
+schváleny 2026-10-23 a implementace S2b je autorizována; dokud neprojde akceptací,
+zůstávají rozhodnutí ve stavu TARGET, nikoli IMPLEMENTED.

@@ -1,6 +1,6 @@
 # S2b — detailní implementační plán inicializace nového archivu
 
-**Stav:** **PROPOSED / AWAITING APPROVAL — DO NOT IMPLEMENT**
+**Stav:** **ACCEPTED / IMPLEMENTATION AUTHORIZED — IN PROGRESS**
 
 **Připraveno:** 2026-10-23
 

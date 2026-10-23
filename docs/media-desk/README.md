@@ -16,9 +16,8 @@
   schválené optimalizace startupu a lazy ověřování originálů.
 - [S2B_DESIGN.md](S2B_DESIGN.md),
   [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md) a
-  [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md) — **PROPOSED / NOT
-  IMPLEMENTED** návrh ingest-owned inicializace nového archivu čekající na
-  architektonické schválení.
+  [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md) — **ACCEPTED / IN
+  PROGRESS** ingest-owned inicializace nového archivu.
 - [Veřejný workspace kontrakt](../workspace-contract.md) a dokumentace
   [Media Ingest](../media-ingest.md), [Session Grouper](../session-grouper.md),
   [Video Keyframes](../video-keyframes.md), [Vision](../vision.md) a
