@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import threading
@@ -36,7 +37,7 @@ def test_empty_archive_is_ready_and_idempotent(tmp_path: Path) -> None:
     assert Path(catalog["source_root"]) == storage.resolve()
     assert list(storage.iterdir()) == []
     database = workspace / "state" / "catalog.sqlite3"
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection:
         assert connection.execute("SELECT COUNT(*) FROM workspace").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM assets").fetchone()[0] == 0
@@ -46,8 +47,11 @@ def test_empty_archive_is_ready_and_idempotent(tmp_path: Path) -> None:
     assert again.state == "ready_existing"
     assert again.workspace_id == result.workspace_id
     assert after == before
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection:
         assert connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
+    moved_database = database.with_suffix(".closed-check")
+    database.replace(moved_database)
+    moved_database.replace(database)
 
 
 @pytest.mark.integration

@@ -89,13 +89,17 @@ def _read_ready_workspace(workspace: Path, storage: Path) -> tuple[str | None, s
             raise ValueError
         source_root = canonical_target(Path(catalog["source_root"]))
         database_path = workspace / "state" / "catalog.sqlite3"
-        uri = f"file:{database_path.resolve().as_posix()}?mode=ro"
-        with sqlite3.connect(uri, uri=True) as connection:
+        # immutable prevents SQLite from creating WAL/SHM sidecars during a read-only readiness check.
+        uri = f"file:{database_path.resolve().as_posix()}?mode=ro&immutable=1"
+        connection = sqlite3.connect(uri, uri=True)
+        try:
             if connection.execute("SELECT COUNT(*) FROM workspace WHERE id = ?", (workspace_id,)).fetchone()[0] != 1:
                 raise ValueError
             run_id = catalog["generated_by_run_id"]
             if connection.execute("SELECT COUNT(*) FROM runs WHERE id = ? AND status = 'success'", (run_id,)).fetchone()[0] != 1:
                 raise ValueError
+        finally:
+            connection.close()
     except (OSError, sqlite3.Error, KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None, "CORRUPT_OR_LEGACY_PARTIAL"
     if source_root != storage:
