@@ -68,6 +68,37 @@ def validate_roots(
     return roots
 
 
+def validate_recovery_roots(
+    *, workspace: Path, media_storage: Path, state_root: Path, work_root: Path
+) -> TransferRoots:
+    roots = TransferRoots(
+        _existing_directory(workspace, "workspace"),
+        _existing_directory(media_storage, "media storage"),
+        _existing_directory(state_root, "state root"),
+        _existing_directory(work_root, "transfer work root"),
+    )
+    named = {
+        "workspace": roots.workspace,
+        "media storage": roots.media_storage,
+        "state root": roots.state_root,
+        "transfer work root": roots.work_root,
+    }
+    entries = list(named.items())
+    for index, (first_name, first_path) in enumerate(entries):
+        for second_name, second_path in entries[index + 1 :]:
+            if _overlap(first_path, second_path):
+                raise configuration_error(
+                    "ROOT_OVERLAP", f"{first_name} and {second_name} must not overlap"
+                )
+    if os.stat(roots.media_storage).st_dev != os.stat(roots.work_root).st_dev:
+        raise configuration_error(
+            "STAGING_FILESYSTEM_MISMATCH",
+            "transfer work root must be on the same filesystem as media storage",
+        )
+    _require_local_filesystem(roots.media_storage)
+    return roots
+
+
 def _require_local_filesystem(path: Path) -> None:
     if os.name == "nt":
         import ctypes
@@ -103,4 +134,3 @@ def _require_local_filesystem(path: Path) -> None:
     raise configuration_error(
         "UNSUPPORTED_FILESYSTEM", "media storage filesystem cannot be safely classified"
     )
-

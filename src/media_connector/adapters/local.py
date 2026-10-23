@@ -8,8 +8,10 @@ import json
 import os
 import stat
 import unicodedata
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import BinaryIO, Iterator
 
 from media_connector.errors import ConnectorError, configuration_error, source_error
 from media_connector.models import (
@@ -91,6 +93,21 @@ def _logical_path(parts: tuple[str, ...]) -> str:
 def _object_id(logical_path: str) -> str:
     encoded = base64.urlsafe_b64encode(logical_path.encode("utf-8")).decode("ascii")
     return f"local-path-v1:{encoded.rstrip('=')}"
+
+
+def _decode_object_id(object_id: str) -> str:
+    prefix = "local-path-v1:"
+    if not object_id.startswith(prefix):
+        raise source_error("INVALID_OBJECT_ID", "local object identity is invalid", retryable=False)
+    encoded = object_id[len(prefix) :]
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        logical = base64.b64decode(encoded + padding, altchars=b"-_", validate=True).decode("utf-8")
+    except (ValueError, UnicodeError) as exc:
+        raise source_error("INVALID_OBJECT_ID", "local object identity is malformed", retryable=False) from exc
+    if not logical or _object_id(logical) != object_id:
+        raise source_error("INVALID_OBJECT_ID", "local object identity is not canonical", retryable=False)
+    return logical
 
 
 def _modified_at(mtime_ns: int) -> str:
@@ -246,3 +263,57 @@ class LocalFilesystemAdapter:
         if not isinstance(after, str) or not after:
             raise configuration_error("INVALID_CURSOR", "cursor position is invalid")
         return after
+
+    def _resolve_file(self, object_id: str, logical_path: str) -> tuple[Path, os.stat_result]:
+        decoded = _decode_object_id(object_id)
+        if decoded != logical_path:
+            raise source_error("OBJECT_ID_PATH_MISMATCH", "object identity does not match logical path", retryable=False)
+        parts = tuple(_validate_component(part) for part in logical_path.split("/"))
+        if not parts or "/".join(parts) != logical_path:
+            raise source_error("UNSAFE_PATH", "logical path is not canonical", retryable=False)
+        current = self.root
+        try:
+            for index, part in enumerate(parts):
+                current = current / part
+                info = os.lstat(current)
+                if _is_link_like(info):
+                    raise source_error("UNSAFE_PATH", "source path contains a link or reparse point", retryable=False)
+                if index < len(parts) - 1 and not stat.S_ISDIR(info.st_mode):
+                    raise source_error("SOURCE_CHANGED", "source path structure changed")
+            if not stat.S_ISREG(info.st_mode):
+                raise source_error("SOURCE_CHANGED", "source object is no longer a regular file")
+            resolved = current.resolve(strict=True)
+        except ConnectorError:
+            raise
+        except OSError as exc:
+            raise _map_os_error(exc, subject="source object") from exc
+        if self.root not in resolved.parents:
+            raise source_error("UNSAFE_PATH", "source object escaped the configured root", retryable=False)
+        return resolved, info
+
+    @contextmanager
+    def open_read(
+        self, *, object_id: str, logical_path: str, expected_version: str
+    ) -> Iterator[BinaryIO]:
+        path, before = self._resolve_file(object_id, logical_path)
+        actual_version = f"local-stat-v1:{before.st_size}:{before.st_mtime_ns}"
+        if actual_version != expected_version:
+            raise source_error("SOURCE_CHANGED", "source version changed before transfer")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(path, flags)
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode):
+                os.close(descriptor)
+                raise source_error("UNSAFE_PATH", "opened source is not a regular file", retryable=False)
+            stream = os.fdopen(descriptor, "rb", closefd=True)
+        except ConnectorError:
+            raise
+        except OSError as exc:
+            raise _map_os_error(exc, subject="source object") from exc
+        with stream:
+            yield stream
+        _, after = self._resolve_file(object_id, logical_path)
+        after_version = f"local-stat-v1:{after.st_size}:{after.st_mtime_ns}"
+        if after_version != expected_version:
+            raise source_error("SOURCE_CHANGED", "source version changed during transfer")
