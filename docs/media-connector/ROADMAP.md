@@ -5,10 +5,17 @@
    bezpečná enumerace a pagination bez persistence či čtení obsahu.
 3. **Google Drive discovery — DEFERRED / REQUIRES APPROVAL.** OAuth, běžné
    soubory, shared drives, shortcuts a cloud-native dokumenty.
-4. **Bezpečný staging a transfer — DEFERRED / REQUIRES ADR.** Transakce,
-   recovery, writer, persistence, kolize a retence.
-5. **Media Ingest handoff — DEFERRED / REQUIRES ADR.** Provenience bez změny
-   workspace contract v1 a bez čtení ingest SQLite.
+4. **Povinný bezpečný staging a Transfer — ACCEPTED/TARGET, NOT IMPLEMENTED.**
+   Každý zdroj zůstává read-only; pouze úplná ověřená kopie může být publikována
+   do Media Storage. Transakce, recovery, writer, persistence, kolize a retence
+   vyžadují detailní ADR před implementací.
+5. **Content identity a transfer evidence — ACCEPTED/TARGET, NOT IMPLEMENTED.**
+   Deduplikace napříč zdroji a historie transferů oddělená od originálních
+   souborů; přesné schema zůstává otevřené.
+6. **Samostatný Media Ingest handoff — ACCEPTED/TARGET, NOT IMPLEMENTED.**
+   Ingest přijímá pouze lokálně převzaté originály z Media Storage a nespouští se
+   automaticky. Provenience se propojí bez změny workspace contract v1 a bez
+   čtení ingest SQLite.
 
 Po MC1 se vývoj zastavuje. Žádný následující bod není implementovaný ani
 automaticky autorizovaný.

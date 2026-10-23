@@ -1,45 +1,72 @@
 # Media Connector — handoff, stav synchronizace a zotavení
 
-**Stav:** PROPOSED / NOT IMPLEMENTED
+**Architektonické invarianty:** ACCEPTED/TARGET
 
-## Delivery model
+**Transfer runtime:** NOT IMPLEMENTED
 
-Jednotkou předání je neměnná `delivery` s UUID. Pracovní data vznikají pod
-dočasným názvem; hotová delivery se zveřejní atomickým přejmenováním až po
-ověření. Publikovaná delivery se nikdy nedoplňuje ani nepřepisuje.
+Tento dokument definuje schválené hranice budoucího Transferu. Layout,
+persistence a transakční mechanismus jsou stále návrh a musí projít samostatným
+ADR před implementací.
+
+## Povinné invarianty
+
+- Všechny současné i budoucí externí zdroje a adaptéry jsou vždy read-only.
+- Discovery pouze inventarizuje a vybírá kandidáty; nepřebírá originál.
+- Transfer pořizuje vlastní kopii přes soukromý staging a ověřuje její úplnost
+  a identitu obsahu.
+- Do Media Storage se publikuje pouze dokončený a ověřený originál.
+- Nedokončený, částečný nebo neověřený transfer není platné médium.
+- Media Ingest přijímá výhradně publikované lokální originály z Media Storage.
+- Spuštění Ingestu je samostatná operace; úspěch Transferu jej automaticky
+  nespouští.
+- Deduplikace Transferu je podle identity obsahu a umožňuje více zdrojových
+  referencí k jednomu převzatému originálu.
+- Zdrojové reference, observations a historie transferů jsou metadata oddělená
+  od souborů originálů.
+- Externí originál se nikdy neupravuje, nepřejmenovává, nepřesouvá ani nemaže.
+
+## Navržený delivery model
+
+Jednotkou práce je transfer run s UUID. Pracovní bajty vznikají pouze v
+soukromém stagingu. Publikace do Media Storage nastane až po úplném přenosu a
+ověření; publikovaný originál se následně nepřepisuje.
 
 ```text
-connector-state/
+connector-state/                   # oddělená evidence; přesné schema OPEN
   profile.json
-  state.sqlite3              # navrženo; ne ingest DB
+  state.<open-format>
   runs/<run-id>/report.json
   manifests/<delivery-id>.json
 
-delivery-root/
-  <delivery-id>.partial/
-  <delivery-id>/media/...    # publikovaný neměnný snapshot
+private-staging/
+  <transfer-id>.partial/            # nikdy není platné médium
+
+Media Storage/
+  <approved-layout>/...             # pouze ověřené lokální originály
 ```
 
-Umístění `delivery-root` čeká na MC-Q03. Connector state nesmí být ve workspace
-ani v `analysis/`. Návrh lokální SQLite počítá s jediným writerem a lokálním
-filesystemem; není to sdílená ani veřejná databáze.
+Přesný staging a Media Storage layout čekají na MC-Q01. Connector state nesmí
+být ve workspace, v `analysis/` ani vložen do souborů originálů. Konkrétní
+persistence zatím není schválená; případná lokální SQLite by byla privátní,
+single-writer a zcela oddělená od ingest DB.
 
-## Handoff manifest
+## Budoucí handoff manifest
 
 Navržený `media-connector-handoff-v1` je kontrakt Connectoru, nikoli rozšíření
-workspace contractu v1. Obsahuje:
+workspace contractu v1. Má odděleně evidovat:
 
 - `schema`, `delivery_id`, `library_id`, `created_at`;
-- identitu a typ zdrojového profilu bez tajných údajů;
-- položky se zdrojovým `object_id`, `version_token`, logickou a výslednou
-  relativní cestou, velikostí a výsledným transfer SHA-256;
-- stav položky a strukturovanou chybu;
+- zdrojové reference a jejich observations bez tajných údajů;
+- vazbu více zdrojových referencí na content identity převzatého originálu;
+- výslednou relativní cestu v Media Storage, velikost a ověřovací hash;
+- stav transferu, strukturovanou chybu a auditní historii;
 - souhrny a otisk kanonického manifestu.
 
-Absolutní lokální cesty, OAuth tokeny a dočasné signed URL se nepublikují.
-Manifest nemění význam `asset_id`; Media Ingest obsah znovu hashovat musí.
+Absolutní externí cesty, OAuth tokeny a dočasné signed URL se nepublikují.
+Transfer content identity se nesmí automaticky vydávat za ingest `asset_id`;
+Media Ingest obsah znovu hashovat musí.
 
-## Stavový automat běhu
+## Stavový automat
 
 ```text
 planned -> discovering -> transferring -> verifying -> publishing -> complete
@@ -48,30 +75,33 @@ planned -> discovering -> transferring -> verifying -> publishing -> complete
                               +------------------------------> interrupted
 ```
 
-Stavy položky jsou `pending`, `transferring`, `verified`, `published`, `failed`
-a `skipped_unchanged`. Přechod na `verified` nastane až po uzavření streamu,
-kontrole očekávané velikosti/verze a výpočtu lokálního SHA-256. `complete`
-znamená, že manifest i delivery byly publikovány; neznamená, že proběhl Ingest.
+Stavy položky jsou navrženy jako `pending`, `transferring`, `verified`,
+`published`, `failed` a `skipped_duplicate`. Přechod na `verified` smí nastat až
+po uzavření streamu, kontrole očekávané velikosti/verze a výpočtu content
+identity. `complete` znamená publikovaný ověřený originál a evidenci; neznamená,
+že proběhl Ingest.
 
 ## Zotavení
 
-- Každý download/kopie používá unikátní `.partial` soubor a atomické přejmenování.
-- Restart označí nedokončený běh jako `interrupted`; nic automaticky nemaže.
-- Retry znovu použije jen ověřené položky se shodnou zdrojovou verzí a cílovým
-  hashem. Jinak přenos zopakuje do nového dočasného souboru.
-- Nedostupný zdroj ponechá konfiguraci i checkpoint; běh skončí strukturovaným
-  retryable stavem.
+- Každá kopie používá unikátní `.partial` umístění mimo publikovaný namespace.
+- Restart rozpozná nedokončený běh; nic automaticky nemaže ani nepublikuje.
+- Retry znovu použije jen prokazatelně ověřené části se shodnou zdrojovou verzí
+  a hashem, jinak přenos zopakuje do nového stagingu.
+- Nedostupný zdroj ponechá konfiguraci i checkpoint a vrátí retryable stav.
 - Změna objektu během přenosu nic nepublikuje a vytvoří `SOURCE_CHANGED`.
-- Odstranění objektu ze zdroje nemaže dříve publikované médium. Mazací a retenční
-  politika není součástí návrhu.
-- Neznámé soubory v cíli se nepřepisují ani neadoptují.
-- Opakovaný publish stejného `delivery_id` je buď ověřený no-op, nebo konflikt;
-  nikdy implicitní overwrite.
+- Odstranění objektu ze zdroje nemaže dříve převzatý originál z Media Storage.
+- Neznámé cílové soubory se nepřepisují ani neadoptují.
+- Opakovaný publish stejné content identity je ověřený dedup/no-op nebo
+  konflikt; nikdy implicitní overwrite.
 
-## Předání Media Ingestu
+## Povinné oddělené předání Media Ingestu
 
-Po explicitním schválení delivery může operátor předat její neměnný `media/`
-adresář dnešnímu Media Ingestu jako `INPUT`. Konektor Ingest automaticky
-nespouští a nevyhodnocuje jeho privátní stav. Propojení manifestové provenience
-s veřejným katalogem by měnilo komponentové kontrakty a vyžaduje samostatné
-architektonické rozhodnutí.
+Teprve po úspěšné publikaci může samostatná operace předat příslušný lokální
+Media Storage root dnešnímu Media Ingestu jako `INPUT`. Externí source root ani
+staging nejsou platným Ingest vstupem. Connector Ingest automaticky nespouští a
+nevyhodnocuje jeho privátní stav.
+
+Media Ingest nadále vlastní SHA-256 `asset_id`, deduplikaci svého katalogu a
+publikaci workspace contractu. Propojení Connector source/transfer provenience
+s veřejným katalogem vyžaduje samostatný budoucí integrační kontrakt bez změny
+workspace contract v1 a bez čtení ingest SQLite.

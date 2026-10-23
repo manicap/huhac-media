@@ -81,24 +81,59 @@ cesty a filesystem metadata. Budoucí Google Drive adaptér použije opaque Driv
 ID a provider version; běžné soubory, shortcuts a cloud-native dokumenty budou
 explicitně rozdílné typy.
 
-## Budoucí převzetí a handoff
+Všechny adaptéry bez výjimky zpřístupňují externí zdroj pouze read-only.
+Zdrojové API nesmí obsahovat mutační operace. Lokální ani cloudový originál se
+neupravuje, nepřejmenovává, nepřesouvá a nemaže.
 
-Budoucí přenos musí nejprve zapisovat do samostatného bezpečného stagingu a až
-potom publikovat do Media Storage. Přesný transakční mechanismus není schválený
-a není součástí MC1. Connector manifest a provenience budou samostatný budoucí
-integrační kontrakt; nebudou vydávány za workspace catalog v1.
+## Povinné převzetí a handoff
+
+```text
+EXTERNAL SOURCE (read-only)
+        |
+        v
+DISCOVERY (inventory + candidate selection)
+        |
+        v
+TRANSFER (own copy into private staging)
+        |
+        v
+VERIFY (complete bytes + content identity)
+        |
+        v
+PUBLISH TO MEDIA STORAGE (valid local original)
+        |
+        v
+SEPARATE MEDIA INGEST OPERATION
+```
+
+Transfer musí nejprve zapisovat do samostatného bezpečného stagingu a až po
+úplném ověření publikovat vlastní kopii do Media Storage. Nedokončené nebo
+neověřené bajty nesmějí být viditelné jako platné médium. Přesný transakční
+mechanismus, layout a persistence nejsou schválené a nejsou součástí MC1.
+
+Převzetí do Media Storage je povinnou podmínkou handoffu. Media Ingest nesmí v
+Connector workflow zpracovávat externí source root, cloud mount ani dočasný
+staging. Dostává pouze publikované lokální originály z Media Storage a spouští
+se samostatnou operací nezávislou na Transferu.
+
+Content identity budoucího Transferu umožní, aby více externích zdrojových
+referencí ukazovalo na jediný převzatý originál. Evidence zdrojů, observations
+a transfer historie bude oddělena od samotných originálních souborů. Přesné
+schema a vazba na Ingest zůstávají budoucím integračním kontraktem; nesmějí měnit
+workspace contract v1 ani používat ingest SQLite.
 
 Media Ingest i nadále sám provede SHA-256, určí `asset_id` a publikuje workspace
-contract. Automatické spuštění Ingestu ani integrace do Media Desku nejsou
-součástí MC1.
+contract. Transfer content identity nesmí být bez schváleného kontraktu vydávána
+za ingest `asset_id`. Automatické spuštění Ingestu ani integrace do Media Desku
+nejsou součástí MC1.
 
 ## Ownership
 
 | Oblast | Vlastník | MC1 přístup |
 |---|---|---|
-| Lokální zdroj | uživatel | read-only metadata |
+| Každý externí zdroj | uživatel / poskytovatel | vždy read-only |
 | `workspace.json` | Media Ingest | read-only identity |
 | Ostatní workspace soubory a ingest SQLite | Media Ingest | žádný |
-| Media Storage | knihovna / budoucí writer | žádný |
+| Media Storage | knihovna / budoucí Transfer writer | MC1 žádný; budoucí pouze ověřená publikace |
 | stdout JSON | Media Connector | jediný výstup |
 | Media Desk a `analysis/` | jejich komponenty | žádný |
