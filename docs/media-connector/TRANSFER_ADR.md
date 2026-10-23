@@ -67,7 +67,7 @@ source paths pro stejné bajty. Doporučen je proto content-addressed layout;
 původní názvy, cesty a historie se zachovají jako metadata, ne jako fyzické
 názvy originálu.
 
-## Navržené rozhodnutí
+## Přijaté rozhodnutí
 
 ### 1. Fyzický objekt
 
@@ -163,7 +163,7 @@ katalogu viditelná, dokud nebude schválen samostatný integrační kontrakt.
 
 ### 5. Persistentní stav a ownership
 
-Navržen je privátní lokální SQLite katalog Media Connectoru pod explicitním
+Implementován je privátní lokální SQLite katalog Media Connectoru pod explicitním
 `connector-state-root`, vázaný na `workspace_id`. Není součástí Media Storage,
 workspace ani ingest SQLite a není veřejným API.
 

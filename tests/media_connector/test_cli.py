@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -72,6 +73,15 @@ def test_cli_error_is_single_json_object(workspace: Path, tmp_path: Path, capsys
 def test_cli_argument_error_is_json(capsys) -> None:
     assert main(["local-discovery"]) == 2
     payload = _json_output(capsys)
+    assert payload["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_module_argv_preserves_transfer_error_contract(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["media-connector", "transfer", "run"])
+    assert main() == 2
+    payload = _json_output(capsys)
+    assert payload["contract"] == "huhac.media-connector.transfer"
+    assert payload["operation"] == "transfer-run"
     assert payload["error"]["code"] == "INVALID_ARGUMENT"
 
 

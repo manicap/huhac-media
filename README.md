@@ -19,11 +19,11 @@ checkpoint currently contains seven implemented components:
   inputs, then independently clusters embeddings into anonymous groups.
 - **Media Desk** provides the read-only gallery, local workspace/originals
   configuration, and S2b orchestration of producer-owned empty archive setup.
-- **Media Connector MC1** provides JSON-only, read-only discovery of a local
-  source tree without opening content or changing the workspace.
+- **Media Connector** provides JSON-only, read-only local discovery and a
+  verified SHA-256 content-addressed Local Media Transfer into Media Storage.
 
 The semantic Normalizer, OCR, cross-asset Similarity, Quality, Audio,
-event interpretation, Media Connector acquisition beyond MC1, and orchestration are future work and
+event interpretation, additional Connector adapters, and orchestration are future work and
 are not implemented.
 
 ## Quick start
@@ -64,6 +64,7 @@ Both commands also work as Python modules:
 python -m huhac_media ingest --input 'D:\Media' --dry-run
 python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
 python -m media_connector local-discovery --workspace 'C:\HUHAC\Workspace' --source-root 'D:\Incoming'
+# Transfer preflight/run/recover commands are documented in docs/media-connector/TRANSFER_JSON_CONTRACT.md.
 ```
 
 ## Documentation
@@ -82,8 +83,8 @@ python -m media_connector local-discovery --workspace 'C:\HUHAC\Workspace' --sou
   licenses for optional model-backed processors.
 - [Media workspace contract](docs/workspace-contract.md): the public JSON
   compatibility boundary and processor ownership rules.
-- [Media Connector MC1](docs/media-connector/README.md): read-only local source
-  discovery, public JSON CLI contract, adapter boundary, and security limits.
+- [Media Connector](docs/media-connector/README.md): read-only local discovery,
+  verified Local Media Transfer, public JSON CLI contracts, and security limits.
 - [System overview](docs/system-overview.md): implemented components, future
   pipeline, architectural decisions, handoff, and milestones.
 - [Architecture](docs/architecture.md) and [data model](docs/data-model.md):
@@ -101,5 +102,6 @@ their own `analysis/<processor>/` namespace.
 ## Project status
 
 Media Ingest Tool v1, Session Grouper v1, Video Keyframe Extractor v1, Vision
-Processor v1, Faces Processor v1, and Media Desk through S2b are implemented.
+Processor v1, Faces Processor v1, Media Desk through S2b, and Media Connector
+Local Transfer are implemented.
 The remaining future processors and storage stages stay out of scope.

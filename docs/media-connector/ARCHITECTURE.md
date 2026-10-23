@@ -4,6 +4,8 @@
 
 **MC1 runtime:** IMPLEMENTED
 
+**Local Media Transfer runtime:** IMPLEMENTED / WINDOWS VERIFIED
+
 ## Účel a identita
 
 Media Connector je samostatný CLI modul pro bezpečné získávání informací a v
@@ -106,24 +108,21 @@ PUBLISH TO MEDIA STORAGE (valid local original)
 SEPARATE MEDIA INGEST OPERATION
 ```
 
-Transfer musí nejprve zapisovat do samostatného bezpečného stagingu a až po
-úplném ověření publikovat vlastní kopii do Media Storage. Nedokončené nebo
-neověřené bajty nesmějí být viditelné jako platné médium. Přesný transakční
-mechanismus, layout a persistence nejsou schválené a nejsou součástí MC1.
-
-Konkrétní doporučená varianta content-addressed Media Storage, odděleného
-same-filesystem stagingu a Connector-owned persistence je **PROPOSED** v
-[MC-ADR-001](TRANSFER_ADR.md). Nejde dosud o implementovaný ani schválený detail.
+Transfer zapisuje do samostatného same-filesystem stagingu a až po dvojím
+SHA-256 ověření publikuje vlastní kopii do Media Storage. Nedokončené nebo
+neověřené bajty nejsou viditelné jako platné médium. Implementovaný mechanismus
+používá SHA-256 CAS, platformní atomic no-replace rename, lokální single-writer
+SQLite a write-ahead recovery podle [MC-ADR-001](TRANSFER_ADR.md).
 
 Převzetí do Media Storage je povinnou podmínkou handoffu. Media Ingest nesmí v
 Connector workflow zpracovávat externí source root, cloud mount ani dočasný
 staging. Dostává pouze publikované lokální originály z Media Storage a spouští
 se samostatnou operací nezávislou na Transferu.
 
-Content identity budoucího Transferu umožní, aby více externích zdrojových
+Content identity Transferu umožňuje, aby více externích zdrojových
 referencí ukazovalo na jediný převzatý originál. Evidence zdrojů, observations
 a transfer historie bude oddělena od samotných originálních souborů. Přesné
-schema a vazba na Ingest zůstávají budoucím integračním kontraktem; nesmějí měnit
+Veřejná vazba provenience na Ingest zůstává budoucím integračním kontraktem; nesmí měnit
 workspace contract v1 ani používat ingest SQLite.
 
 Media Ingest i nadále sám provede SHA-256, určí `asset_id` a publikuje workspace
@@ -138,6 +137,7 @@ nejsou součástí MC1.
 | Každý externí zdroj | uživatel / poskytovatel | vždy read-only |
 | `workspace.json` | Media Ingest | read-only identity |
 | Ostatní workspace soubory a ingest SQLite | Media Ingest | žádný |
-| Media Storage | knihovna / budoucí Transfer writer | MC1 žádný; budoucí pouze ověřená publikace |
+| Media Storage | knihovna / Transfer writer | MC1 žádný; Transfer pouze ověřená atomická publikace |
+| Connector state a manifesty | Media Connector | lokální single-writer SQLite a redigovaný přenositelný manifest |
 | stdout JSON | Media Connector | jediný výstup |
 | Media Desk a `analysis/` | jejich komponenty | žádný |

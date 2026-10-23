@@ -4,6 +4,11 @@
 
 **Etapa MC1:** COMPLETE
 
+**Historický rozsah:** Tento dokument popisuje uzavřenou MC1. Později schválený
+a implementovaný Local Media Transfer popisuje
+[TRANSFER_IMPLEMENTATION_PLAN.md](TRANSFER_IMPLEMENTATION_PLAN.md); původní
+výluky MC1 nejsou tvrzením o dnešním stavu celé komponenty.
+
 ## Přesný rozsah MC1
 
 MC1 přidá samostatný instalovatelný příkaz:
@@ -72,7 +77,8 @@ Nativní Linux confinement zůstává **UNVERIFIED**. Reálný Windows NTFS junc
 smoke proběhl; vytvoření klasického symlinku nebylo účtu povoleno a příslušné
 testy jsou transparentně skipped. Reparse atribut je navíc pokryt unit testem.
 
-## Následující etapy — neautorizované
+## Původně následující etapy
 
-Google Drive discovery, staging/transfer/recovery a handoff do Media Ingestu
-vyžadují samostatné zadání. Po dokončení MC1 se práce zastaví.
+Local staging/transfer/recovery následně schválilo MC-D017 a jsou implementované.
+Google Drive discovery a automatická orchestrace Media Ingestu zůstávají
+neautorizované.

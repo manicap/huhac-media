@@ -2,16 +2,16 @@
 
 The implemented system currently has seven components: Media Ingest Tool v1,
 Session Grouper v1, Video Keyframe Extractor v1, Vision Processor v1, Faces
-Processor v1, the read-only Media Desk, and Media Connector MC1.
+Processor v1, the read-only Media Desk, and Media Connector with Local Transfer.
 Everything else in this overview is explicitly future work.
 
 ```text
 MEDIA SOURCES
     |
     v
-[Media Connector MC1 -- IMPLEMENTED READ-ONLY LOCAL DISCOVERY]
-    local source -> metadata-only enumeration -> versioned JSON
-    no Media Ingest handoff; future acquisition/staging -- NOT IMPLEMENTED
+[Media Connector -- IMPLEMENTED LOCAL DISCOVERY + TRANSFER]
+    read-only local source -> inventory -> verified same-filesystem staging
+    -> SHA-256 CAS publish; Media Ingest remains a separate operation
 
 MEDIA STORAGE / EXPLICIT INPUT
     |
@@ -60,10 +60,12 @@ read-only. S2b setup invokes the producer-owned `huhac-media init` JSON CLI
 without importing ingest internals, validates the result through the public
 contract, and only then stores the local workspace profile.
 
-Media Connector MC1 is an independent CLI source component. It reads only the
-public workspace identity, enumerates local source metadata without opening
-content, and emits a separate JSON contract. It does not write the workspace,
-Media Storage, ingest SQLite, or processor namespaces.
+Media Connector is an independent CLI source component. MC1 reads only the
+public workspace identity and enumerates local metadata. Its Local Transfer
+opens selected sources read-only, verifies a private same-filesystem staging
+copy, and atomically publishes a SHA-256 CAS object into Media Storage. It does
+not write the workspace, ingest SQLite, or processor namespaces and does not
+automatically run Ingest.
 
 Session Grouper is an independent consumer. It reads only the public JSON
 contract and writes only beneath `analysis/session-grouper/`. It groups media by
@@ -91,9 +93,8 @@ version change must produce a distinct result path instead of overwriting old
 results. Expensive AI does not belong in ingest.
 
 Media Connector is the approved name for the independent source component.
-MC1 is limited to read-only local discovery. Future acquisition may include an
-internal collector function that stages content from external or local sources
-while preserving provenance; its transaction and orchestration remain open.
+Local discovery and Local Media Transfer are implemented. Additional adapters,
+including Google Drive, and automatic orchestration remain future work.
 
 ## Architectural decisions
 

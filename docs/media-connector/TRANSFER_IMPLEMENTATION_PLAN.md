@@ -1,14 +1,14 @@
 # Media Transfer — detailní implementační plán
 
-**Stav:** ACCEPTED / IMPLEMENTATION IN PROGRESS
+**Stav:** IMPLEMENTED PRO LOCAL / WINDOWS VERIFIED / LINUX UNVERIFIED
 
-**Runtime:** PARTIAL UNTIL ALL ACCEPTANCE TESTS PASS
+**Runtime:** IMPLEMENTED; síťové filesystemy a Google Drive nejsou součástí
 
 Plán vychází ze schváleného [TRANSFER_ADR.md](TRANSFER_ADR.md).
 
 ## Veřejná a interní rozhraní
 
-### Navržené JSON CLI
+### Implementované JSON CLI
 
 ```powershell
 media-connector transfer preflight `
@@ -155,7 +155,7 @@ nepodporovaný, dokud neprojde samostatnou kvalifikací atomicity/durability.
 | Ingest | dnešní CLI nad CAS rootem, v1 catalog, nezměněný SQLite ownership |
 | Ochrana dat | unknown final object, existing mismatch a cizí state se nikdy nepřepíší |
 
-## Commity navržené pro budoucí realizaci
+## Logické implementační celky
 
 1. kontrakty, error codes a compatibility fixtures;
 2. Connector state schema, preflight a locks;

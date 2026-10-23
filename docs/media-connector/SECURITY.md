@@ -2,7 +2,9 @@
 
 **MC1:** IMPLEMENTED
 
-**Transfer a cloud bezpečnost:** PROPOSED / NOT IMPLEMENTED
+**Transfer bezpečnost:** IMPLEMENTED PRO LOCAL / WINDOWS VERIFIED
+
+**Cloud bezpečnost:** PROPOSED / NOT IMPLEMENTED
 
 ## Implementované hranice MC1
 
@@ -25,11 +27,21 @@ Filesystem se může měnit během enumerace a MC1 nedrží snapshot ani otevře
 handles souborů. Výsledek je proto bezpečný read-only observation, nikoli důkaz
 integrity nebo úplnosti v jednom časovém okamžiku.
 
-## Budoucí staging a transfer
+## Implementovaný staging a transfer
 
-Schválen je pouze směr samostatného stagingu před Media Storage. Atomická
-publikace, limity, recovery, writer, persistence a retence zůstávají otevřené a
-v MC1 není žádný cílový zápis.
+- Zdroj se otevírá pouze read-only po nové kontrole object ID, confinement,
+  link/reparse ochrany a očekávané verze.
+- Všechny rooty existují předem, vzájemně se nepřekrývají a staging sdílí
+  filesystem s Media Storage.
+- SHA-256 se počítá při streamování a znovu z uzavřeného staged souboru.
+- Finální cesta vzniká pouze z lowercase SHA-256 a allowlisted canonical suffixu.
+- Publikace přesouvá celý item adresář atomic no-replace operací; existující cíl
+  se plně rehashuje a nikdy nepřepisuje.
+- SQLite zapisuje `publishing` před filesystem operací; recovery adoptuje cíl až
+  po plném ověření a nevyžaduje dostupný externí zdroj.
+- Lokální OS lock povoluje jediného writera. Multi-host a síťové filesystemy
+  nejsou podporované.
+- Partial staging ani konfliktní objekt se automaticky nemažou nebo neopravují.
 
 ## Budoucí Google Drive
 

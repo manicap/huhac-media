@@ -215,3 +215,30 @@ def test_source_content_is_never_opened(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(Path, "open", guarded_open)
     page = LocalFilesystemAdapter(source).list_page(page_size=10, cursor=None)
     assert [item.logical_path for item in page.items] == ["photo.jpg"]
+
+
+def test_transfer_open_rejects_file_identity_swap(monkeypatch, tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    media = source / "photo.jpg"
+    replacement = source / "replacement.jpg"
+    _touch(media, b"original")
+    _touch(replacement, b"replacement")
+    adapter = LocalFilesystemAdapter(source)
+    item = next(item for item in adapter.list_page(page_size=10, cursor=None).items if item.logical_path == "photo.jpg")
+    original_open = os.open
+
+    def swapped_open(path, flags, *args, **kwargs):
+        if Path(path) == media.resolve():
+            return original_open(replacement, flags, *args, **kwargs)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", swapped_open)
+    with pytest.raises(ConnectorError) as caught:
+        with adapter.open_read(
+            object_id=item.object_id,
+            logical_path=item.logical_path,
+            expected_version=item.version_token,
+        ):
+            pass
+    assert caught.value.code == "SOURCE_CHANGED"

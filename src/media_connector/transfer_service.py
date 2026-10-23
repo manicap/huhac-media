@@ -122,7 +122,7 @@ def _copy_to_stage(adapter: LocalFilesystemAdapter, item: Any, stage_directory: 
 
 
 def _verify_and_name_stage(partial: Path, expected_hash: str, expected_size: int) -> tuple[Path, str]:
-    verified_hash, verified_size = hash_file(partial)
+    verified_hash, verified_size = hash_file(partial, confinement_root=partial.parent)
     if verified_hash != expected_hash or verified_size != expected_size:
         raise ConnectorError("STAGED_CONTENT_MISMATCH", "staged payload failed independent verification", 4)
     compatible = classify_content(partial)
@@ -289,6 +289,7 @@ def transfer_run(
                 except ConnectorError as exc:
                     repository.update_item(run_id, item_id, "failed", _now(), error_code=exc.code)
                     repository.finish_run(run_id, "failed", _now())
+                    _manifest(repository, roots.state_root, workspace_id, run_id)
                     raise
             repository.finish_run(run_id, "complete", _now())
             manifest = _manifest(repository, roots.state_root, workspace_id, run_id)
@@ -359,7 +360,9 @@ def transfer_recover(
                 existing = store.inspect_existing(content_hash, size)
                 if existing is None:
                     stage = _recovery_stage(row["staging_path"], roots, suffix)
-                    staged_hash, staged_size = hash_file(stage / f"payload.{suffix}")
+                    staged_hash, staged_size = hash_file(
+                        stage / f"payload.{suffix}", confinement_root=roots.work_root
+                    )
                     compatible = classify_content(stage / f"payload.{suffix}")
                     if staged_hash != content_hash or staged_size != size or compatible.canonical_suffix != suffix:
                         raise ConnectorError("RECOVERY_EVIDENCE_INVALID", "staged evidence failed verification", 4)

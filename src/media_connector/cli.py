@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -75,16 +76,17 @@ def _emit(payload: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    if argv and argv[:2] == ["transfer", "preflight"]:
+    effective_argv = argv if argv is not None else sys.argv[1:]
+    if effective_argv[:2] == ["transfer", "preflight"]:
         operation = "transfer-preflight"
-    elif argv and argv[:2] == ["transfer", "run"]:
+    elif effective_argv[:2] == ["transfer", "run"]:
         operation = "transfer-run"
-    elif argv and argv[:2] == ["transfer", "recover"]:
+    elif effective_argv[:2] == ["transfer", "recover"]:
         operation = "transfer-recover"
     else:
         operation = OPERATION
     try:
-        args = build_parser().parse_args(argv)
+        args = build_parser().parse_args(effective_argv)
         if args.command == "local-discovery":
             payload = discover_local(
                 workspace=args.workspace,

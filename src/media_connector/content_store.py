@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from media_connector.adapters.local import _is_link_like
+from media_connector.compatibility import CANONICAL_SUFFIXES
 from media_connector.errors import ConnectorError
 
 
@@ -21,14 +22,33 @@ class ExistingObject:
     suffix: str
 
 
-def hash_file(path: Path) -> tuple[str, int]:
+def hash_file(path: Path, *, confinement_root: Path | None = None) -> tuple[str, int]:
     digest = hashlib.sha256()
     size = 0
     try:
-        with path.open("rb") as stream:
+        before = os.lstat(path)
+        if _is_link_like(before) or not stat.S_ISREG(before.st_mode):
+            raise ConnectorError("UNSAFE_CONTENT_PATH", "content path is not a regular non-link file", 4)
+        if confinement_root is not None:
+            resolved = path.resolve(strict=True)
+            root = confinement_root.resolve(strict=True)
+            if root not in resolved.parents:
+                raise ConnectorError("UNSAFE_CONTENT_PATH", "content path escaped its root", 4)
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            os.close(descriptor)
+            raise ConnectorError("CONTENT_CHANGED", "content object changed while it was opened", 4, True)
+        with os.fdopen(descriptor, "rb", closefd=True) as stream:
             while chunk := stream.read(CHUNK_SIZE):
                 digest.update(chunk)
                 size += len(chunk)
+        after = os.lstat(path)
+        if _is_link_like(after) or (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino):
+            raise ConnectorError("CONTENT_CHANGED", "content object changed during verification", 4, True)
+    except ConnectorError:
+        raise
     except OSError as exc:
         raise ConnectorError("CONTENT_READ_FAILED", "content cannot be read for verification", 4, True) from exc
     return digest.hexdigest(), size
@@ -89,6 +109,9 @@ class ContentStore:
             if len(entries) != 1 or not entries[0].name.startswith("payload."):
                 raise ConnectorError("CONTENT_OBJECT_CORRUPT_OR_COLLISION", "content object layout is invalid", 4)
             payload = entries[0]
+            suffix = payload.suffix[1:]
+            if suffix not in CANONICAL_SUFFIXES or payload.name != f"payload.{suffix}":
+                raise ConnectorError("CONTENT_OBJECT_CORRUPT_OR_COLLISION", "content payload suffix is not allowed", 4)
             payload_info = os.lstat(payload)
             if _is_link_like(payload_info) or not stat.S_ISREG(payload_info.st_mode):
                 raise ConnectorError("CONTENT_OBJECT_CORRUPT_OR_COLLISION", "content payload is unsafe", 4)
@@ -96,14 +119,14 @@ class ContentStore:
             raise
         except OSError as exc:
             raise ConnectorError("CONTENT_OBJECT_INSPECTION_FAILED", "content object cannot be inspected", 4, True) from exc
-        actual_hash, actual_size = hash_file(payload)
+        actual_hash, actual_size = hash_file(payload, confinement_root=self.root)
         if actual_hash != content_hash or actual_size != expected_size:
             raise ConnectorError(
                 "CONTENT_OBJECT_CORRUPT_OR_COLLISION",
                 "existing content object does not match its SHA-256 identity",
                 4,
             )
-        return ExistingObject(payload, payload.relative_to(self.root).as_posix(), payload.suffix[1:])
+        return ExistingObject(payload, payload.relative_to(self.root).as_posix(), suffix)
 
     def ensure_parent(self, content_hash: str) -> Path:
         current = self.root

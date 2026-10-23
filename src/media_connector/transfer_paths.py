@@ -65,6 +65,7 @@ def validate_roots(
     except OSError as exc:
         raise configuration_error("ROOT_UNAVAILABLE", f"root filesystem cannot be inspected: {exc}") from exc
     _require_local_filesystem(roots.media_storage)
+    _require_local_filesystem(roots.state_root)
     return roots
 
 
@@ -96,6 +97,7 @@ def validate_recovery_roots(
             "transfer work root must be on the same filesystem as media storage",
         )
     _require_local_filesystem(roots.media_storage)
+    _require_local_filesystem(roots.state_root)
     return roots
 
 

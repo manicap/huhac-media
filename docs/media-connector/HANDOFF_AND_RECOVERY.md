@@ -2,11 +2,10 @@
 
 **Architektonické invarianty:** ACCEPTED/TARGET
 
-**Transfer runtime:** NOT IMPLEMENTED
+**Transfer runtime:** IMPLEMENTED PRO LOCAL / WINDOWS VERIFIED
 
-Tento dokument definuje schválené hranice budoucího Transferu. Layout,
-persistence a transakční mechanismus jsou stále návrh a musí projít samostatným
-ADR před implementací.
+Tento dokument popisuje implementované hranice lokálního Transferu. Layout,
+persistence a transakční mechanismus schvaluje MC-D017 a MC-ADR-001.
 
 Posuzovaný konkrétní návrh je v [TRANSFER_ADR.md](TRANSFER_ADR.md); detailní
 testovací a realizační pořadí v
@@ -29,42 +28,40 @@ testovací a realizační pořadí v
   od souborů originálů.
 - Externí originál se nikdy neupravuje, nepřejmenovává, nepřesouvá ani nemaže.
 
-## Navržený delivery model
+## Implementovaný delivery model
 
 Jednotkou práce je transfer run s UUID. Pracovní bajty vznikají pouze v
 soukromém stagingu. Publikace do Media Storage nastane až po úplném přenosu a
 ověření; publikovaný originál se následně nepřepisuje.
 
 ```text
-connector-state/                   # oddělená evidence; přesné schema OPEN
-  profile.json
-  state.<open-format>
-  runs/<run-id>/report.json
-  manifests/<delivery-id>.json
+connector-state/                   # lokální evidence svázaná s workspace_id
+  connector-state.sqlite3
+  .transfer.lock
+  manifests/<operation-id>.json
 
-private-staging/
-  <transfer-id>.partial/            # nikdy není platné médium
+transfer-work/staging/<run-id>/
+  <item-id>.partial/                # nikdy není platné médium
 
-Media Storage/
-  <approved-layout>/...             # pouze ověřené lokální originály
+Media Storage/objects/sha256/<prefix>/<sha256>/
+  payload.<canonical-suffix>        # pouze ověřený lokální originál
 ```
 
-Přesný staging a Media Storage layout čekají na MC-Q01. Connector state nesmí
-být ve workspace, v `analysis/` ani vložen do souborů originálů. Konkrétní
-persistence zatím není schválená; případná lokální SQLite by byla privátní,
-single-writer a zcela oddělená od ingest DB.
+Connector state nesmí být ve workspace, v `analysis/`, Media Storage ani vložen
+do originálů. SQLite je privátní, lokální, single-writer a zcela oddělená od
+ingest DB. Stabilní veřejný kontrakt je JSON CLI a provenance manifest, nikoli DB
+schema.
 
-## Budoucí handoff manifest
+## Implementovaný provenance manifest
 
-Navržený `media-connector-handoff-v1` je kontrakt Connectoru, nikoli rozšíření
-workspace contractu v1. Má odděleně evidovat:
+`huhac.media-connector.provenance` v1 je kontrakt Connectoru, nikoli rozšíření
+workspace contractu v1. Odděleně eviduje:
 
-- `schema`, `delivery_id`, `library_id`, `created_at`;
-- zdrojové reference a jejich observations bez tajných údajů;
+- `contract`, `contract_version`, `workspace_id` a `run_id`;
+- zdrojové reference, jejich version token a logickou cestu bez absolutního rootu;
 - vazbu více zdrojových referencí na content identity převzatého originálu;
 - výslednou relativní cestu v Media Storage, velikost a ověřovací hash;
-- stav transferu, strukturovanou chybu a auditní historii;
-- souhrny a otisk kanonického manifestu.
+- dokončený stav, Compatibility Profile, velikost a CAS relativní cestu.
 
 Absolutní externí cesty, OAuth tokeny a dočasné signed URL se nepublikují.
 Transfer content identity se nesmí automaticky vydávat za ingest `asset_id`;
@@ -73,14 +70,15 @@ Media Ingest obsah znovu hashovat musí.
 ## Stavový automat
 
 ```text
-planned -> discovering -> transferring -> verifying -> publishing -> complete
-                              |              |             |
-                              +--------------+-------------+-> failed
-                              +------------------------------> interrupted
+pending -> transferring -> verified_staged -> publishing
+   |            |                |                |
+   +------------+----------------+----------------+-> failed / interrupted
+                                                    -> published
+                                                    -> deduplicated_existing
+                                                    -> recovered_published
 ```
 
-Stavy položky jsou navrženy jako `pending`, `transferring`, `verified`,
-`published`, `failed` a `skipped_duplicate`. Přechod na `verified` smí nastat až
+Přechod na `verified_staged` smí nastat až
 po uzavření streamu, kontrole očekávané velikosti/verze a výpočtu content
 identity. `complete` znamená publikovaný ověřený originál a evidenci; neznamená,
 že proběhl Ingest.

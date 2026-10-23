@@ -243,15 +243,15 @@ def test_unknown_target_layout_fails_without_overwrite(workspace: Path, tmp_path
     digest = hashlib.sha256(content).hexdigest()
     target = storage / "objects" / "sha256" / digest[:2] / digest
     target.mkdir(parents=True)
-    evidence = target / "unknown.bin"
-    evidence.write_bytes(b"do-not-touch")
+    evidence = target / "payload.exe"
+    evidence.write_bytes(content)
     selection = tmp_path / "selection.json"
     write_selection(source, selection)
 
     assert main(run_args(workspace, storage, state, work, selection)) == 4
     payload = json.loads(capsys.readouterr().out)
     assert payload["error"]["code"] == "CONTENT_OBJECT_CORRUPT_OR_COLLISION"
-    assert evidence.read_bytes() == b"do-not-touch"
+    assert evidence.read_bytes() == content
 
 
 def test_unsupported_content_is_not_published(workspace: Path, tmp_path: Path, capsys) -> None:

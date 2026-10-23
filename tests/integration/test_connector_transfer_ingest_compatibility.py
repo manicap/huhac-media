@@ -16,8 +16,20 @@ from media_connector.transfer_service import transfer_run
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.parametrize(
+    ("content", "expected_type", "expected_format", "expected_suffix"),
+    [
+        (b"\xff\xd8\xff" + b"connector-ingest" * 100, MediaType.IMAGE, "JPEG", "jpg"),
+        (
+            bytes(bytearray([0x47]) + bytearray(187) + bytearray([0x47]) + bytearray(187) + bytearray([0x47]) + bytearray(223)),
+            MediaType.VIDEO,
+            "MTS",
+            "mts",
+        ),
+    ],
+)
 def test_published_cas_payload_is_discovered_by_unchanged_ingest_scanner(
-    tmp_path: Path
+    tmp_path: Path, content: bytes, expected_type: MediaType, expected_format: str, expected_suffix: str
 ) -> None:
     workspace = tmp_path / "workspace"
     source = tmp_path / "source"
@@ -35,7 +47,6 @@ def test_published_cas_payload_is_discovered_by_unchanged_ingest_scanner(
         ),
         encoding="utf-8",
     )
-    content = b"\xff\xd8\xff" + b"connector-ingest" * 100
     (source / "misleading.png").write_bytes(content)
     adapter = LocalFilesystemAdapter(source)
     item = adapter.list_page(page_size=10, cursor=None).items[0]
@@ -59,7 +70,8 @@ def test_published_cas_payload_is_discovered_by_unchanged_ingest_scanner(
 
     scanned = Scanner().scan(storage)
     assert len(scanned) == 1
-    assert scanned[0].media_type == MediaType.IMAGE
-    assert scanned[0].format == "JPEG"
+    assert scanned[0].media_type == expected_type
+    assert scanned[0].format == expected_format
     assert scanned[0].sha256 == hashlib.sha256(content).hexdigest()
     assert scanned[0].relative_path.as_posix() == result["run"]["items"][0]["relative_path"]
+    assert scanned[0].absolute_path.suffix == f".{expected_suffix}"

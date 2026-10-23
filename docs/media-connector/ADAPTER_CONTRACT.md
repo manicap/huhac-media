@@ -24,9 +24,11 @@ list_page(page_size, cursor) -> ObjectPage
 - `size_bytes`, `mtime_ns` a UTC `modified_at`;
 - `object_kind: file`, `media_type_hint: null` a `source_checksum: null`.
 
-MC1 neotevírá obsah. Operace `open_read`, provider checksum, transfer a
-snapshotování tedy nejsou v implementovaném Protocolu. Budoucí rozšíření
-kontraktu pro transfer vyžaduje samostatné schválení.
+MC1 discovery neotevírá obsah a společný `SourceAdapter` Protocol proto zůstává
+metadata-only. Schválený Local Transfer používá oddělený interní read-only port
+`open_read(object_id, logical_path, expected_version)` konkrétního lokálního
+adaptéru. Budoucí adaptéry musí dodat ekvivalentní read-only SourceReader port,
+aniž by do discovery Protocolu přidaly mutační operace.
 
 ## Pagination
 

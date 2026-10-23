@@ -306,6 +306,9 @@ class LocalFilesystemAdapter:
             if not stat.S_ISREG(opened.st_mode):
                 os.close(descriptor)
                 raise source_error("UNSAFE_PATH", "opened source is not a regular file", retryable=False)
+            if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+                os.close(descriptor)
+                raise source_error("SOURCE_CHANGED", "source object changed while it was opened")
             stream = os.fdopen(descriptor, "rb", closefd=True)
         except ConnectorError:
             raise
@@ -314,6 +317,8 @@ class LocalFilesystemAdapter:
         with stream:
             yield stream
         _, after = self._resolve_file(object_id, logical_path)
+        if (after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino):
+            raise source_error("SOURCE_CHANGED", "source object identity changed during transfer")
         after_version = f"local-stat-v1:{after.st_size}:{after.st_mtime_ns}"
         if after_version != expected_version:
             raise source_error("SOURCE_CHANGED", "source version changed during transfer")

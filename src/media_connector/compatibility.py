@@ -7,6 +7,7 @@ from media_connector.errors import ConnectorError
 
 
 PROFILE_ID = "ingest-compatibility-v1"
+CANONICAL_SUFFIXES = frozenset({"jpg", "png", "tif", "webp", "avi", "mkv", "heic", "mov", "mp4", "mts", "m2ts"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,4 +62,3 @@ def classify_content(path: Path) -> CompatibleFormat:
             False,
         )
     return detected
-
