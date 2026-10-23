@@ -62,9 +62,7 @@ def test_preflight_rejects_symlink(tmp_path: Path) -> None:
     assert result.error and result.error.code == "PATH_IDENTITY_CHANGED"
 
 
-def test_cli_emits_one_machine_readable_document(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("huhac_media.services.archive_init.classify_filesystem", local)
-    # Default binding is captured by the function, so use existing native-local temp roots.
+def test_cli_emits_one_machine_readable_document(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code = main([
         "init", "--storage", str(tmp_path / "storage"), "--workspace",
         str(tmp_path / "workspace"), "--preflight", "--json",
@@ -75,4 +73,14 @@ def test_cli_emits_one_machine_readable_document(tmp_path: Path, capsys: pytest.
     assert payload["schema_version"] == 1
     assert payload["state"] == "preflight_ok"
     assert payload["error"] is None
+    assert output.err == ""
+
+
+def test_cli_argument_error_is_also_json(capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["init", "--storage", "missing-workspace", "--json"])
+    output = capsys.readouterr()
+    payload = json.loads(output.out)
+    assert code == 2
+    assert payload["state"] == "rejected"
+    assert payload["error"]["code"] == "INVALID_ARGUMENTS"
     assert output.err == ""

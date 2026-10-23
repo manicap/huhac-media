@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import redirect_stderr
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
+import sys
+from uuid import uuid4
 
 from huhac_media import __version__
 from huhac_media.config import ConfigError, load_config
@@ -12,7 +16,7 @@ from huhac_media.exit_codes import ExitCode
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PreviewGenerator
 from huhac_media.services.ingest import IngestService
-from huhac_media.services.archive_init import InitError, initialize_archive, preflight_archive_init
+from huhac_media.services.archive_init import InitError, InitResult, initialize_archive, preflight_archive_init
 from huhac_media.services.planner import CatalogSnapshot, Planner
 from huhac_media.services.preflight import render_preflight
 from huhac_media.services.scanner import Scanner
@@ -49,7 +53,30 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw_arguments = list(argv) if argv is not None else sys.argv[1:]
+    if raw_arguments[:1] == ["init"] and "--json" in raw_arguments:
+        try:
+            with redirect_stderr(StringIO()):
+                args = build_parser().parse_args(raw_arguments)
+        except SystemExit as exc:
+            if exc.code == 0:
+                return ExitCode.SUCCESS
+            def value_after(flag: str) -> str:
+                try:
+                    return raw_arguments[raw_arguments.index(flag) + 1]
+                except (ValueError, IndexError):
+                    return ""
+            result = InitResult(
+                str(uuid4()),
+                "rejected",
+                value_after("--storage"),
+                value_after("--workspace"),
+                error=InitError("INVALID_ARGUMENTS", "invalid or missing init arguments"),
+            )
+            print(result.to_json())
+            return ExitCode.USAGE_OR_CONFIG
+    else:
+        args = build_parser().parse_args(raw_arguments)
     if args.command == "init":
         result = preflight_archive_init(
             args.storage, args.workspace, operation_id=args.operation_id

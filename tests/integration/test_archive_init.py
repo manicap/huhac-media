@@ -9,6 +9,12 @@ from uuid import uuid4
 import pytest
 
 from huhac_media.services.archive_init import SimulatedInterruption, initialize_archive
+from faces.contract import load_workspace as load_faces
+from media_desk.contract import load_workspace as load_media_desk
+from session_grouper.contract import load_workspace as load_sessions
+from session_grouper.models import GroupingConfig
+from video_keyframes.contract import load_workspace as load_keyframes
+from vision.contract import load_workspace as load_vision
 
 
 def local(_: Path) -> str:
@@ -131,3 +137,16 @@ def test_concurrent_initialization_has_one_writer(tmp_path: Path) -> None:
     assert competing.state == "failed_recoverable"
     assert competing.error and competing.error.code == "INITIALIZATION_BUSY"
     assert holder and holder[0].state == "ready"
+
+
+@pytest.mark.integration
+def test_empty_catalog_is_accepted_by_all_public_consumers(tmp_path: Path) -> None:
+    result = initialize_archive(
+        tmp_path / "media", tmp_path / "workspace", str(uuid4()), classifier=local
+    )
+    workspace = Path(result.workspace_path)
+    assert load_media_desk(workspace).assets == ()
+    assert load_sessions(workspace, GroupingConfig()).observations == ()
+    assert load_keyframes(workspace).assets == ()
+    assert load_vision(workspace).inputs == ()
+    assert load_faces(workspace).inputs == ()
