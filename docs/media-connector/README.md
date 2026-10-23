@@ -1,6 +1,6 @@
 # HUHÁČ Media Connector
 
-**Stav:** ARCHITECTURAL PROPOSAL / AWAITING APPROVAL
+**Stav:** ARCHITECTURAL DIRECTION ACCEPTED / MC1 AUTHORIZED
 
 **Implementace:** ABSENT
 
@@ -30,13 +30,11 @@ napojení na Media Ingest.
   zotavení;
 - [SECURITY.md](SECURITY.md) — bezpečnostní hranice a oprávnění;
 - [DECISIONS.md](DECISIONS.md) — přijaté hranice, návrhy a otevřené otázky;
-- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — navržené etapy a akceptace;
+- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — rozsah MC1 a akceptace;
+- [MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md) — veřejné JSON CLI schema;
 - [STATUS.md](STATUS.md) — skutečný stav a podklady auditu.
 
-## Terminologický rozpor k rozhodnutí
+## Terminologie
 
-Současný [system overview](../system-overview.md) používá pracovní název
-**Media Collector** pro dosud neimplementovanou komponentu se stejnou základní
-odpovědností. Tento návrh doporučuje, aby **Media Connector** tento budoucí pojem
-nahradil. Globální dokumentace zatím nebyla přepsána, protože přejmenování čeká
-na architektonické schválení (MC-Q01 v [DECISIONS.md](DECISIONS.md)).
+Oficiálním názvem komponenty je **Media Connector**. Pojem **Media Collector**
+je vyhrazen jen případné budoucí interní funkci převzetí médií.

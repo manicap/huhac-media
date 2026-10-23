@@ -1,63 +1,76 @@
-# Media Connector — navržený implementační plán
+# Media Connector — implementační plán
 
-**Stav:** PROPOSED / AWAITING APPROVAL
+**Architektonický směr:** ACCEPTED
 
-**Aktuální etapa:** dokumentace pouze; žádný bod níže není implementovaný
+**Aktivní etapa:** MC1 — read-only Local Discovery
 
-## MC1 — read-only lokální discovery (doporučená první etapa)
+## Přesný rozsah MC1
 
-MC1 záměrně nečeká na rozhodnutí o zápisu do Media Storage. Dodá samostatný
-balíček, společné doménové typy, lokální adaptér a strojově čitelný dry-run.
+MC1 přidá samostatný instalovatelný příkaz:
 
-Navržený rozsah:
+```powershell
+media-connector local-discovery `
+  --workspace 'C:\HUHAC\Workspace' `
+  --source-root 'D:\Incoming' `
+  --page-size 1000 `
+  [--cursor '<opaque-cursor>']
+```
 
-1. veřejný JSON kontrakt dry-run výstupu včetně stabilních chybových kódů;
-2. `SourceAdapter` protocol a contract test suite;
-3. lokální read-only adaptér s deterministickou stránkovanou enumerací;
-4. confinement, symlink/reparse-point ochrana a kontrola změny souboru;
-5. plánovací výstup na stdout nebo atomicky do explicitního souboru;
-6. žádné kopírování, journal DB, OAuth, workspace zápisy ani spuštění Ingestu.
+Výstup je vždy právě jeden UTF-8 JSON objekt na stdout. Úspěch má exit code `0`,
+chyba argumentu či kontraktu `2` a zdrojová/I/O chyba `3`. Text chyb se nikdy
+nemusí parsovat. Přesné schema a kódy jsou v
+[MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md).
 
-### Akceptační kritéria MC1
+Implementované části:
 
-- stejný nezměněný strom vytvoří deterministicky ekvivalentní plán;
-- soubor a adresář unikající přes symlink/reparse point jsou odmítnuty;
-- traversal, absolutní a platformně nebezpečné cesty jsou odmítnuty;
-- změna velikosti/mtime mezi plánem a otevřením má stabilní
-  `SOURCE_CHANGED` výsledek;
-- permission denied, offline root, neexistující kořen a kolize jsou rozlišeny
-  strojovými kódy;
-- Windows i nativní Linux mají cílené filesystem testy; neprovedená platforma
-  zůstane označena **UNVERIFIED**;
-- žádný test ani runtime zápis nenastane ve workspace, Media Storage nebo ingest
-  SQLite;
-- code-versus-documentation kontrola potvrdí, že status nehlásí transfer či
-  Google Drive jako hotový.
+1. balíček `media_connector` nezávislý na Media Desku a Ingest internals;
+2. společné immutable typy a `SourceAdapter` protocol;
+3. minimální read-only validace `workspace.json` v1 a `workspace_id`;
+4. bezpečný lokální adaptér s deterministickým pořadím;
+5. opaque, source-bound cursor a omezená velikost stránky;
+6. JSON CLI s verzovaným envelope a stabilními chybovými kódy;
+7. cílené unit/CLI/security testy na Windows a platformně neutrální testy.
 
-## MC2 — Google Drive read-only discovery
+Výslovně mimo MC1 jsou čtení obsahu, SHA-256, detekce médií, kopie, staging,
+manifest na disku, databáze, konfigurace profilu, OAuth, Google Drive, Media
+Desk, spuštění Ingestu a jakákoli změna workspace.
 
-Po schválení auth a privacy rozhodnutí doplní samostatný Google Drive adaptér,
-OAuth, stránkování, kvóty, shared-drive politiku a fake-server contract testy.
-MC2 ještě nemusí stahovat obsah. Povinné jsou testy redakce tokenů, expirace,
-odvolaného souhlasu, pagination restartu, shortcut cyklu a cloud dokumentu.
+## Implementační kroky
 
-## MC3 — transfer, ověření a recovery
+1. Přidat typy `SourceObject`, `ObjectPage`, `AdapterCapabilities`, warning a
+   strukturovanou chybu.
+2. Implementovat lokální root validaci, link/reparse odmítnutí, bezpečný walk,
+   path validaci a detekci normalizačních kolizí.
+3. Implementovat cursor založený na schema verzi, source ID a poslední logické
+   cestě; při změně zdroje cursor odmítnout.
+4. Implementovat read-only workspace identity reader bez importu Ingestu.
+5. Přidat JSON-only CLI a entry point `media-connector`.
+6. Ověřit nulové persistentní zápisy a synchronizovat dokumentaci se skutečným
+   výsledkem.
 
-Začne až po schválení MC-Q03, MC-Q04, kolizní a retenční politiky. Implementuje
-dočasné soubory, limity, SHA-256 transferu, journal, restart a atomickou
-publikaci immutable delivery. Fault-injection testy pokryjí přerušení po každé
-stavové hraně, plný disk, změnu zdroje, síťový timeout a opakovaný publish.
+## Akceptační testy MC1
 
-## MC4 — explicitní handoff
+- platný workspace v1 vrátí jeho přesné `workspace_id`;
+- chybějící, malformed a unsupported workspace mají rozdílné stabilní kódy;
+- prázdný zdroj vrátí úspěšnou prázdnou stránku;
+- Unicode a vnořené názvy jsou deterministicky seřazené a používají `/`;
+- pagination nevrací položku dvakrát a cursor je vázán na source ID;
+- absolutní, traversal, NUL, Windows device/ADS a normalizačně kolidující
+  logické cesty jsou odmítnuty;
+- file/directory symlink a Windows reparse point nejsou následovány a jsou
+  vykázány jako bezpečně přeskočené warnings;
+- link/reparse source root je odmítnut;
+- chybějící root, neadresář, permission error a dostupná offline OS signalizace
+  mají strukturované chyby;
+- discovery neotevře obsah souboru a nemění zdroj ani workspace;
+- opakované spuštění nad nezměněným stromem vrátí ekvivalentní položky;
+- CLI na úspěch i chybu vytiskne právě jeden validní JSON objekt;
+- import graph balíčku neobsahuje `media_desk` ani `huhac_media`.
 
-Ověří interoperabilitu hotové delivery s nezměněným Media Ingest CLI. Bez
-samostatného schválení nepřidá automatickou orchestraci ani změnu workspace
-contractu. End-to-end test musí dokázat, že Ingest sám určí SHA-256 asset identity
-a Connector nečte jeho SQLite.
+Nativní Linux confinement a skutečné Windows junction/reparse chování se musí
+uvádět jako **UNVERIFIED**, pokud neproběhne odpovídající platformní test.
 
-## Dokumentační brány každé etapy
+## Následující etapy — neautorizované
 
-Před implementací se znovu porovná tento návrh s kódem a aktuální projektovou
-dokumentací. Ve stejné změně se aktualizují alespoň zdejší `STATUS.md`,
-`DECISIONS.md`, relevantní kontrakt a uživatelský návod. Globální dokumenty se
-změní jen po schválení názvosloví a integračních rozhodnutí.
+Google Drive discovery, staging/transfer/recovery a handoff do Media Ingestu
+vyžadují samostatné zadání. Po dokončení MC1 se práce zastaví.

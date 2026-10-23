@@ -9,7 +9,7 @@ Everything else in this overview is explicitly future work.
 MEDIA SOURCES
     |
     v
-[FUTURE: Media Collector -- NOT IMPLEMENTED]
+[FUTURE: Media Connector -- MC1 AUTHORIZED, NOT YET IMPLEMENTED]
     external/local source -> collect/download -> provenance -> local inbox
     |
     v
@@ -82,10 +82,10 @@ namespace under `analysis/<processor>/`. A model, configuration, or processor
 version change must produce a distinct result path instead of overwriting old
 results. Expensive AI does not belong in ingest.
 
-The future Media Collector has one intended responsibility: move or download
-content from an external or local source into a local inbox while preserving
-collection provenance. Its API, storage design, and orchestration are not
-defined here.
+Media Connector is the approved name for the independent source component.
+MC1 is limited to read-only local discovery. Future acquisition may include an
+internal collector function that stages content from external or local sources
+while preserving provenance; its transaction and orchestration remain open.
 
 ## Architectural decisions
 

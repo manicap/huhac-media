@@ -21,7 +21,7 @@ checkpoint currently contains six implemented components:
   configuration, and S2b orchestration of producer-owned empty archive setup.
 
 The semantic Normalizer, OCR, cross-asset Similarity, Quality, Audio,
-event interpretation, a Media Collector, and orchestration are future work and
+event interpretation, Media Connector acquisition beyond MC1, and orchestration are future work and
 are not implemented.
 
 ## Quick start

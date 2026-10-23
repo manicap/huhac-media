@@ -9,10 +9,11 @@
 ## Skutečný stav
 
 - **IMPLEMENTED:** samostatná vývojová větev a dokumentační prostor.
-- **ACCEPTED/TARGET:** jeden klient = jedna knihovna; oddělené local/Google Drive
-  adaptéry; zachování workspace contract v1; izolace od ingest SQLite.
-- **PROPOSED:** architektura, adapter contract, immutable delivery, handoff
-  manifest, recovery model, privátní stav a OAuth bezpečnostní model.
+- **ACCEPTED/TARGET:** oficiální název Media Connector; jeden klient = jedna
+  knihovna; `workspace_id` jako identita; samostatné adaptéry; CLI modul;
+  zachování workspace contract v1; izolace od ingest SQLite; rozsah MC1.
+- **PROPOSED:** budoucí staging, handoff manifest, recovery model, privátní stav
+  a OAuth bezpečnostní model.
 - **ABSENT:** runtime kód, CLI, lokální adaptér, Google Drive adaptér, transfer,
   journal, handoff a integrace s Media Ingestem.
 - **UNVERIFIED:** Google API chování, Windows reparse-point implementace,
@@ -29,10 +30,8 @@ Před návrhem byly porovnány:
   `docs/media-desk/DECISIONS.md` a `docs/media-desk/ROADMAP.md`;
 - lokální a vzdálený commit větve `mediadesk` po `git fetch`.
 
-Zjištěný materiální rozpor je pouze názvoslovný: existující dokumentace uvádí
-budoucí neimplementovaný **Media Collector**, zatímco nové zadání zavádí
-**Media Connector**. Návrh změnu zaznamenává, ale bez schválení nepřepisuje
-globální dokumentaci.
+Původní názvoslovný rozpor je rozhodnut: komponenta se jmenuje Media Connector.
+Globální dokumentace je synchronizována ve stejném dokumentačním commitu.
 
 ## Důkazy a testy této etapy
 

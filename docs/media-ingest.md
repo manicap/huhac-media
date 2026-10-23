@@ -323,6 +323,6 @@ tools and exercise real command-line behavior rather than fake adapters.
 - No video preview or keyframe extraction.
 - No AI, OCR, faces, similarity, quality, or audio analysis.
 - No event identification or domain interpretation.
-- No cloud/external-source collector.
+- No cloud/external-source acquisition; that belongs to the independent Media Connector.
 - Originals remain in place; `source_root` is machine-local.
 - No shared orchestrator or processor registry.

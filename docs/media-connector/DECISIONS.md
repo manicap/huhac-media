@@ -1,43 +1,40 @@
 # Media Connector — registr rozhodnutí a otázek
 
-**Stav návrhu:** AWAITING APPROVAL
+**Aktualizováno:** 2026-10-23 po schválení směru MC1
 
-Stavy: **ACCEPTED/TARGET** je hranice výslovně daná schváleným zadáním;
-**PROPOSED** čeká na schválení; **OPEN** vyžaduje volbu; **IMPLEMENTED** by
-vyžadovalo existující kód a důkaz — takové rozhodnutí zde zatím není.
+Stavy: **ACCEPTED/TARGET** je závazná schválená hranice;
+**PROPOSED** čeká na schválení; **OPEN** vyžaduje budoucí volbu;
+**IMPLEMENTED** vyžaduje existující kód a ověření.
 
 | ID | Rozhodnutí | Stav |
 |---|---|---|
-| MC-D001 | Jeden klient = jedna knihovna; žádný multi-client management, přepínání ani federace. | **ACCEPTED/TARGET** |
-| MC-D002 | Lokální a Google Drive adaptér jsou oddělené od společné orchestrace. | **ACCEPTED/TARGET** |
-| MC-D003 | Workspace contract v1 a ingest SQLite zůstávají nedotčené; Connector neimportuje interní API Ingestu. | **ACCEPTED/TARGET** |
-| MC-D004 | Zdrojové adaptéry jsou read-only a předávají společné vrstvě stream a zdrojovou provenienci. | **PROPOSED** |
-| MC-D005 | Předávací jednotka je neměnná delivery s vlastním verzovaným manifestem; manifest není workspace katalog. | **PROPOSED** |
-| MC-D006 | Connector vede vlastní lokální single-writer stav oddělený od Workspace, Media Storage a ingest DB. | **PROPOSED** |
-| MC-D007 | Google Drive používá nejmenší scope `drive.readonly` a refresh token ukládá pouze do OS credential store. | **PROPOSED** |
-| MC-D008 | První etapy automaticky nespouštějí Media Ingest; handoff je explicitní. | **PROPOSED** |
-| MC-D009 | Získaný zdrojový checksum ani transfer SHA-256 není `asset_id`; obsahovou identitu nadále vlastní Ingest. | **PROPOSED** |
+| MC-D001 | Oficiální název samostatné komponenty je **Media Connector**. „Media Collector“ smí být jen případná budoucí interní funkce převzetí médií. | **ACCEPTED/TARGET** |
+| MC-D002 | Jeden klient = jedna samostatná knihovna. Stabilní identita knihovny je `workspace_id`. Multi-client management, přepínání a federace jsou mimo rozsah. | **ACCEPTED/TARGET** |
+| MC-D003 | Media Connector je samostatný CLI modul nezávislý na Media Desku. | **ACCEPTED/TARGET** |
+| MC-D004 | Zdrojové adaptéry jsou read-only a oddělené od společné logiky přes společný kontrakt. | **ACCEPTED/TARGET** |
+| MC-D005 | Workspace contract v1 zůstává beze změny. Connector nečte ingest SQLite, neimportuje interní API Ingestu a nezapisuje workspace. | **ACCEPTED/TARGET** |
+| MC-D006 | MC1 obsahuje pouze read-only Local Discovery. Neobsahuje převzetí médií, staging, databázi, OAuth ani změny workspace. | **ACCEPTED/TARGET** |
+| MC-D007 | Budoucí převzetí médií má použít samostatný bezpečný staging před publikací do Media Storage. Transakční mechanismus, writer a persistence zatím nejsou schválené. | **ACCEPTED/TARGET + OPEN DETAIL** |
+| MC-D008 | MC1 nemaže, nepřejmenovává ani nepřepisuje zdrojové soubory a neotvírá jejich obsah. | **ACCEPTED/TARGET** |
+| MC-D009 | Provenience a vazba na Media Ingest budou budoucí samostatný integrační kontrakt bez změny workspace contract v1. | **ACCEPTED/TARGET** |
+| MC-D010 | Google Drive je samostatná pozdější etapa. Běžné soubory a cloud-native dokumenty mají rozdílné chování a nesmějí se tiše zaměnit. | **ACCEPTED/TARGET** |
+| MC-D011 | Veřejná hranice MC1 je verzovaný JSON-only CLI kontrakt `media-connector local-discovery`; přímý Python import jiné komponenty není veřejné API. | **ACCEPTED/TARGET** |
+| MC-D012 | MC1 používá `relative_path + size_bytes + mtime_ns` pouze jako observační verzi. Nehashuje obsah a nevytváří ingest `asset_id`. | **ACCEPTED/TARGET** |
 
-## Otázky vyžadující schválení
+## Otevřené otázky mimo MC1
 
-- **MC-Q01 — Název komponenty:** nahrazuje Media Connector dosavadní budoucí
-  pojem Media Collector v globální dokumentaci?
-- **MC-Q02 — Identita knihovny:** má profil Connectoru používat existující
-  `workspace_id` jako jedinou kanonickou `library_id`, načítanou read-only?
-- **MC-Q03 — Ownership originálů:** publikuje Connector immutable delivery přímo
-  do vyhrazeného namespace Media Storage, nebo nejdřív do odděleného stagingu a
-  kdo provede propagaci? Toto rozhodnutí blokuje jakýkoli cílový zápis.
-- **MC-Q04 — Stavová persistence:** je schválená privátní lokální SQLite s jedním
-  writerem, nebo je pro první produkční rozsah požadován jiný journal?
-- **MC-Q05 — Provenience:** postačí v první integraci connector manifest vedle
-  delivery, když jej současný Ingest nepublikuje do catalog v1, nebo je nutné
-  navrhnout budoucí kompatibilní veřejné propojení?
-- **MC-Q06 — Kolize cest:** preferuje se fail-closed, nebo deterministické
-  přejmenování při Windows/Unicode/case-fold kolizi?
-- **MC-Q07 — Google cloud-native dokumenty:** mají být trvale mimo rozsah, nebo
-  později exportovány podle samostatné formátové politiky?
-- **MC-Q08 — Retence:** jak dlouho uchovávat delivery, manifesty, checkpointy a
-  redigované reporty; kdo smí provést explicitní cleanup?
+- **MC-Q01 — transakční staging:** přesný layout, atomická publikace, recovery a
+  writer ownership budoucího stagingu;
+- **MC-Q02 — persistence:** zda a jaký privátní journal použít pro budoucí
+  transfery; MC1 databázi nemá;
+- **MC-Q03 — provenience:** přesný budoucí handoff manifest a kompatibilní vazba
+  na Media Ingest bez změny kontraktu v1;
+- **MC-Q04 — kolize při publikaci:** fail-closed versus deterministické mapování
+  cílových názvů; MC1 žádné cílové názvy nevytváří;
+- **MC-Q05 — Google Drive:** OAuth, shared drives, shortcuts, exportní politika
+  cloud-native dokumentů a retence tokenů;
+- **MC-Q06 — retence:** životní cyklus budoucích deliveries, manifestů,
+  checkpointů a diagnostických reportů.
 
-Dokud nejsou MC-Q03 a MC-Q04 schválené, lze bezpečně implementovat pouze
-read-only discovery a dry-run kontrakty bez přenosu a perzistentního journalu.
+Žádná z těchto otázek neblokuje MC1, protože jeho jediným výstupem je JSON na
+stdout a nemění zdroj, workspace ani jiné persistentní úložiště.

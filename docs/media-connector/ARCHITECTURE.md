@@ -1,110 +1,102 @@
-# Media Connector — architektonický návrh
+# Media Connector — architektura
 
-**Stav dokumentu:** PROPOSED / AWAITING APPROVAL
+**Architektonický směr:** ACCEPTED
 
-**Runtime stav:** NOT IMPLEMENTED
+**MC1 runtime:** NOT IMPLEMENTED (do dokončení implementační etapy)
 
-## Účel a hranice
+## Účel a identita
 
-Media Connector získává bajty a zdrojovou provenienci z externího nebo lokálního
-zdroje. Nerozpoznává obsah, nevytváří asset identity Media Ingestu, nespouští
-metadata, preview ani AI procesory a nevytváří či nemění workspace.
+Media Connector je samostatný CLI modul pro bezpečné získávání informací a v
+budoucnu médií z různých zdrojů. Oficiální název komponenty je Media Connector.
+Pojem Media Collector je vyhrazen pouze případné budoucí interní funkci převzetí
+bajtů.
 
-Jedna instalace/profil konektoru obsluhuje právě jednu knihovnu jednoho klienta.
-Profil může později obsahovat více zdrojů stejné knihovny, například lokální
-složku i Google Drive, ale nemůže přepínat mezi knihovnami. Za kanonickou
-identitu knihovny je navrženo použít `workspace_id`, načtené pouze read-only z
-veřejného `workspace.json`. Toto navázání čeká na schválení v MC-Q02.
+Jedna instance/profil obsluhuje jednu knihovnu jednoho klienta. Kanonickou
+identitou knihovny je `workspace_id`, který Connector načítá read-only z
+veřejného `workspace.json`. Connector nepřepíná klienty ani knihovny.
 
-## Navržené vrstvy
+## Komponentové hranice
 
 ```text
-CLI / budoucí UI boundary
+media-connector CLI
         |
         v
-Connector application service
-  discovery -> plan -> transfer -> verify -> publish delivery
-        |                         |
-        |                         +--> connector-owned state and manifests
+common discovery service
+        |
         v
 SourceAdapter contract
-  +-- LocalFilesystemAdapter
-  `-- GoogleDriveAdapter
-        |
-        v
-read-only source APIs / source files
+  +-- LocalFilesystemAdapter       # MC1
+  `-- GoogleDriveAdapter           # budoucí samostatná etapa
 
-published immutable delivery
-        |
-        v
-explicit handoff boundary (no automatic orchestration in initial stages)
-        |
-        v
-Media Ingest INPUT
+MC1 output: versioned JSON on stdout only
 ```
 
-Společná vrstva vlastní plánování, omezení objemu, názvové kolize, retry,
-ověření přenosu, stav běhu a publikaci. Adaptér vlastní pouze zdrojově specifické
-načtení objektů, stránkování, verze a čtecí stream. Adaptér nerozhoduje o cílové
-cestě, nezapisuje manifest a nevolá Media Ingest.
+Media Connector neimportuje Media Desk ani interní Python API Media Ingestu.
+Nevstupuje do ingest SQLite. `workspace.json` čte pouze kvůli verzi veřejného
+kontraktu a `workspace_id`; nečte katalog ani nepřepisuje žádný workspace
+artefakt.
 
-## Oddělení adaptérů
+## MC1 — read-only Local Discovery
 
-### Lokální souborový systém
+MC1 přijme cestu k existujícímu workspace a explicitní lokální zdrojový kořen.
+Ověří workspace contract v1 a UUID knihovny, bezpečně enumeruje běžné soubory a
+vrátí jednu deterministickou stránku JSON výsledku.
 
-Lokální adaptér dostane explicitní kořen zdroje, enumeruje bez následování
-symlinků a každý otevřený soubor znovu omezí na tento kořen. Zdroj je pouze pro
-čtení. Stabilní identifikátor objektu musí být definován přenositelně; samotná
-absolutní cesta ani inode nejsou dostatečná dlouhodobá identita. Pro první etapu
-je proto navržena složená observační identita `relative_path + size + mtime_ns`
-a její změna znamená novou verzi pozorování, nikoli obsahovou identitu.
+MC1:
 
-### Google Drive
+- provádí pouze metadata operace (`lstat`/`stat`, bezpečnou enumeraci);
+- neotevírá a nehashuje obsah souborů;
+- nenásleduje symlinky, junctions ani jiné reparse points;
+- nic nezapisuje do zdroje, workspace, Media Storage ani lokální databáze;
+- nemění názvy a nevytváří staging či manifest na disku;
+- neposuzuje, zda je soubor podporované médium — to zůstává odpovědností
+  Media Ingestu;
+- nepředstavuje `size_bytes + mtime_ns` jako obsahovou identitu.
 
-Google Drive adaptér používá oficiální API, stránkování a opaque Drive file ID.
-`version_token` je odvozen ze zdrojových verzovacích údajů (`version`,
-`modifiedTime`, případně checksum), nikoli z názvu souboru. Adaptér řeší shared
-drives, shortcuts a cloud-native dokumenty explicitně; žádný z těchto typů se
-nesmí tiše vydávat za běžný binární soubor. Export Google dokumentů vyžaduje
-samostatnou schválenou politiku a v počátečním rozsahu je odmítnut.
+### Vrstvy MC1
 
-Autentizace, tokeny a síťové retry zůstávají uvnitř adaptéru. Doménové objekty
-nesmějí obsahovat access ani refresh token.
+```text
+cli.py
+  JSON envelope, stabilní exit codes, argument validation
+service.py
+  workspace identity + adapter orchestration
+workspace.py
+  minimální read-only workspace contract v1 reader
+adapters/base.py
+  společný Protocol a doménové typy
+adapters/local.py
+  confinement, deterministic walk, pagination, cursor
+```
 
-## Ownership a kompatibilita
+Přímé importy těchto Python tříd jsou interní. Veřejným kontraktem MC1 je pouze
+CLI popsané v [MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md).
 
-| Oblast | Vlastník | Přístup Connectoru |
+## Oddělení budoucích adaptérů
+
+Společný adaptér vrací zdrojové objekty, schopnosti a stabilní strojové chyby.
+Neřeší cílový zápis ani orchestraci Ingestu. Lokální adaptér používá relativní
+cesty a filesystem metadata. Budoucí Google Drive adaptér použije opaque Drive
+ID a provider version; běžné soubory, shortcuts a cloud-native dokumenty budou
+explicitně rozdílné typy.
+
+## Budoucí převzetí a handoff
+
+Budoucí přenos musí nejprve zapisovat do samostatného bezpečného stagingu a až
+potom publikovat do Media Storage. Přesný transakční mechanismus není schválený
+a není součástí MC1. Connector manifest a provenience budou samostatný budoucí
+integrační kontrakt; nebudou vydávány za workspace catalog v1.
+
+Media Ingest i nadále sám provede SHA-256, určí `asset_id` a publikuje workspace
+contract. Automatické spuštění Ingestu ani integrace do Media Desku nejsou
+součástí MC1.
+
+## Ownership
+
+| Oblast | Vlastník | MC1 přístup |
 |---|---|---|
-| Zdrojové soubory / Drive objekty | uživatel / poskytovatel | read-only |
-| Connector config, journal a manifesty | Media Connector | read/write |
-| Publikovaná delivery média | k rozhodnutí MC-Q03 | pouze řízené vytvoření |
-| `workspace.json`, `metadata/`, `state/` | Media Ingest | žádný zápis |
-| `state/catalog.sqlite3` | Media Ingest | žádný přístup |
-| `analysis/` | jednotlivé procesory | žádný přístup |
-
-Media Connector nevytváří pole workspace contractu a nepřekládá svůj manifest
-za katalog v1. Existující Media Ingest nadále přijímá adresář `INPUT`, sám
-provádí SHA-256 a publikuje katalog. Connector nesmí považovat zdrojový checksum
-nebo svůj transfer checksum za `asset_id`.
-
-## Navržený handoff
-
-Společná vrstva publikuje neměnnou delivery: adresář médií a oddělený verzovaný
-Connector manifest. Publikace nastane až po ověření všech úspěšných položek.
-Media Ingest dostane explicitně pouze adresář s médii jako `INPUT`; manifest
-není součást workspace contractu v1 a Ingest jej v první integraci neparsuje.
-Automatické spuštění Ingestu není součást prvních etap.
-
-Přesné umístění delivery — uvnitř Media Storage, nebo v samostatném stagingu s
-pozdější propagací — je otevřená ownership otázka MC-Q03. Do jejího schválení
-nesmí implementace zapisovat originály do Media Storage.
-
-## Deployment model
-
-Navržen je jeden aktivní writer konektoru na knihovnu. Connector state musí být
-lokální, nesdílený přes SMB/NFS a oddělený od workspace i ingest SQLite.
-Google Drive i zdrojový lokální disk mohou být dočasně nedostupné; tento stav
-nesmí zrušit konfiguraci ani již publikovanou delivery.
-
-Multi-client management, centrální služba, federace, více aktivních writerů,
-obousměrná synchronizace a mazání zdrojů jsou mimo rozsah.
+| Lokální zdroj | uživatel | read-only metadata |
+| `workspace.json` | Media Ingest | read-only identity |
+| Ostatní workspace soubory a ingest SQLite | Media Ingest | žádný |
+| Media Storage | knihovna / budoucí writer | žádný |
+| stdout JSON | Media Connector | jediný výstup |
+| Media Desk a `analysis/` | jejich komponenty | žádný |
