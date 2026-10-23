@@ -111,6 +111,10 @@ Transfer musí nejprve zapisovat do samostatného bezpečného stagingu a až po
 neověřené bajty nesmějí být viditelné jako platné médium. Přesný transakční
 mechanismus, layout a persistence nejsou schválené a nejsou součástí MC1.
 
+Konkrétní doporučená varianta content-addressed Media Storage, odděleného
+same-filesystem stagingu a Connector-owned persistence je **PROPOSED** v
+[MC-ADR-001](TRANSFER_ADR.md). Nejde dosud o implementovaný ani schválený detail.
+
 Převzetí do Media Storage je povinnou podmínkou handoffu. Media Ingest nesmí v
 Connector workflow zpracovávat externí source root, cloud mount ani dočasný
 staging. Dostává pouze publikované lokální originály z Media Storage a spouští

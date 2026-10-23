@@ -9,6 +9,9 @@
    Každý zdroj zůstává read-only; pouze úplná ověřená kopie může být publikována
    do Media Storage. Transakce, recovery, writer, persistence, kolize a retence
    vyžadují detailní ADR před implementací.
+   Návrh je připraven v [TRANSFER_ADR.md](TRANSFER_ADR.md) a čeká na schválení;
+   prováděcí pořadí je v
+   [TRANSFER_IMPLEMENTATION_PLAN.md](TRANSFER_IMPLEMENTATION_PLAN.md).
 5. **Content identity a transfer evidence — ACCEPTED/TARGET, NOT IMPLEMENTED.**
    Deduplikace napříč zdroji a historie transferů oddělená od originálních
    souborů; přesné schema zůstává otevřené.

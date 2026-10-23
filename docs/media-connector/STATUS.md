@@ -47,3 +47,18 @@ dva POSIX-only názvové scénáře. Nejsou vydávány za úspěšně ověřené
 - observační verze `size + mtime_ns` není obsahová integrita ani asset identity;
 - výkon velmi velkých stromů a reálné offline NAS chyby nejsou změřené;
 - absolutní source root je součást lokálního JSON výstupu a může být citlivý.
+
+## Media Transfer návrh
+
+MC-ADR-001 a detailní implementační plán jsou **PROPOSED / AWAITING APPROVAL**.
+Audit potvrdil kompatibilitu content-addressed Media Storage s nezměněným
+Ingestem pouze při použití Ingest-kompatibilní canonical suffix politiky;
+extensionless layout není obecně kompatibilní. Transfer, Connector SQLite,
+staging ani publish runtime nejsou implementované.
+
+Návrhové ověření: aktuální scanner integrační testy `3 passed`; cílený
+`detect_media` probe potvrdil JPEG bez přípony, odmítnutí extensionless MTS a
+závislost `.mts` na příponě. CR3-like ISO-BMFF je v první scanner fázi veden jako
+MP4 i s `.cr3` a vyžaduje existující metadata refinement. Tyto výsledky jsou
+zaneseny do compatibility brány MC-ADR-001, nikoli prezentovány jako nová
+implementovaná schopnost.

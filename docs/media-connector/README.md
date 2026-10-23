@@ -45,6 +45,9 @@ objekt. Při stránkování předejte hodnotu `page.next_cursor` pomocí `--curs
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — rozsah MC1 a akceptace;
 - [MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md) — veřejné JSON CLI schema;
 - [ROADMAP.md](ROADMAP.md) — dokončená a odložená etapa;
+- [TRANSFER_ADR.md](TRANSFER_ADR.md) — návrh content-addressed Media Transferu;
+- [TRANSFER_IMPLEMENTATION_PLAN.md](TRANSFER_IMPLEMENTATION_PLAN.md) — plán,
+  rozhraní a akceptační testy Transferu;
 - [STATUS.md](STATUS.md) — skutečný stav a podklady auditu.
 
 ## Terminologie

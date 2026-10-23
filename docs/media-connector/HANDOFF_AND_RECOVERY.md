@@ -8,6 +8,10 @@ Tento dokument definuje schválené hranice budoucího Transferu. Layout,
 persistence a transakční mechanismus jsou stále návrh a musí projít samostatným
 ADR před implementací.
 
+Posuzovaný konkrétní návrh je v [TRANSFER_ADR.md](TRANSFER_ADR.md); detailní
+testovací a realizační pořadí v
+[TRANSFER_IMPLEMENTATION_PLAN.md](TRANSFER_IMPLEMENTATION_PLAN.md).
+
 ## Povinné invarianty
 
 - Všechny současné i budoucí externí zdroje a adaptéry jsou vždy read-only.
