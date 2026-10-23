@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import json
+import os
 from pathlib import Path
+import shutil
 import sqlite3
 from typing import Any, Callable
 from uuid import UUID, uuid4
@@ -143,6 +145,21 @@ def preflight_archive_init(
     storage_fs = classifier(storage)
     if storage_fs != "local":
         warnings.append(f"Media Storage filesystem classified as {storage_fs}; it must remain available for ingest.")
+    for candidate in (storage, workspace):
+        writable_parent = candidate if candidate.exists() else candidate.parent
+        while not writable_parent.exists() and writable_parent.parent != writable_parent:
+            writable_parent = writable_parent.parent
+        if not os.access(writable_parent, os.W_OK):
+            return _reject(operation_id, storage, workspace, "PERMISSION_DENIED", f"parent is not writable: {writable_parent}", state="failed_recoverable")
+    try:
+        space_target = workspace
+        while not space_target.exists() and space_target.parent != space_target:
+            space_target = space_target.parent
+        free_bytes = shutil.disk_usage(space_target).free
+        if free_bytes < 64 * 1024 * 1024:
+            warnings.append("Workspace filesystem has less than 64 MiB free; initialization may fail.")
+    except OSError:
+        warnings.append("Workspace free space could not be determined.")
     for candidate, code in ((storage, "STORAGE_NOT_EMPTY"), (workspace, "WORKSPACE_NOT_EMPTY_UNKNOWN")):
         if candidate.exists() and not candidate.is_dir():
             return _reject(operation_id, storage, workspace, "INVALID_PATH", f"not a directory: {candidate}")
@@ -283,6 +300,10 @@ def initialize_archive(
             _phase(marker, workspace, "catalog_ready", phase_hook)
             store.finish_run(operation_id, "success", {"assets": 0, "operation_kind": "initialize"})
             _phase(marker, workspace, "run_finished", phase_hook)
+            if any(storage.iterdir()):
+                return _reject(operation_id, storage, workspace, "STORAGE_CHANGED", "storage changed before manifest publication", state="failed_recoverable")
+            if contains_reparse_or_symlink(storage) or contains_reparse_or_symlink(workspace):
+                return _reject(operation_id, storage, workspace, "PATH_IDENTITY_CHANGED", "root identity changed before manifest publication", state="failed_requires_manual_action")
             manifest = {
                 "schema_version": 1,
                 "workspace_contract_version": WORKSPACE_CONTRACT_VERSION,

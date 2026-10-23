@@ -84,3 +84,13 @@ def test_cli_argument_error_is_also_json(capsys: pytest.CaptureFixture[str]) -> 
     assert payload["state"] == "rejected"
     assert payload["error"]["code"] == "INVALID_ARGUMENTS"
     assert output.err == ""
+
+
+def test_confirmed_cli_requires_operation_id(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main([
+        "init", "--storage", str(tmp_path / "storage"), "--workspace",
+        str(tmp_path / "workspace"), "--yes", "--json",
+    ])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert payload["error"]["code"] == "INVALID_OPERATION_ID"

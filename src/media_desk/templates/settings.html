@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Nastavení{% endblock %}
 {% block content %}
-<section class="settings-head"><div><p class="eyebrow">MEDIA DESK</p><h1>Nastavení</h1><p class="muted">Jeden aktivní workspace, bezpečně a pouze pro čtení.</p></div></section>
+<section class="settings-head"><div><p class="eyebrow">MEDIA DESK</p><h1>Nastavení</h1><p class="muted">Jeden aktivní workspace; běžné prohlížení zůstává pouze pro čtení.</p></div></section>
 
 {% if notice %}<div class="settings-message is-success" role="status">{{ notice }}</div>{% endif %}
 {% if error %}<div class="settings-message is-error" role="alert">{{ error }}</div>{% endif %}
@@ -131,7 +131,7 @@
   <section class="panel settings-about">
     <p class="eyebrow">O APLIKACI</p><h2>HUHÁČ Media Desk {{ app_version }}</h2>
     <dl class="settings-facts"><div><dt>Konfigurace aplikace</dt><dd class="path-value">{{ config_path }}</dd></div><div><dt>Režim workspace</dt><dd>Read-only</dd></div></dl>
-    <p class="muted">Media Desk zapisuje pouze tento per-user konfigurační soubor. Katalog, metadata, originály i výstupy procesorů nemění.</p>
+    <p class="muted">Media Desk sám zapisuje pouze tento per-user konfigurační soubor. Výslovně potvrzené založení archivu deleguje samostatnému ingest-owned příkazu; prohlížení katalog, originály ani výstupy procesorů nemění.</p>
   </section>
 </div>
 {% endblock %}

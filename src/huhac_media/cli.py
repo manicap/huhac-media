@@ -46,8 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--storage", type=Path, required=True)
     init.add_argument("--workspace", type=Path, required=True)
     init.add_argument("--operation-id")
-    init.add_argument("--preflight", action="store_true")
-    init.add_argument("--yes", action="store_true")
+    init_mode = init.add_mutually_exclusive_group()
+    init_mode.add_argument("--preflight", action="store_true")
+    init_mode.add_argument("--yes", action="store_true")
     init.add_argument("--json", action="store_true", required=True)
     return parser
 
@@ -78,6 +79,16 @@ def main(argv: list[str] | None = None) -> int:
     else:
         args = build_parser().parse_args(raw_arguments)
     if args.command == "init":
+        if args.yes and not args.operation_id:
+            result = InitResult(
+                str(uuid4()),
+                "rejected",
+                str(args.storage),
+                str(args.workspace),
+                error=InitError("INVALID_OPERATION_ID", "confirmed initialization requires --operation-id"),
+            )
+            print(result.to_json())
+            return ExitCode.USAGE_OR_CONFIG
         result = preflight_archive_init(
             args.storage, args.workspace, operation_id=args.operation_id
         )
@@ -95,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
             return ExitCode.SUCCESS
         if result.state == "confirmation_required":
             return ExitCode.CANCELLED
+        if result.error and result.error.code == "INTERRUPTED":
+            return ExitCode.INTERRUPTED
         return ExitCode.FATAL
     if args.command == "ingest":
         overrides = {
