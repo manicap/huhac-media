@@ -86,6 +86,12 @@ version and image settings. Output is validated before an atomic replace.
 
 ## Ingest and resume
 
+The separate `huhac-media init` path reserves and locks a new target before it
+creates private state. It records a dedicated initialization run, publishes a
+valid empty catalog, and publishes `workspace.json` last. It never invokes
+discovery or media stages. A fixed operation marker makes recognized partial
+state retryable without deleting directories or unknown data.
+
 After confirmation, the application initializes a versioned workspace and
 takes a non-blocking OS file lock. Discovery is committed before content stages.
 Each stage is marked `processing`, writes and validates its artifact, and only

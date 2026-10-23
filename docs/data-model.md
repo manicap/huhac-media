@@ -38,6 +38,12 @@ config_fingerprint)`, so completed ingest work is reused only when its recipe
 matches. Table names, columns, migrations, and SQLite itself are private ingest
 implementation details, not a compatibility surface for consumers.
 
+S2b records archive initialization as a normal `runs` row whose private
+effective configuration contains `operation_kind: initialize`. It creates no
+asset, source, run-item, stage, or error row in the successful empty case. This
+reuses the existing private schema; no migration or public contract change was
+introduced.
+
 Portable source and asset sidecars are separate from this transactional state.
 Only the artifacts explicitly named by the workspace contract are consumer API;
 source sidecars remain producer-owned supporting evidence.

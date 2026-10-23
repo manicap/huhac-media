@@ -1,6 +1,6 @@
 # S2b — návrh inicializace nového archivu
 
-**Stav:** **ACCEPTED / IMPLEMENTATION AUTHORIZED — NOT IMPLEMENTED**
+**Stav:** **ACCEPTED + IMPLEMENTED**
 
 **Připraveno:** 2026-10-23
 
@@ -9,8 +9,9 @@
 **Schválená hranice:** D-012 — prázdný workspace zakládá Media Ingest přes
 samostatné rozhraní, nikoli Media Desk přímým zápisem producer-owned souborů.
 
-Tento dokument je návrh. Nezavádí CLI, HTTP endpoint, databázovou migraci,
-import, procesory ani správu úložišť.
+Tento dokument zachycuje schválený a implementovaný návrh. Skutečné výsledky,
+testy a limity jsou v [S2B_VERIFICATION.md](S2B_VERIFICATION.md). S2b nezavedla
+databázovou migraci, import, procesory ani obecnou správu úložišť.
 
 ## 1. Terminologie a zjištěný rozpor
 
@@ -375,10 +376,10 @@ publikuje neprázdný katalog. S2b ho automaticky nespouští.
 
 ## 8. Webová bezpečnost
 
-Budoucí endpointy jsou například:
+Implementované endpointy jsou:
 
-- `POST /setup/archive/preflight` — pouze read-only CLI preflight;
-- `POST /setup/archive/initialize` — potvrzení a ingest-owned init.
+- `POST /settings/archive/preflight` — pouze read-only CLI preflight;
+- `POST /settings/archive/initialize` — potvrzení a ingest-owned init.
 
 Oba musí používat dnešní server-side loopback bind, loopback Host, same-origin
 Origin, SameSite/HttpOnly CSRF token, exact field set a omezené tělo
@@ -440,5 +441,4 @@ nezná lokální S2a mapping. Inicializace neslibuje přenosnou storage architek
    na prokazatelně lokálním filesystemu; network/unknown workspace je v S2b
    odmítnut.
 
-Body D-017 až D-020 byly schváleny 2026-10-23. Implementace musí dodržet detailní
-plán a akceptaci; do té doby se zde popsané chování neoznačuje jako implementované.
+Body D-017 až D-020 byly schváleny a implementovány 2026-10-23.

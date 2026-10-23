@@ -1,7 +1,7 @@
 # huhac-media
 
 `huhac-media` is a local, Windows-oriented media workspace pipeline. The stable
-checkpoint currently contains five implemented components:
+checkpoint currently contains six implemented components:
 
 - **Media Ingest Tool v1** scans immutable originals, tracks source history,
   deduplicates content by SHA-256, extracts metadata, creates image previews,
@@ -17,6 +17,8 @@ checkpoint currently contains five implemented components:
   output and a strictly validated canonical result.
 - **Faces Processor v1** detects and embeds faces in those same public visual
   inputs, then independently clusters embeddings into anonymous groups.
+- **Media Desk** provides the read-only gallery, local workspace/originals
+  configuration, and S2b orchestration of producer-owned empty archive setup.
 
 The semantic Normalizer, OCR, cross-asset Similarity, Quality, Audio,
 event interpretation, a Media Collector, and orchestration are future work and
@@ -44,6 +46,14 @@ Run ingest and then Session Grouper:
 ```powershell
 huhac-media ingest --input 'D:\Media' --yes
 session-grouper analyze --workspace 'D:\Media\_processing'
+```
+
+Initialize a new empty archive without scanning or importing media:
+
+```powershell
+huhac-media init --storage 'D:\HUHAC\Media' --workspace 'C:\HUHAC\Workspace' --preflight --json
+# Confirm with the operation_id returned by preflight:
+huhac-media init --storage 'D:\HUHAC\Media' --workspace 'C:\HUHAC\Workspace' --operation-id '<UUID>' --yes --json
 ```
 
 Both commands also work as Python modules:
@@ -75,9 +85,9 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
   internal design rationale.
 - [Development](docs/development.md): environment, test suites, and contribution
   safeguards.
-- [Media Desk M1–M1.3 + S2a](docs/media-desk/README.md): read-only local gallery,
-  per-user workspace setup, host-local originals mapping, architecture, security,
-  and limitations.
+- [Media Desk M1–M1.3 + S2a–S2b](docs/media-desk/README.md): read-only local
+  gallery, per-user workspace setup, host-local originals mapping, safe empty
+  archive initialization, architecture, security, and limitations.
 
 SQLite, logs, run state, locks, and ingest Python APIs are internal. Consumers
 start at `workspace.json`, follow `metadata/catalog.json`, and write only under
@@ -86,5 +96,5 @@ their own `analysis/<processor>/` namespace.
 ## Project status
 
 Media Ingest Tool v1, Session Grouper v1, Video Keyframe Extractor v1, Vision
-Processor v1, and Faces Processor v1 are implemented and accepted on a real
-workspace. The remaining future processors stay out of scope.
+Processor v1, Faces Processor v1, and Media Desk through S2b are implemented.
+The remaining future processors and storage stages stay out of scope.

@@ -8,17 +8,19 @@
 
 **Implementační commity S2a.1:** `921f48c`, `18c0919`
 
-**Stav aktualizován:** 2026-10-23; S2b schválena a implementace zahájena
+**Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`
 
-> **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a a S2a.1: read-only web nad jedním existujícím
-> workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
+**Stav aktualizován:** 2026-10-23; S2b dokončena
+
+> **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a, S2a.1 a S2b: read-only galerie nad
+> jedním workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
 > bezpečně uložená lokální cesta k workspace i host-local mapování originálů.
 > Aktivní workspace a mapping se načítají při
 > startu procesu. Důkazy jsou níže a v [auditu](AUDIT_2026-10.md).
 
-> **CÍLOVÝ WORKFLOW, DOSUD NEIMPLEMENTOVÁNO** — webové založení nového archivu a správa lifecycle
-> úložišť. Tři schválené uživatelské scénáře jsou cílem, nikoli tvrzením o dnešní
-> funkčnosti. Varianty vyžadují rozhodnutí v [RFC](SETUP_STORAGE_RFC.md).
+> **NADÁLE MIMO ROZSAH** — import, orchestrace procesorů, obecná správa lifecycle
+> úložišť, přenosná metadata a síťový workspace writer. Varianty vyžadují nové
+> rozhodnutí v [RFC](SETUP_STORAGE_RFC.md).
 
 ## Etapy
 
@@ -29,10 +31,10 @@
 | M1.1.1: desktop layout | **IMPLEMENTED** | `src/media_desk/static/library.js:6`, `src/media_desk/static/library.js:283` | Jediný scroll root galerie je `.app-main`. |
 | M1.2: profesionální UI a branding | **IMPLEMENTED** | `src/media_desk/templates/base.html:13`, `src/media_desk/static/huhac-logo.png`, commit `7da319a` | Logo je lokální statický asset. |
 | M1.3: nastavení jednoho workspace | **IMPLEMENTED** | `src/media_desk/config.py:17`, `src/media_desk/config.py:87`, `src/media_desk/web.py:311`, `tests/media_desk/test_settings.py:73` | Ukládá jen per-user TOML; aktivace po restartu. |
-| Nový archiv z webu | **ABSENT** | setup přijímá jen existující workspace: `src/media_desk/workspace_status.py:28` | Media Desk nevytváří workspace ani Media Storage. |
+| Nový archiv z webu | **IMPLEMENTED** | `archive_setup.py`, `web.py`, `test_archive_setup.py` | Media Desk orchestruje veřejné ingest JSON CLI, postvaliduje a pak uloží profil. |
 | Přemapování originálů pro jiný host/OS | **IMPLEMENTED** | `src/media_desk/originals.py`, `contract.py`, `web.py`; `tests/media_desk/test_settings.py` | UI mapping validuje nejvýše 16členným SHA-256 vzorkem, atomicky uloží a po restartu bezpečně použije. |
 | S2a.1 lazy origin access | **IMPLEMENTED** | `models.py`, `contract.py`, `web.py`; `test_web.py`; `S2A1_STARTUP_PERFORMANCE.md` | Snapshot registruje unchecked source reference bez per-file I/O; GET/Range provádí request-scoped ověření a otevření. 10k p50: 25,77 s → 7,75 s (3,32×). |
-| S2b: inicializace nového archivu | **ACCEPTED / IN PROGRESS — NOT YET IMPLEMENTED** | `S2B_DESIGN.md`, `S2B_FAILURE_MATRIX.md`, `S2B_IMPLEMENTATION_PLAN.md` | D-017 až D-020 schváleny 2026-10-23; implementace musí teprve projít akceptací. |
+| S2b: inicializace nového archivu | **IMPLEMENTED** | `S2B_VERIFICATION.md`; commity výše | Stabilní JSON CLI, crash-safe retry, empty v1 catalog a chráněný web setup. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Uživatelská data (výběry, hodnocení, kolekce) | **ABSENT** | `docs/media-desk/README.md` | Není úložiště ani databáze Media Desku. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -62,20 +64,17 @@ až po restartu (`src/media_desk/web.py:361-365`).
   syntetický katalog na tomto Windows hostu má p50 `create_app` 7,75 s proti
   baseline 25,77 s (3,32×); při startupu je 0 per-file
   resolve/stat/is_file/open/SHA operací originálů.
-- **ABSENT:** web neumí vytvořit Media Storage nebo nový workspace a nespouští
-  ingest ani procesory.
-- **ACCEPTED/TARGET:** S2b tento gap řeší ingest-owned init rozhraním, ale žádný příkaz,
-  HTTP endpoint ani nový zapisující workflow zatím v kódu není.
-- **DECIDED/TARGET:** veřejný `workspace_contract_version: 1` a historická data se
-  v následující etapě nesmějí měnit ani migrovat bez zvláštního schválení.
+- **IMPLEMENTED:** web umí výslovně potvrzeným ingest-owned příkazem vytvořit
+  prázdný Media Storage a workspace; import ani procesory nespouští.
+- **IMPLEMENTED:** S2b zachovala veřejný `workspace_contract_version: 1` a
+  nemigruje historická data.
 - **UNVERIFIED:** přímý zapisující provoz ingest SQLite/WAL na konkrétním SMB/NFS
   serveru není v tomto auditu kvalifikován jako podporovaný deployment.
 
 ## Stav testů
 
-Cílená Media Desk sada po S2a.1: **64 passed, 5 skipped** za 38,77 s. Finální
-FAST sada: **183 passed, 6 skipped, 33 deselected** za 13,60 s. Bezpečnostní
-podmnožina implementačního kroku: **31 passed, 4 skipped**. S2a symlink testy
+Cílená S2b sada: **53 passed, 4 skipped** za 32,93 s. Finální FAST sada:
+**200 passed, 7 skipped, 48 deselected** za 18,32 s. S2a/S2b symlink testy
 jsou na tomto Windows hostu přeskočeny bez oprávnění symlink vytvořit; povinné
 POSIX varianty zůstávají v testech. Reprodukovatelné finální 10k měření je v
 `S2A1_STARTUP_PERFORMANCE.md`. Windows i POSIX `source_root` jsou pokryty

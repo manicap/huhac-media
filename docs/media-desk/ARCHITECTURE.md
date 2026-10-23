@@ -6,22 +6,21 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-22 po schválení D-011, D-012 a D-009
+**Rozhodnutí aktualizována:** 2026-10-23 po dokončení S2b
 
-> **IMPLEMENTOVÁNO DNES** — Media Desk je lokální read-only konzument jednoho
-> veřejného workspace v1. Při startu načte snapshot a zapisuje pouze vlastní
-> per-user TOML konfiguraci. Media Ingest je samostatný writer vlastnící interní
-> SQLite, veřejné katalogy, náhledy a run state.
+> **IMPLEMENTOVÁNO DNES** — běžící galerie je lokální read-only konzument jednoho
+> veřejného workspace v1. Výslovně potvrzené založení archivu orchestruje přes
+> veřejné JSON CLI samostatného Media Ingest writeru; profil uloží až po vlastní
+> read-only validaci výsledku.
 
-> **CÍLOVÝ WORKFLOW, DOSUD NEIMPLEMENTOVÁNO** — založení nového archivu,
-> připojení workspace a originálů pod odlišnými cestami na jiném hostiteli a
-> bezpečný storage lifecycle. Cíl neuděluje Media Desku právo zapisovat workspace.
+> **NADÁLE NEIMPLEMENTOVÁNO** — import z webu, orchestrace procesorů, obecný
+> storage lifecycle, síťový workspace writer a cílová přenosná metadata.
 
 ## Pojmy a vlastnictví
 
 | Vrstva | Dnešní podoba | Vlastník zápisu | Stav |
 |---|---|---|---|
-| Media Storage | adresář originálů zadaný ingestu jako `input` | mimo Media Desk; ingest originály čte | **IMPLEMENTED**, správa **ABSENT** |
+| Media Storage | adresář originálů zadaný ingestu jako `input` | mimo Media Desk; ingest originály čte | **IMPLEMENTED**, prázdný init **IMPLEMENTED**, lifecycle **ABSENT** |
 | Workspace | `workspace.json`, `metadata/`, `previews/`, `analysis/`, `state/`, `runs/`, `logs/`, `tmp/`, `locks/` | ingest a každý procesor pouze ve svém namespace | **IMPLEMENTED** |
 | Veřejný kontrakt | `workspace.json` → `metadata/catalog.json`, verze 1 | ingest publikuje atomicky | **IMPLEMENTED** |
 | Ingest runtime | `state/catalog.sqlite3`, WAL, locks, reporty | Media Ingest | **IMPLEMENTED**, privátní |
@@ -47,6 +46,8 @@ zatímco aktivní zdroj nese relativní cestu.
    (`src/media_desk/web.py:641-660`).
 5. **IMPLEMENTED:** změna cesty z UI atomicky přepíše jen per-user TOML a projeví
    se při příštím startu (`src/media_desk/config.py:164-213`).
+6. **IMPLEMENTED S2b:** Media Desk spouští pevné JSON CLI Media Ingestu bez
+   Python importu, postvaliduje veřejný kontrakt a až potom uloží profil.
 
 ## Databázová hranice a síťová úložiště
 
@@ -116,40 +117,29 @@ potvrzenou dostupnost souboru. Baseline a finální měření jsou v
 - **IMPLEMENTED:** S2a validate/save/clear používají stejnou
   loopback/Host/Origin/CSRF hranici; save vždy znovu provede SHA-256 vzorek a
   chybný kandidát nezmění poslední platný profil.
+- **IMPLEMENTED:** S2b preflight/confirm používá tutéž HTTP hranici a navíc
+  jednorázový expirovaný nonce svázaný s operation ID a oběma cestami.
 - **ABSENT:** autentizace a TLS; bezpečný default je `127.0.0.1`.
 
 ## Tři provozní scénáře
 
 ### A. Založení nového archivu
 
-**Dnes:** web nemá takový endpoint. Samostatný ingest umí založit workspace až v
-zapisujícím běhu: vytvoří strom a manifest, zamkne workspace, otevře SQLite,
-založí run/report a publikuje katalog (`src/huhac_media/cli.py:114-135`,
-`src/huhac_media/storage/workspace.py:54-86`,
-`src/huhac_media/services/ingest.py:49-118`). Prázdný scan podle kódu nevyžaduje
-ExifTool (`src/huhac_media/cli.py:96`), ale cesta nebyla auditním testem
-provedena end-to-end, proto je provozní použitelnost **UNVERIFIED**.
-
-**DECIDED/TARGET:** průvodce UI → ingest-owned backend s explicitní autoritou → validace prázdných či
-existujících kořenů → atomické založení → lokální config → restart/readiness.
-Při selhání odstranit jen prokazatelně nově vytvořené prázdné artefakty, nikdy
-cizí adresář. Inicializace musí být oddělená od importu a analýzy; konkrétní API
-a rollback protokol zůstávají návrhem budoucí etapy.
-
-**ACCEPTED/TARGET (S2b, dosud neimplementováno):** veřejnou hranicí bude JSON CLI vlastněné
+**IMPLEMENTED (S2b):** veřejnou hranicí je JSON CLI vlastněné
 Media Ingestem. Read-only preflight nic nerezervuje; confirmed init zopakuje
 validace, atomicky rezervuje operaci, vytvoří privátní SQLite stav a prázdný
 katalog a publikuje `workspace.json` poslední. Media Desk až potom provede
 read-only postcondition validaci, uloží lokální profil a vyžádá restart.
-Žádný scan, hash, import ani procesor se nespouští. Detail, failure model a body
-ke schválení jsou v [S2B_DESIGN.md](S2B_DESIGN.md) a
+Žádný scan, hash, import ani procesor se nespouští. Detail a failure model jsou v
+[S2B_DESIGN.md](S2B_DESIGN.md) a
 [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md).
 
 Schválený návrh je přísnější než dnešní plný ingest: nový Workspace a Media Storage se
 nesmějí překrývat a workspace musí být na prokazatelně lokálním filesystemu.
 Lokální-only workspace je bezpečnostní omezení etapy S2b, nikoli definitivní
 omezení Media Pipeline. Přenosná knihovna a případné centrální úložiště metadat
-zůstávají otevřeným tématem. Chování zatím není implementované.
+zůstávají otevřeným tématem. Implementační důkazy jsou v
+[S2B_VERIFICATION.md](S2B_VERIFICATION.md).
 
 ### B. Připojení existujícího archivu na jiném OS
 

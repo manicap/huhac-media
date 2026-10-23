@@ -1,6 +1,6 @@
-# HUHÁČ Media Desk (M1–M1.3 + S2a)
+# HUHÁČ Media Desk (M1–M1.3 + S2a–S2b)
 
-**Dokumentace synchronizována:** 2026-10-22 na větvi `mediadesk` po implementaci S2a.
+**Dokumentace synchronizována:** 2026-10-23 na větvi `mediadesk` po implementaci S2b.
 
 ## Začni zde — aktuální autoritativní dokumentace
 
@@ -16,8 +16,9 @@
   schválené optimalizace startupu a lazy ověřování originálů.
 - [S2B_DESIGN.md](S2B_DESIGN.md),
   [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md) a
-  [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md) — **ACCEPTED / IN
-  PROGRESS** ingest-owned inicializace nového archivu.
+  [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md) a
+  [S2B_VERIFICATION.md](S2B_VERIFICATION.md) — **IMPLEMENTED** ingest-owned
+  inicializace nového archivu.
 - [Veřejný workspace kontrakt](../workspace-contract.md) a dokumentace
   [Media Ingest](../media-ingest.md), [Session Grouper](../session-grouper.md),
   [Video Keyframes](../video-keyframes.md), [Vision](../vision.md) a
@@ -82,10 +83,17 @@ and restart Media Desk. The equivalent module command is:
 .\.venv\Scripts\python.exe -m media_desk
 ```
 
-The saved workspace is loaded automatically on later starts. The profile file
+The saved workspace is loaded automatically on later starts. To create a new
+empty archive, use **Nastavení → Založit prázdný archiv**, enter separate Media
+Storage and local workspace paths, run the read-only preflight, explicitly
+confirm, and restart. This does not import media or run processors.
+
+The profile file
 is `%APPDATA%\HUHAC\MediaDesk\config.toml` on Windows and
 `${XDG_CONFIG_HOME:-~/.config}/huhac/media-desk/config.toml` on Linux. The
-workspace remains read-only; only this application config is written.
+browsing runtime remains read-only; the confirmed S2b action delegates workspace
+creation to the producer-owned `huhac-media init` process, while Media Desk
+itself writes only this application config.
 
 ### Originály na jiném hostiteli nebo OS (S2a)
 

@@ -1,6 +1,6 @@
 # S2b — detailní implementační plán inicializace nového archivu
 
-**Stav:** **ACCEPTED / IMPLEMENTATION AUTHORIZED — IN PROGRESS**
+**Stav:** **COMPLETE — ověření v [S2B_VERIFICATION.md](S2B_VERIFICATION.md)**
 
 **Připraveno:** 2026-10-23
 
@@ -8,8 +8,9 @@
 
 **Failure model:** [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md)
 
-Tento plán nezačíná implementaci. Každý work package má vlastní stop podmínku,
-cílené testy a dokumentační synchronizaci.
+Tento dokument je zachovaný prováděcí plán dokončené implementace. Každý work
+package měl vlastní stop podmínku, cílené testy a dokumentační synchronizaci;
+výsledek je v [S2B_VERIFICATION.md](S2B_VERIFICATION.md).
 
 ## 1. Rozsah a invarianty
 

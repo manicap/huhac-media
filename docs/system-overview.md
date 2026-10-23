@@ -1,8 +1,8 @@
 # Media pipeline system overview
 
-The implemented system currently has five components: Media Ingest Tool v1,
+The implemented system currently has six components: Media Ingest Tool v1,
 Session Grouper v1, Video Keyframe Extractor v1, Vision Processor v1, and
-Faces Processor v1.
+Faces Processor v1, plus the read-only Media Desk with S2b archive setup.
 Everything else in this overview is explicitly future work.
 
 ```text
@@ -32,6 +32,9 @@ Standardized media workspace -- IMPLEMENTED
     +--> Faces Processor v1 -- IMPLEMENTED
     |      face detection + embeddings -> anonymous complete-link clusters
     |
+    +--> Media Desk -- IMPLEMENTED
+    |      read-only gallery + ingest-owned empty archive initialization
+    |
     +--> FUTURE independent processors -- NOT IMPLEMENTED
            Similarity | OCR | Quality | Audio | Normalizer
               |
@@ -48,6 +51,11 @@ Media Ingest owns source discovery, immutable-original handling, SHA-256 asset
 identity, normalized metadata, image previews, and publication of the public
 workspace contract. SQLite is private transactional state; JSON is the boundary
 between components.
+
+Media Desk reads that same public JSON contract. Its browsing runtime remains
+read-only. S2b setup invokes the producer-owned `huhac-media init` JSON CLI
+without importing ingest internals, validates the result through the public
+contract, and only then stores the local workspace profile.
 
 Session Grouper is an independent consumer. It reads only the public JSON
 contract and writes only beneath `analysis/session-grouper/`. It groups media by

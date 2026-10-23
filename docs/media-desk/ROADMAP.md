@@ -28,15 +28,15 @@ posloupnost pro tři schválené provozní scénáře.
    otevření konkrétního souboru probíhají v GET/Range požadavku. Na syntetickém
    10k katalogu klesl p50 startu z 25,77 s na 7,75 s (3,32×) a startup provádí
    0 per-file I/O originálů. Důkazy: [S2A1_STARTUP_PERFORMANCE.md](S2A1_STARTUP_PERFORMANCE.md).
-4. **S2b — ACCEPTED / IMPLEMENTATION AUTHORIZED, NOT YET IMPLEMENTED.** Nové zadání tímto
+4. **S2b — COMPLETE 2026-10-23.** Nové zadání tímto
    názvem označuje úzký ingest-owned `init` nového archivu, dříve vedený jako S1.
    Návrh zahrnuje JSON CLI, idempotenci, crash recovery, prázdný katalog,
    lokální-only workspace a chráněnou Media Desk orchestraci. Viz
    [S2B_DESIGN.md](S2B_DESIGN.md),
    [S2B_FAILURE_MATRIX.md](S2B_FAILURE_MATRIX.md) a
-   [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md). D-017 až D-020 byly
-   schváleny 2026-10-23; lokální-only workspace je omezení etapy S2b, ne cílové
-   rozhodnutí o přenosné knihovně nebo centrálním úložišti metadat.
+   [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md) a
+   [S2B_VERIFICATION.md](S2B_VERIFICATION.md). Lokální-only workspace je omezení
+   etapy S2b, ne cílové rozhodnutí o přenosné knihovně nebo centrálních metadatech.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

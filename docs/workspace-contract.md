@@ -33,7 +33,10 @@ deletion or media reingest is required. Dry-run never performs this upgrade.
 The asset catalog is atomically replaced near the end of each actual ingest. If
 an ingest terminates before publication, consumers continue to see the last
 complete catalog. A new or legacy workspace may have no catalog until its first
-successful or partially successful contract-aware ingest.
+successful or partially successful contract-aware ingest. An S2b-initialized
+empty workspace is immediately ready: it publishes a valid catalog with
+`assets: []`, then publishes `workspace.json` as the final readiness point.
+This is contract version 1; no special empty asset or schema variant exists.
 
 ## Public contract
 

@@ -54,6 +54,28 @@ The same planner drives dry-run and real ingest. `known`, `new`, and `changed`
 are exclusive source classifications. `exact duplicate` and `previous failure`
 are additional flags and can overlap them.
 
+## Empty archive initialization
+
+S2b adds a separate producer-owned command that does not run ingest:
+
+```powershell
+huhac-media init --storage 'D:\HUHAC\Media' --workspace 'C:\HUHAC\Workspace' --preflight --json
+huhac-media init --storage 'D:\HUHAC\Media' --workspace 'C:\HUHAC\Workspace' --operation-id '<UUID>' --yes --json
+```
+
+Preflight is read-only. Confirmed initialization repeats validation while holding
+an exclusive operation lock, records a private init run, publishes an empty v1
+catalog, and publishes `workspace.json` last. Its stdout is a versioned JSON
+envelope with stable `state` and `error.code` values. It does not scan Media
+Storage, hash files, import media, invoke metadata/preview tools, or orchestrate
+processors. Repeating it over the same ready archive returns `ready_existing`
+without changing identity or data.
+
+Storage and workspace roots must not overlap. For S2b the workspace must be on
+a filesystem positively classified as local; network and unknown workspace
+filesystems are rejected. This is an S2b safety constraint, not a permanent
+architecture decision for the whole pipeline.
+
 ## Metadata
 
 ExifTool runs as:

@@ -1,6 +1,6 @@
 # S2b — failure a recovery matrix
 
-**Stav:** **ACCEPTED / IMPLEMENTATION AUTHORIZED — NOT IMPLEMENTED**
+**Stav:** **ACCEPTED + IMPLEMENTED**
 
 **Návaznost:** [S2B_DESIGN.md](S2B_DESIGN.md), D-009, D-012
 
@@ -90,7 +90,7 @@ init reportu.
 - Stejně privilegovaný lokální proces může provést závod mezi kontrolou a
   operací. Directory handles/no-follow a opakovaná validace riziko omezují, ale
   neodstraňují všechny platformní TOCTOU případy.
-- Detekce SMB/NFS/network mountu není univerzální. Proto `unknown` workspace FS
-  návrh blokuje místo falešné garance.
+- Detekce SMB/NFS/network mountu není univerzální. Proto implementace `unknown`
+  workspace FS blokuje místo falešné garance.
 - Výpadek napájení může vyžadovat SQLite integrity check a kontrolu atomicky
   publikovaných JSON; automatický recovery nesmí hádat.
