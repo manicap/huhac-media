@@ -12,7 +12,7 @@ from huhac_media.exit_codes import ExitCode
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PreviewGenerator
 from huhac_media.services.ingest import IngestService
-from huhac_media.services.archive_init import InitError, InitResult, preflight_archive_init
+from huhac_media.services.archive_init import InitError, initialize_archive, preflight_archive_init
 from huhac_media.services.planner import CatalogSnapshot, Planner
 from huhac_media.services.preflight import render_preflight
 from huhac_media.services.scanner import Scanner
@@ -58,13 +58,10 @@ def main(argv: list[str] | None = None) -> int:
             result.state = "confirmation_required"
             result.error = InitError("CONFIRMATION_REQUIRED", "pass --yes to initialize")
         elif args.yes and result.state == "preflight_ok":
-            result = InitResult(
+            result = initialize_archive(
+                args.storage,
+                args.workspace,
                 result.operation_id,
-                "rejected",
-                result.storage_path,
-                result.workspace_path,
-                warnings=result.warnings,
-                error=InitError("NOT_IMPLEMENTED", "confirmed initialization is not available yet"),
             )
         print(result.to_json())
         if result.state in {"preflight_ok", "ready", "ready_existing"}:

@@ -86,6 +86,32 @@ class CatalogStore:
             )
         return run_id
 
+    def ensure_initialization_run(
+        self, run_id: str, input_path: Path, work_path: Path, effective_config: dict
+    ) -> None:
+        encoded = json.dumps(effective_config, ensure_ascii=False, sort_keys=True)
+        with self.database.transaction() as connection:
+            existing = connection.execute(
+                "SELECT input_path, work_path, effective_config_json FROM runs WHERE id = ?",
+                (run_id,),
+            ).fetchone()
+            if existing is not None:
+                if (
+                    existing["input_path"] != str(input_path)
+                    or existing["work_path"] != str(work_path)
+                    or existing["effective_config_json"] != encoded
+                ):
+                    raise ValueError("initialization run identity mismatch")
+                return
+            connection.execute(
+                """
+                INSERT INTO runs(id, status, started_at, input_path, work_path,
+                                 app_version, effective_config_json)
+                VALUES (?, 'running', ?, ?, ?, ?, ?)
+                """,
+                (run_id, _now(), str(input_path), str(work_path), __version__, encoded),
+            )
+
     def ensure_workspace(self, workspace_id: str) -> None:
         with self.database.transaction() as connection:
             connection.execute(

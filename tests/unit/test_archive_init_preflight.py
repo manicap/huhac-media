@@ -19,8 +19,7 @@ def test_preflight_missing_targets_is_read_only(tmp_path: Path) -> None:
     before = sorted(tmp_path.iterdir())
     result = preflight_archive_init(storage, workspace, classifier=local)
     assert result.state == "preflight_ok"
-    assert result.created["storage_directory"] is True
-    assert result.created["workspace_directory"] is True
+    assert not any(result.created.values())
     assert sorted(tmp_path.iterdir()) == before
 
 
