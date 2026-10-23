@@ -53,6 +53,24 @@ originály. Balíček `media_connector` neimportuje
 - corrupt/malformed existující cíl končí fail-closed bez overwrite;
 - zdrojový byte hash, cesta a `mtime_ns` zůstávají po transferu beze změny.
 
+### Integrační smoke — 2026-10-23
+
+Izolovaný úplný tok init → Local Discovery → Local Transfer → Media Ingest →
+Media Desk je **VERIFIED** na Windows a lokálním filesystemu. Devět syntetických
+vstupů (JPEG s obsahovou duplicitou, PNG, WebP, TIFF, AVI, MP4, MOV a MKV)
+vytvořilo osm fyzických CAS objektů a osm katalogových assetů. Čtyři obrazové
+náhledy byly validní, Media Desk načetl všech osm assetů a video HTTP Range
+vrátil 206. SHA-256, velikost a `mtime_ns` všech externích zdrojů zůstaly
+nezměněné. Naměřené fáze: init preflight 0,683 s; init 1,118 s; discovery
+0,428 s; Transfer preflight 0,520 s; Transfer 1,538 s; Ingest 13,236 s; Media
+Desk 0,692 s.
+
+Úplný protokol, matice formátů a hranice důkazu jsou v
+[TRANSFER_INTEGRATION_SMOKE.md](TRANSFER_INTEGRATION_SMOKE.md). Nativní
+`ffprobe` nebyl na hostu dostupný, proto video metadata v tomto smoke běhu
+poskytl deterministický stub; tato část není vydávána za produkční ověření
+dekodéru videa.
+
 Skipped testy jsou dva skutečné symlink scénáře bez Windows privilege 1314 a
 dva POSIX-only názvové scénáře. Nejsou vydávány za úspěšně ověřené.
 

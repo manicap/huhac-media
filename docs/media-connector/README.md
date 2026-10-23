@@ -59,6 +59,8 @@ Storage a nesmí se překrývat se zdrojem, workspace ani state rootem.
   rozhraní a akceptační testy Transferu;
 - [TRANSFER_JSON_CONTRACT.md](TRANSFER_JSON_CONTRACT.md) — implementovaný veřejný
   CLI kontrakt Transferu;
+- [TRANSFER_INTEGRATION_SMOKE.md](TRANSFER_INTEGRATION_SMOKE.md) — izolované
+  ověření toku init, Discovery, Transfer, Ingest a Media Desk;
 - [STATUS.md](STATUS.md) — skutečný stav a podklady auditu.
 
 ## Terminologie
