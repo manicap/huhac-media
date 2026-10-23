@@ -12,6 +12,7 @@ from huhac_media.exit_codes import ExitCode
 from huhac_media.media.metadata import MetadataExtractor
 from huhac_media.media.preview import PreviewGenerator
 from huhac_media.services.ingest import IngestService
+from huhac_media.services.archive_init import InitError, InitResult, preflight_archive_init
 from huhac_media.services.planner import CatalogSnapshot, Planner
 from huhac_media.services.preflight import render_preflight
 from huhac_media.services.scanner import Scanner
@@ -37,11 +38,40 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--yes", "--non-interactive", dest="non_interactive", action="store_true")
     ingest.add_argument("--no-warn-existing-workdir", action="store_true")
     ingest.add_argument("--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default="INFO")
+    init = subparsers.add_parser("init", help="initialize an empty archive")
+    init.add_argument("--storage", type=Path, required=True)
+    init.add_argument("--workspace", type=Path, required=True)
+    init.add_argument("--operation-id")
+    init.add_argument("--preflight", action="store_true")
+    init.add_argument("--yes", action="store_true")
+    init.add_argument("--json", action="store_true", required=True)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "init":
+        result = preflight_archive_init(
+            args.storage, args.workspace, operation_id=args.operation_id
+        )
+        if not args.preflight and not args.yes and result.state == "preflight_ok":
+            result.state = "confirmation_required"
+            result.error = InitError("CONFIRMATION_REQUIRED", "pass --yes to initialize")
+        elif args.yes and result.state == "preflight_ok":
+            result = InitResult(
+                result.operation_id,
+                "rejected",
+                result.storage_path,
+                result.workspace_path,
+                warnings=result.warnings,
+                error=InitError("NOT_IMPLEMENTED", "confirmed initialization is not available yet"),
+            )
+        print(result.to_json())
+        if result.state in {"preflight_ok", "ready", "ready_existing"}:
+            return ExitCode.SUCCESS
+        if result.state == "confirmation_required":
+            return ExitCode.CANCELLED
+        return ExitCode.FATAL
     if args.command == "ingest":
         overrides = {
             "input": str(args.input) if args.input else None,
