@@ -55,4 +55,3 @@ def test_transport_stream_signature_is_deterministic(tmp_path: Path) -> None:
     second.write_bytes(payload)
     assert classify_content(first).canonical_suffix == "mts"
     assert classify_content(second).canonical_suffix == "mts"
-

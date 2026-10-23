@@ -14,4 +14,3 @@ def test_state_is_bound_to_workspace(tmp_path: Path) -> None:
     with pytest.raises(ConnectorError) as caught:
         TransferRepository(tmp_path, "87654321-4321-8765-4321-876543218765")
     assert caught.value.code == "STATE_LIBRARY_MISMATCH"
-

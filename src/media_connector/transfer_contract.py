@@ -87,4 +87,3 @@ def read_selection(path: Path) -> TransferSelection:
         seen.add(item.object_id)
         items.append(item)
     return TransferSelection(workspace_id, adapter_kind, source_id, source_root, tuple(items))
-

@@ -83,4 +83,3 @@ def test_preflight_rejects_overlapping_roots(workspace: Path, tmp_path: Path, ca
     )
     assert result == 2
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "ROOT_OVERLAP"
-
