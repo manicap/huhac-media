@@ -4,37 +4,46 @@
 
 **Větev:** `feature/media-connector`
 
-**Základ:** `0433703ad88293c03000dbd1cd4197fbd2e2a51e`
+**MC1:** IMPLEMENTED / COMPLETE
 
-## Skutečný stav
+## Implementováno
 
-- **IMPLEMENTED:** samostatná vývojová větev a dokumentační prostor.
-- **ACCEPTED/TARGET:** oficiální název Media Connector; jeden klient = jedna
-  knihovna; `workspace_id` jako identita; samostatné adaptéry; CLI modul;
-  zachování workspace contract v1; izolace od ingest SQLite; rozsah MC1.
-- **PROPOSED:** budoucí staging, handoff manifest, recovery model, privátní stav
-  a OAuth bezpečnostní model.
-- **ABSENT:** runtime kód, CLI, lokální adaptér, Google Drive adaptér, transfer,
-  journal, handoff a integrace s Media Ingestem.
-- **UNVERIFIED:** Google API chování, Windows reparse-point implementace,
-  nativní Linux confinement, NAS/cloud failure scénáře a výkon velkých listingů.
+- samostatný balíček a CLI `media-connector local-discovery`;
+- read-only načtení `workspace_id` z veřejného workspace contractu v1;
+- lokální adaptér a společný `SourceAdapter` protocol;
+- deterministická NFC-normalizovaná enumerace běžných souborů;
+- source-bound cursor a stránky 1 až 10 000 položek;
+- odmítnutí překryvu source/workspace, nebezpečných cest a kolizí;
+- symlink/reparse skipping bez následování;
+- stabilní JSON success/error envelope a chybové kódy;
+- nulové čtení obsahu, hashing, persistence, staging a orchestrace.
 
-## Auditovaný základ
+## Zachované hranice
 
-Před návrhem byly porovnány:
+Workspace contract v1, Media Desk, Media Ingest, ingest SQLite, Media Storage a
+analytické procesory nebyly změněny. Balíček `media_connector` neimportuje
+`media_desk` ani `huhac_media`.
 
-- `AGENTS.md` a Documentation First & Documentation Sync;
-- `docs/system-overview.md` a `docs/architecture.md`;
-- `docs/media-ingest.md` a `docs/workspace-contract.md`;
-- dokončená rozhodnutí a roadmap Media Desku v
-  `docs/media-desk/DECISIONS.md` a `docs/media-desk/ROADMAP.md`;
-- lokální a vzdálený commit větve `mediadesk` po `git fetch`.
+## Ověření
 
-Původní názvoslovný rozpor je rozhodnut: komponenta se jmenuje Media Connector.
-Globální dokumentace je synchronizována ve stejném dokumentačním commitu.
+- `30 passed, 4 skipped` — cílené MC1 unit, CLI a bezpečnostní testy na Windows;
+- `2 passed` — existující ingest CLI regresní test;
+- `compileall` — bez chyby;
+- module CLI smoke — validní jediný JSON error envelope a exit `2`;
+- skutečný Windows NTFS junction — `LINK_SKIPPED`, žádná enumerace cíle;
+- `git diff --check` a relativní dokumentační odkazy — kontrolují se před
+  finálním commitem.
 
-## Důkazy a testy této etapy
+Skipped testy jsou dva skutečné symlink scénáře bez Windows privilege 1314 a
+dva POSIX-only názvové scénáře. Nejsou vydávány za úspěšně ověřené.
 
-Produkční kód se nemění, proto nejsou runtime testy účelné. Před uzavřením
-dokumentačního commitu se ověří relativní odkazy, `git diff --check`, seznam
-změněných souborů a nezměněný základ větve `mediadesk`.
+## Známá omezení
+
+- Google Drive, OAuth, transfer, staging, manifest, databáze a Ingest handoff
+  jsou **ABSENT**;
+- nativní Linux testy jsou **UNVERIFIED**;
+- stránkování znovu prochází celý strom a není konzistentní snapshot;
+- obsah, MIME ani skutečný media typ se nečtou a neověřují;
+- observační verze `size + mtime_ns` není obsahová integrita ani asset identity;
+- výkon velmi velkých stromů a reálné offline NAS chyby nejsou změřené;
+- absolutní source root je součást lokálního JSON výstupu a může být citlivý.

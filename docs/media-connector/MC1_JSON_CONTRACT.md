@@ -1,6 +1,6 @@
 # MC1 — veřejný JSON CLI kontrakt
 
-**Stav:** ACCEPTED/TARGET
+**Stav:** ACCEPTED + IMPLEMENTED
 
 **Contract ID:** `huhac.media-connector.local-discovery`
 
@@ -87,6 +87,7 @@ Stabilní kódy MC1:
 | `CURSOR_SOURCE_MISMATCH` | 2 | false |
 | `SOURCE_NOT_FOUND` | 3 | true |
 | `SOURCE_NOT_DIRECTORY` | 2 | false |
+| `SOURCE_WORKSPACE_OVERLAP` | 2 | false |
 | `SOURCE_PERMISSION_DENIED` | 3 | true |
 | `SOURCE_OFFLINE` | 3 | true |
 | `UNSAFE_SOURCE_ROOT` | 2 | false |

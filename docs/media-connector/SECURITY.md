@@ -1,64 +1,44 @@
-# Media Connector — bezpečnostní návrh
+# Media Connector — bezpečnost
 
-**Stav:** PROPOSED / NOT IMPLEMENTED
+**MC1:** IMPLEMENTED
 
-## Trust boundaries
+**Transfer a cloud bezpečnost:** PROPOSED / NOT IMPLEMENTED
 
-Nedůvěryhodné jsou názvy, cesty, MIME typy, metadata, checksums i obsah ze
-zdroje. Connector data nekóduje ani nespouští. Síť, mount a zdroj se mohou změnit
-mezi discovery a čtením; každé otevření proto znovu ověřuje identitu a hranice.
+## Implementované hranice MC1
 
-## Lokální adaptér
+- Source root je explicitní, musí existovat jako adresář a nesmí být link ani
+  Windows reparse point.
+- Source root a workspace se nesmějí překrývat žádným směrem.
+- Enumerace používá `lstat`/`stat` bez otevření obsahu.
+- Directory a file symlinky, junctions a reparse points se nenásledují a vrací
+  `LINK_SKIPPED` warning.
+- Každý navštívený adresář se znovu resolve a musí zůstat pod kanonickým rootem.
+- Logické cesty odmítají traversal, absolutní/oddělovací prvky, NUL, control
+  znaky, ADS dvojtečku, trailing dot/space a Windows device names.
+- Kolize po NFC normalizaci a case-foldingu fail-closed.
+- Connector zdroje nemaže, nepřejmenovává, nepřepisuje ani nehashuje.
+- Jediný výstup je JSON na stdout; MC1 nevytváří config, log, DB ani manifest.
+- Cursor je pouze paginační pomůcka vázaná na source ID, ne bezpečnostní token.
+- Chybová hlášení jsou bounded; neočekávaná výjimka se nepředává v tracebacku.
 
-- Kořen zdroje je explicitní a kanonizovaný.
-- Enumerace nenásleduje directory ani file symlinky.
-- Každé otevření používá path confinement a kontrolu symlink/reparse-point
-  escape; lexikální prefix není dostatečný.
-- Relativní cesty s `..`, absolutním prefixem, alternate data streamem, device
-  názvem nebo NUL jsou odmítnuty.
-- TOCTOU riziko se omezuje handle-based kontrolou, kde ji OS podporuje, a
-  kontrolou verze před/po čtení. Na platformě bez potřebné primitive se operace
-  musí fail-closed nebo být označena jako nepodporovaná.
-- Zdroj se nikdy nemaže, nepřejmenovává ani nemění.
+Filesystem se může měnit během enumerace a MC1 nedrží snapshot ani otevřené
+handles souborů. Výsledek je proto bezpečný read-only observation, nikoli důkaz
+integrity nebo úplnosti v jednom časovém okamžiku.
 
-## Google Drive adaptér
+## Budoucí staging a transfer
 
-- Výchozí OAuth scope je pouze `drive.readonly`; širší scope vyžaduje nové
-  rozhodnutí.
-- Authorization Code + PKCE nebo device flow; klientské tajemství vložené do
-  desktopové aplikace se nepovažuje za tajné.
-- Refresh token se ukládá do OS credential store, ne do JSON configu, manifestu,
-  logu ani Git repozitáře.
-- Logy redigují Authorization hlavičky, tokeny, cookies a signed download URL.
-- TLS se ověřuje; neomezené redirecty, neznámé hosty a vypnutí validace
-  certifikátu jsou zakázané.
-- API retry respektuje `Retry-After`, kvóty a bounded exponential backoff.
-- Shared Drive musí být explicitně povolen ve zdrojovém profilu. Shortcut se
-  buď bezpečně resolvuje s detekcí cyklu, nebo odmítne.
+Schválen je pouze směr samostatného stagingu před Media Storage. Atomická
+publikace, limity, recovery, writer, persistence a retence zůstávají otevřené a
+v MC1 není žádný cílový zápis.
 
-## Cílový zápis
+## Budoucí Google Drive
 
-- Logická cesta se mapuje pod jediný schválený delivery root; kolize po Unicode
-  normalizaci a case-foldingu jsou explicitní chyba nebo deterministické
-  přejmenování zaznamenané v manifestu.
-- Platí limity na počet položek, velikost položky, celkový objem, dobu přenosu a
-  souběžnost. Nedostatek místa selže před publikací.
-- Dočasné soubory mají nejmenší praktická oprávnění a nejsou zpřístupněny jako
-  hotové médium.
-- Publikace je atomická na stejném filesystemu; přes-filesystemové přejmenování
-  se nesmí vydávat za atomické.
-- Existující neznámý soubor nebo adresář se nepřepisuje.
+Google Drive je samostatná etapa. OAuth scope, credential store, token redakce,
+TLS/retry a shared-drive politika zůstávají návrhem. Běžné soubory, shortcuts a
+cloud-native dokumenty musí být explicitně odlišeny; nic z toho MC1 neobsahuje.
 
-## Tajné a osobní údaje
+## Izolace komponent
 
-Zdrojové ID, názvy souborů a Drive metadata mohou být osobní údaje. Reporty a
-manifesty obsahují jen minimum nutné pro audit a retry. Diagnostický export musí
-mít samostatnou redakční politiku. Retence, export a odstranění connector state
-jsou před implementací Google Drive otevřené otázky.
-
-## Oddělení od ostatních komponent
-
-Connector nemá oprávnění zapisovat workspace ani číst ingest SQLite. Neimportuje
-interní Python API Media Ingestu. Budoucí integrace probíhá přes výslovně
-schválenou veřejnou hranici a nesmí obcházet existující zamykání či SHA-256
-identitu Ingestu.
+Connector zapisuje nulové workspace artefakty, nečte ingest SQLite a neimportuje
+interní kód Media Ingestu ani Media Desku. Budoucí provenience vyžaduje veřejný
+integrační kontrakt bez změny workspace contract v1.

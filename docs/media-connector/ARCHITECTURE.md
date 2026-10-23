@@ -2,7 +2,7 @@
 
 **Architektonický směr:** ACCEPTED
 
-**MC1 runtime:** NOT IMPLEMENTED (do dokončení implementační etapy)
+**MC1 runtime:** IMPLEMENTED
 
 ## Účel a identita
 
@@ -69,7 +69,9 @@ adapters/local.py
 ```
 
 Přímé importy těchto Python tříd jsou interní. Veřejným kontraktem MC1 je pouze
-CLI popsané v [MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md).
+CLI popsané v [MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md). Implementace je v
+`src/media_connector/` a nemá import dependency na `media_desk` ani
+`huhac_media`.
 
 ## Oddělení budoucích adaptérů
 

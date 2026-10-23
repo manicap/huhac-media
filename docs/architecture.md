@@ -7,6 +7,12 @@ Quality, Audio, cross-asset Similarity, semantic normalization, indexing, and
 domain-specific interpretation are future, not implemented consumers. Ingest
 neither knows their models nor schedules or stores their processing state.
 
+Media Connector MC1 is an independent source-side CLI. It validates only the
+public workspace identity and performs read-only local metadata discovery. It
+does not import Ingest internals, write a workspace, transfer originals, or
+schedule processing. Its JSON discovery contract is separate from workspace
+contract v1.
+
 Within the producer, M1 is layered as CLI, application services, domain model,
 media adapters, and persistence. The flow is `scan -> plan -> confirm -> ingest
 -> publish contract -> report`. Originals are always opened read-only.

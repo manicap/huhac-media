@@ -1,16 +1,19 @@
 # Media pipeline system overview
 
-The implemented system currently has six components: Media Ingest Tool v1,
-Session Grouper v1, Video Keyframe Extractor v1, Vision Processor v1, and
-Faces Processor v1, plus the read-only Media Desk with S2b archive setup.
+The implemented system currently has seven components: Media Ingest Tool v1,
+Session Grouper v1, Video Keyframe Extractor v1, Vision Processor v1, Faces
+Processor v1, the read-only Media Desk, and Media Connector MC1.
 Everything else in this overview is explicitly future work.
 
 ```text
 MEDIA SOURCES
     |
     v
-[FUTURE: Media Connector -- MC1 AUTHORIZED, NOT YET IMPLEMENTED]
-    external/local source -> collect/download -> provenance -> local inbox
+[Media Connector MC1 -- IMPLEMENTED READ-ONLY LOCAL DISCOVERY]
+    local source -> metadata-only enumeration -> versioned JSON
+    no Media Ingest handoff; future acquisition/staging -- NOT IMPLEMENTED
+
+MEDIA STORAGE / EXPLICIT INPUT
     |
     v
 Media Ingest Tool v1 -- IMPLEMENTED
@@ -56,6 +59,11 @@ Media Desk reads that same public JSON contract. Its browsing runtime remains
 read-only. S2b setup invokes the producer-owned `huhac-media init` JSON CLI
 without importing ingest internals, validates the result through the public
 contract, and only then stores the local workspace profile.
+
+Media Connector MC1 is an independent CLI source component. It reads only the
+public workspace identity, enumerates local source metadata without opening
+content, and emits a separate JSON contract. It does not write the workspace,
+Media Storage, ingest SQLite, or processor namespaces.
 
 Session Grouper is an independent consumer. It reads only the public JSON
 contract and writes only beneath `analysis/session-grouper/`. It groups media by

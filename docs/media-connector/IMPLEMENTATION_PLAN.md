@@ -2,7 +2,7 @@
 
 **Architektonický směr:** ACCEPTED
 
-**Aktivní etapa:** MC1 — read-only Local Discovery
+**Etapa MC1:** COMPLETE
 
 ## Přesný rozsah MC1
 
@@ -21,7 +21,7 @@ chyba argumentu či kontraktu `2` a zdrojová/I/O chyba `3`. Text chyb se nikdy
 nemusí parsovat. Přesné schema a kódy jsou v
 [MC1_JSON_CONTRACT.md](MC1_JSON_CONTRACT.md).
 
-Implementované části:
+Dodané části:
 
 1. balíček `media_connector` nezávislý na Media Desku a Ingest internals;
 2. společné immutable typy a `SourceAdapter` protocol;
@@ -35,7 +35,7 @@ Výslovně mimo MC1 jsou čtení obsahu, SHA-256, detekce médií, kopie, stagin
 manifest na disku, databáze, konfigurace profilu, OAuth, Google Drive, Media
 Desk, spuštění Ingestu a jakákoli změna workspace.
 
-## Implementační kroky
+## Realizované kroky
 
 1. Přidat typy `SourceObject`, `ObjectPage`, `AdapterCapabilities`, warning a
    strukturovanou chybu.
@@ -62,13 +62,15 @@ Desk, spuštění Ingestu a jakákoli změna workspace.
 - link/reparse source root je odmítnut;
 - chybějící root, neadresář, permission error a dostupná offline OS signalizace
   mají strukturované chyby;
+- source root a workspace se nesmějí překrývat žádným směrem;
 - discovery neotevře obsah souboru a nemění zdroj ani workspace;
 - opakované spuštění nad nezměněným stromem vrátí ekvivalentní položky;
 - CLI na úspěch i chybu vytiskne právě jeden validní JSON objekt;
 - import graph balíčku neobsahuje `media_desk` ani `huhac_media`.
 
-Nativní Linux confinement a skutečné Windows junction/reparse chování se musí
-uvádět jako **UNVERIFIED**, pokud neproběhne odpovídající platformní test.
+Nativní Linux confinement zůstává **UNVERIFIED**. Reálný Windows NTFS junction
+smoke proběhl; vytvoření klasického symlinku nebylo účtu povoleno a příslušné
+testy jsou transparentně skipped. Reparse atribut je navíc pokryt unit testem.
 
 ## Následující etapy — neautorizované
 

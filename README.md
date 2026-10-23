@@ -1,7 +1,7 @@
 # huhac-media
 
 `huhac-media` is a local, Windows-oriented media workspace pipeline. The stable
-checkpoint currently contains six implemented components:
+checkpoint currently contains seven implemented components:
 
 - **Media Ingest Tool v1** scans immutable originals, tracks source history,
   deduplicates content by SHA-256, extracts metadata, creates image previews,
@@ -19,6 +19,8 @@ checkpoint currently contains six implemented components:
   inputs, then independently clusters embeddings into anonymous groups.
 - **Media Desk** provides the read-only gallery, local workspace/originals
   configuration, and S2b orchestration of producer-owned empty archive setup.
+- **Media Connector MC1** provides JSON-only, read-only discovery of a local
+  source tree without opening content or changing the workspace.
 
 The semantic Normalizer, OCR, cross-asset Similarity, Quality, Audio,
 event interpretation, Media Connector acquisition beyond MC1, and orchestration are future work and
@@ -61,6 +63,7 @@ Both commands also work as Python modules:
 ```powershell
 python -m huhac_media ingest --input 'D:\Media' --dry-run
 python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
+python -m media_connector local-discovery --workspace 'C:\HUHAC\Workspace' --source-root 'D:\Incoming'
 ```
 
 ## Documentation
@@ -79,6 +82,8 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
   licenses for optional model-backed processors.
 - [Media workspace contract](docs/workspace-contract.md): the public JSON
   compatibility boundary and processor ownership rules.
+- [Media Connector MC1](docs/media-connector/README.md): read-only local source
+  discovery, public JSON CLI contract, adapter boundary, and security limits.
 - [System overview](docs/system-overview.md): implemented components, future
   pipeline, architectural decisions, handoff, and milestones.
 - [Architecture](docs/architecture.md) and [data model](docs/data-model.md):
