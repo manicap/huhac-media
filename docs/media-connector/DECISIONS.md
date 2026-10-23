@@ -1,6 +1,6 @@
 # Media Connector — registr rozhodnutí a otázek
 
-**Aktualizováno:** 2026-10-23 po schválení source immutability a mandatory transfer
+**Aktualizováno:** 2026-10-23 po schválení MC-D017
 
 Stavy: **ACCEPTED/TARGET** je závazná schválená hranice;
 **PROPOSED** čeká na schválení; **OPEN** vyžaduje budoucí volbu;
@@ -24,7 +24,7 @@ Stavy: **ACCEPTED/TARGET** je závazná schválená hranice;
 | MC-D014 | Povinný tok je `Connector → Discovery → Transfer → ověřená publikace do Media Storage`. Media Ingest smí dostat pouze lokálně převzaté a ověřené originály z Media Storage; přímý ingest externího zdroje není podporovaný handoff. | **ACCEPTED/TARGET; TRANSFER ABSENT** |
 | MC-D015 | Nedokončený nebo neověřený transfer není platné médium a nesmí být publikován. Spuštění Media Ingestu je samostatná operace nezávislá na Transferu. | **ACCEPTED/TARGET; TRANSFER ABSENT** |
 | MC-D016 | Transfer deduplikuje podle identity obsahu: více externích zdrojů může odkazovat na jediný převzatý originál. Evidence zdrojů a historie transferů je oddělena od originálních souborů. | **ACCEPTED/TARGET; DATA MODEL OPEN** |
-| MC-D017 | Media Transfer použije content-addressed Media Storage, same-filesystem staging, privátní Connector state a atomic no-replace publikaci podle [MC-ADR-001](TRANSFER_ADR.md). | **PROPOSED / AWAITING APPROVAL** |
+| MC-D017 | Media Transfer použije SHA-256 content-addressed Media Storage, same-filesystem staging, privátní Connector state a atomic no-replace publikaci podle [MC-ADR-001](TRANSFER_ADR.md). SHA-256 je jediná identita objektu; kanonická přípona je pouze deterministická Ingest-kompatibilní reprezentace. Stejné bajty mají právě jeden fyzický originál bez ohledu na zdrojový název nebo příponu. | **ACCEPTED/TARGET; IMPLEMENTATION IN PROGRESS** |
 
 ## Otevřené otázky mimo MC1
 
@@ -45,7 +45,7 @@ Stavy: **ACCEPTED/TARGET** je závazná schválená hranice;
 JSON na stdout a nemění zdroj, workspace ani jiné persistentní úložiště. Blokují
 však implementaci Transferu a publikace do Media Storage.
 
-Detailní návrh k rozhodnutí MC-D017 je v
+Schválený detail rozhodnutí MC-D017 je v
 [TRANSFER_ADR.md](TRANSFER_ADR.md) a prováděcí kroky v
-[TRANSFER_IMPLEMENTATION_PLAN.md](TRANSFER_IMPLEMENTATION_PLAN.md). Do
-schválení se Transfer neimplementuje.
+[TRANSFER_IMPLEMENTATION_PLAN.md](TRANSFER_IMPLEMENTATION_PLAN.md). Implementace
+nesmí měnit Media Ingest, jeho SQLite, Media Desk ani workspace contract v1.

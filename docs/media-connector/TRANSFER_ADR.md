@@ -1,10 +1,10 @@
 # MC-ADR-001 — Media Transfer a content-addressed Media Storage
 
-**Stav:** PROPOSED / AWAITING APPROVAL
+**Stav:** ACCEPTED / IMPLEMENTATION AUTHORIZED
 
 **Datum:** 2026-10-23
 
-**Rozsah:** budoucí Media Transfer; MC1 se nemění
+**Rozsah:** Media Transfer; MC1 se nemění
 
 ## Kontext a závazné vstupy
 
@@ -78,10 +78,19 @@ Media Storage používá content-addressed namespace:
   objects/sha256/<first-2-hex>/<64-hex>/payload.<canonical-suffix>
 ```
 
-Adresář `<64-hex>` je identita objektu. Obsahuje právě jeden běžný payload
-soubor, žádný manifest, lock ani dočasná data. `canonical-suffix` určí verzovaný
-Ingest Compatibility Profile z ověřeného formátu; nikdy se nepřebírá jako
-nedůvěryhodná cesta. Stejný hash nesmí vytvořit druhý fyzický payload.
+Adresář `<64-hex>` je identita objektu a SHA-256 je jeho jediná content identity.
+Přípona ani zdrojový název nejsou součástí identity. Adresář obsahuje právě jeden
+běžný payload soubor, žádný manifest, lock ani dočasná data. `canonical-suffix`
+určí verzovaný Ingest Compatibility Profile z ověřeného obsahu/formátu; nikdy se
+nepřebírá přímo jako nedůvěryhodná zdrojová přípona. Profil používá pevné pořadí
+detekce signatur a jedno mapování `detected format -> canonical suffix`. Proto
+stejné bajty pod různými názvy nebo příponami vždy zvolí stejnou příponu. Pokud
+obsah nelze jednoznačně klasifikovat bez důvěry ve zdrojový název, v první etapě
+se nepublikuje. Stejný hash nesmí vytvořit druhý fyzický payload.
+
+Změna Compatibility Profile platí pouze pro nové objekty. Již publikované
+objekty se automaticky nepřejmenovávají ani nepřemisťují; jejich profil a přípona
+zůstávají součástí evidence, zatímco SHA-256 identita zůstává stejná.
 
 Transfer SHA-256 má stejný algoritmus a textový tvar jako Ingest, ale Ingest jej
 při samostatném běhu vždy nezávisle přepočítá a teprve on publikuje `asset_id`.
@@ -107,6 +116,13 @@ Povinné pořadí:
 6. publikovat celý item adresář platformním atomic **no-replace** rename do
    content-addressed cíle;
 7. fsync cílového parentu, potom transakčně označit objekt jako `published`.
+
+Crash consistency používá write-ahead stav položky: DB nejprve uloží očekávaný
+SHA-256, velikost, staging a finální cestu ve stavu `publishing`; teprve potom
+proběhne filesystem publish. Pád po rename a před DB potvrzením je rozpoznatelný
+a recovery smí finální objekt adoptovat pouze po úplném rehashi a kontrole
+jediného regular non-link payloadu. Staging ani publikovaný objekt se při této
+rekonciliaci automaticky nemažou.
 
 Publikační bod je úspěšný no-replace rename. Obyčejný copy, overwrite nebo
 cross-filesystem move není publikace. Implementace musí mít explicitní Windows
@@ -161,8 +177,14 @@ Minimální entity:
 Jeden aktivní writer na knihovnu drží OS lock. SQLite transakce zaznamenává stav
 před a po externí filesystem operaci; DB a filesystem netvoří jednu atomickou
 transakci, proto recovery vždy reconciliuje oba světy. Multi-host zápis není
-podporovaný. Záloha state je samostatná odpovědnost Connectoru; ztráta state
-nesmí poškodit originály, ale znamená ztrátu zdrojové historie.
+podporovaný. Záloha state je samostatná odpovědnost Connectoru. Přenositelný,
+redigovaný provenance manifest obsahuje workspace ID, source reference, content
+SHA-256, velikost, relativní CAS cestu, profil a dokončený stav, ale ne absolutní
+source root ani tajné údaje. Při změně hostitele se privátní SQLite automaticky
+nepovažuje za přenositelný sdílený writer: obnoví se pouze z explicitní zálohy se
+shodným workspace ID, nebo se založí nový lokální stav a existující CAS objekty
+se adoptují jen při novém transferu/recovery po plném ověření. Ztráta state
+nepoškodí originály, ale bez exportu znamená ztrátu detailní zdrojové historie.
 
 ### 6. Recovery a konzistence
 
@@ -203,7 +225,7 @@ stagingů vyžaduje explicitní, auditovanou operaci v pozdější etapě.
 - Connector state je jediný vlastník externí provenience a transfer historie.
 - Content-addressed namespace usnadní dedup a recovery, ale není lidsky čitelný.
 
-## Body ke schválení
+## Schválené body
 
 1. Content-addressed adresář na SHA-256 s jediným `payload.<canonical-suffix>`.
 2. Povinný Ingest Compatibility Profile a zákaz publikace nejednoznačného

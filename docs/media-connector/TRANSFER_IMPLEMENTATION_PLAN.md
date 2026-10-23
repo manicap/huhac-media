@@ -1,10 +1,10 @@
 # Media Transfer — detailní implementační plán
 
-**Stav:** PROPOSED / BLOCKED ON MC-ADR-001 APPROVAL
+**Stav:** ACCEPTED / IMPLEMENTATION IN PROGRESS
 
-**Runtime:** NOT IMPLEMENTED
+**Runtime:** PARTIAL UNTIL ALL ACCEPTANCE TESTS PASS
 
-Plán vychází z [TRANSFER_ADR.md](TRANSFER_ADR.md). Neautorizuje implementaci.
+Plán vychází ze schváleného [TRANSFER_ADR.md](TRANSFER_ADR.md).
 
 ## Veřejná a interní rozhraní
 
@@ -55,13 +55,18 @@ adapter contractu musí zachovat read-only zdroj.
 
 1. Schválit MC-ADR-001.
 2. Zmrazit JSON envelope, `selection-v1`, error codes a stavový automat.
-3. Vytvořit Ingest Compatibility Profile v1 s canonical suffix mappingem.
+3. Vytvořit Ingest Compatibility Profile v1 s deterministickým mapováním
+   ověřené signatury/formátu na canonical suffix. Zdrojová přípona není vstupem
+   identity ani rozhodujícím vstupem klasifikace.
 4. Přidat fixture matrix všech podporovaných image/video formátů proti skutečnému
    `detect_media` a metadata refinement; runtime Connector nesmí importovat
    privátní Ingest Python API.
 
 Akceptace: extensionless MTS/M2TS nesmí projít jako ingest-ready; každý
 publikovatelný fixture musí Ingest rozpoznat ve fyzickém CAS layoutu.
+Stejné bajty pod různými názvy/příponami musí zvolit shodný SHA-256, shodný
+canonical suffix a jediný fyzický objekt. Změna profilu nesmí přesouvat existující
+objekty.
 
 ### T1 — path preflight, locks a state schema
 
@@ -91,6 +96,8 @@ change, read error, disk full a interrupt nikdy nevytvoří publikovaný objekt.
 3. Existující objekt vždy plně ověřit před dedup vazbou.
 4. Publikovat nový objekt, fsync parent a dokončit state transition.
 5. Neznámý/malformed/mismatching cíl fail-closed bez overwrite.
+6. Před publish uložit write-ahead `publishing` záznam s očekávaným hashem a
+   cestami; po rename fsyncnout parent a teprve potom potvrdit SQLite.
 
 Akceptace: dvě source reference se stejnými bajty vytvoří jeden payload a dvě
 metadata vazby; paralelní race skončí jedním publish a jedním ověřeným dedupem.
@@ -105,6 +112,8 @@ hash verify očekávaného cíle.
 Akceptace: restart nikdy nepublikuje partial, nepřepíše existující objekt ani
 neztratí již commitnutou source-content vazbu. Výpadek zdroje/disku je retryable,
 pokud chyba není integritní.
+Pád po publish před SQLite potvrzením musí být bezpečně rekoncilovatelný plným
+ověřením cíle bez nového čtení zdroje a bez automatického mazání.
 
 ### T5 — handoff a nezměněný Media Ingest
 
@@ -118,6 +127,11 @@ pokud chyba není integritní.
 Akceptace: Ingest nikdy neuvidí staging/state/manifest, workspace contract zůstane
 v1 a původní externí path je dostupný v Connector manifestu, ne fingovaný v
 Ingest katalogu.
+
+Manifest je přenositelná evidence dokončených vazeb. Privátní SQLite je lokální
+provozní stav, nikoli katalog Ingestu ani automaticky sdílená databáze mezi hosty.
+Obnova SQLite na jiném hostu vyžaduje explicitní zálohu a kontrolu workspace ID;
+bez ní se CAS objekty nikdy slepě neadoptují.
 
 ### T6 — dokumentace a provozní ověření
 
