@@ -46,6 +46,42 @@
     {% endif %}
   </section>
 
+  <section class="panel settings-editor">
+    <p class="eyebrow">NOVÝ ARCHIV</p><h2>Založit prázdný archiv</h2>
+    <p class="muted">Inicializace vytvoří pouze prázdný Media Storage a workspace. Nespouští import, sken, hashování ani procesory.</p>
+    {% if workspace_editable %}
+      <form action="/settings/archive/preflight" method="post" class="settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="archive-storage">Media Storage pro budoucí originály</label>
+        <input id="archive-storage" name="storage" maxlength="4096" value="{{ archive_storage }}" placeholder="D:\HUHAC\Media nebo /mnt/archive/media" autocomplete="off" required>
+        <label for="archive-workspace">Lokální workspace</label>
+        <input id="archive-workspace" name="workspace" maxlength="4096" value="{{ archive_workspace }}" placeholder="C:\HUHAC\Workspace nebo /var/lib/huhac/workspace" autocomplete="off" required>
+        <p class="field-help">Kořeny se nesmějí překrývat. Workspace musí být v etapě S2b na prokazatelně lokálním filesystemu.</p>
+        <button class="secondary-action" type="submit">Bezpečně ověřit</button>
+      </form>
+      {% if archive_result %}
+        <div class="validation-result status-{{ 'connected' if archive_result.successful else 'invalid' }}">
+          <strong>{{ archive_result.state }}</strong>
+          <span>{{ archive_result.error_message or 'Cesty splňují podmínky inicializace.' }}</span>
+          {% for warning in archive_result.warnings %}<span>{{ warning }}</span>{% endfor %}
+        </div>
+      {% endif %}
+      {% if archive_nonce %}
+        <form action="/settings/archive/initialize" method="post" class="save-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="storage" value="{{ archive_storage }}">
+          <input type="hidden" name="workspace" value="{{ archive_workspace }}">
+          <input type="hidden" name="operation_id" value="{{ archive_result.operation_id }}">
+          <input type="hidden" name="confirmation_nonce" value="{{ archive_nonce }}">
+          <button class="primary-action" type="submit">Vytvořit prázdný archiv</button>
+          <span>Po dokončení bude nutný restart Media Desku.</span>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="settings-message">Nový archiv lze založit jen tehdy, když aktivní workspace neurčuje CLI, ENV nebo explicitní config.</p>
+    {% endif %}
+  </section>
+
   <section class="panel settings-originals">
     <div class="section-title">
       <div><p class="eyebrow">ORIGIN&Aacute;LY</p><h2>Lok&aacute;ln&iacute; mapov&aacute;n&iacute; zdroje</h2></div>

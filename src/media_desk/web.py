@@ -25,6 +25,7 @@ from media_desk.config import (
     save_profile_workspace,
     user_config_path,
 )
+from media_desk.archive_setup import ArchiveSetupClient, ArchiveSetupError, ArchiveSetupResult, ConfirmationStore
 from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_date, capture_label
 from media_desk.models import Artifact, Asset, OriginalReference, WorkspaceSnapshot
 from media_desk.originals import (
@@ -223,6 +224,7 @@ def create_app(
     keyframe_fingerprint: str | None = None,
     *,
     settings: Settings | None = None,
+    archive_setup_client: ArchiveSetupClient | None = None,
 ) -> FastAPI:
     if settings is None:
         settings = Settings(
@@ -246,6 +248,8 @@ def create_app(
     app.state.library_index = LibraryIndex(snapshot) if snapshot is not None else None
     app.state.settings = settings
     app.state.csrf_secret = secrets.token_urlsafe(32)
+    app.state.archive_setup_client = archive_setup_client or ArchiveSetupClient()
+    app.state.archive_confirmations = ConfirmationStore()
     templates.env.globals["active_workspace_id"] = snapshot.workspace_id if snapshot else "none"
 
     def require_snapshot() -> WorkspaceSnapshot:
@@ -263,6 +267,10 @@ def create_app(
         notice: str | None = None,
         mapping_candidate: str | None = None,
         mapping_validation: MappingValidation | None = None,
+        archive_result: ArchiveSetupResult | None = None,
+        archive_nonce: str | None = None,
+        archive_storage: str | None = None,
+        archive_workspace: str | None = None,
     ) -> dict:
         current_settings: Settings = app.state.settings
         current_snapshot: WorkspaceSnapshot | None = app.state.snapshot
@@ -281,6 +289,10 @@ def create_app(
             "notice": notice,
             "mapping_candidate": mapping_candidate,
             "mapping_validation": mapping_validation,
+            "archive_result": archive_result,
+            "archive_nonce": archive_nonce,
+            "archive_storage": archive_storage or "",
+            "archive_workspace": archive_workspace or "",
             "mapping_configured": configured_mapping is not None,
             "mapping_local_root": str(configured_mapping.local_root) if configured_mapping else "",
             "mapping_source_root": (
@@ -450,6 +462,65 @@ def create_app(
             candidate=candidate,
             candidate_validation=checked,
             notice="Cesta byla bezpečně uložena. Pro její aktivaci restartujte Media Desk.",
+        )
+
+    @app.post("/settings/archive/preflight", response_class=HTMLResponse)
+    async def preflight_archive(request: Request):
+        fields = await protected_form(request, {"csrf_token", "storage", "workspace"})
+        if not app.state.settings.workspace_editable:
+            return render_settings(request, error="Aktivní cestu určuje vyšší priorita; nový archiv nelze nastavit.")
+        try:
+            storage = _safe_path_input(fields["storage"])
+            workspace_candidate = _safe_path_input(fields["workspace"])
+            result = app.state.archive_setup_client.preflight(storage, workspace_candidate)
+        except (ValueError, ArchiveSetupError) as exc:
+            return render_settings(request, archive_storage=fields["storage"], archive_workspace=fields["workspace"], error=str(exc))
+        nonce = app.state.archive_confirmations.issue(result) if result.state == "preflight_ok" else None
+        return render_settings(
+            request,
+            archive_result=result,
+            archive_nonce=nonce,
+            archive_storage=result.storage_path,
+            archive_workspace=result.workspace_path,
+            error=result.error_message if not result.successful else None,
+        )
+
+    @app.post("/settings/archive/initialize", response_class=HTMLResponse)
+    async def initialize_new_archive(request: Request):
+        fields = await protected_form(
+            request,
+            {"csrf_token", "storage", "workspace", "operation_id", "confirmation_nonce"},
+        )
+        current_settings: Settings = app.state.settings
+        if not current_settings.workspace_editable:
+            return render_settings(request, error="Aktivní cestu určuje vyšší priorita; nový archiv nelze nastavit.")
+        if not app.state.archive_confirmations.consume(
+            fields["confirmation_nonce"], fields["operation_id"], fields["storage"], fields["workspace"]
+        ):
+            return render_settings(request, archive_storage=fields["storage"], archive_workspace=fields["workspace"], error="Potvrzení vypršelo nebo neodpovídá ověřeným cestám. Proveďte preflight znovu.")
+        try:
+            result = app.state.archive_setup_client.initialize(
+                fields["storage"], fields["workspace"], fields["operation_id"]
+            )
+        except ArchiveSetupError as exc:
+            return render_settings(request, archive_storage=fields["storage"], archive_workspace=fields["workspace"], error=str(exc))
+        if result.state not in {"ready", "ready_existing"}:
+            return render_settings(request, archive_result=result, archive_storage=result.storage_path, archive_workspace=result.workspace_path, error=result.error_message or "Inicializace nebyla dokončena.")
+        checked = validate_workspace(Path(result.workspace_path), keyframe_fingerprint)
+        if not checked.valid or checked.resolved_path is None:
+            return render_settings(request, archive_result=result, archive_storage=result.storage_path, archive_workspace=result.workspace_path, error="Archiv vznikl, ale read-only kontrola Media Desku selhala. Původní konfigurace zůstala beze změny.")
+        try:
+            save_profile_workspace(
+                current_settings.profile_config_path or user_config_path(), checked.resolved_path
+            )
+        except ConfigurationError as exc:
+            return render_settings(request, archive_result=result, archive_storage=result.storage_path, archive_workspace=result.workspace_path, error=f"Archiv je připraven, ale konfiguraci se nepodařilo uložit: {exc}")
+        return render_settings(
+            request,
+            archive_result=result,
+            archive_storage=result.storage_path,
+            archive_workspace=result.workspace_path,
+            notice="Nový prázdný archiv je připraven a bezpečně uložen. Pro aktivaci restartujte Media Desk.",
         )
 
     def mapping_workspace() -> tuple[Settings, WorkspaceSnapshot] | None:
