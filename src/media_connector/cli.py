@@ -7,6 +7,7 @@ from typing import Any
 
 from media_connector.errors import ConnectorError, configuration_error
 from media_connector.service import CONTRACT, CONTRACT_VERSION, OPERATION, discover_local
+from media_connector.transfer_service import transfer_error_envelope, transfer_preflight
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -24,7 +25,19 @@ def build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--source-root", required=True, type=Path)
     discover.add_argument("--page-size", type=int, default=1000)
     discover.add_argument("--cursor")
+    transfer = subparsers.add_parser("transfer", help="copy verified media into Media Storage")
+    transfer_commands = transfer.add_subparsers(dest="transfer_command", required=True)
+    preflight = transfer_commands.add_parser("preflight", help="validate a transfer without writes")
+    _add_transfer_arguments(preflight)
     return parser
+
+
+def _add_transfer_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--workspace", required=True, type=Path)
+    parser.add_argument("--media-storage", required=True, type=Path)
+    parser.add_argument("--state-root", required=True, type=Path)
+    parser.add_argument("--transfer-work-root", required=True, type=Path)
+    parser.add_argument("--selection", required=True, type=Path)
 
 
 def _error_envelope(error: ConnectorError) -> dict[str, Any]:
@@ -47,16 +60,27 @@ def _emit(payload: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    operation = "transfer-preflight" if argv and argv[:2] == ["transfer", "preflight"] else OPERATION
     try:
         args = build_parser().parse_args(argv)
-        payload = discover_local(
-            workspace=args.workspace,
-            source_root=args.source_root,
-            page_size=args.page_size,
-            cursor=args.cursor,
-        )
+        if args.command == "local-discovery":
+            payload = discover_local(
+                workspace=args.workspace,
+                source_root=args.source_root,
+                page_size=args.page_size,
+                cursor=args.cursor,
+            )
+        else:
+            payload = transfer_preflight(
+                workspace=args.workspace,
+                media_storage=args.media_storage,
+                state_root=args.state_root,
+                work_root=args.transfer_work_root,
+                selection_path=args.selection,
+            )
     except ConnectorError as exc:
-        _emit(_error_envelope(exc))
+        envelope = transfer_error_envelope(operation, exc.to_dict()) if operation.startswith("transfer-") else _error_envelope(exc)
+        _emit(envelope)
         return exc.exit_code
     except Exception:
         error = ConnectorError(
@@ -65,7 +89,8 @@ def main(argv: list[str] | None = None) -> int:
             exit_code=3,
             retryable=False,
         )
-        _emit(_error_envelope(error))
+        envelope = transfer_error_envelope(operation, error.to_dict()) if operation.startswith("transfer-") else _error_envelope(error)
+        _emit(envelope)
         return error.exit_code
     _emit(payload)
     return 0
