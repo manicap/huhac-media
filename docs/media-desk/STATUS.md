@@ -10,7 +10,7 @@
 
 **Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`, `da416df`
 
-**Stav aktualizován:** 2026-10-25; Pracovní knihovna v1 implementována
+**Stav aktualizován:** 2026-10-25; Library UI Polishing v1.1 implementováno
 
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a, S2a.1 a S2b: read-only galerie nad
 > jedním workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
@@ -36,6 +36,7 @@
 | S2a.1 lazy origin access | **IMPLEMENTED** | `models.py`, `contract.py`, `web.py`; `test_web.py`; `S2A1_STARTUP_PERFORMANCE.md` | Snapshot registruje unchecked source reference bez per-file I/O; GET/Range provádí request-scoped ověření a otevření. 10k p50: 25,77 s → 7,75 s (3,32×). |
 | S2b: inicializace nového archivu | **IMPLEMENTED** | `S2B_VERIFICATION.md`; commity výše | Stabilní JSON CLI, crash-safe retry, empty v1 catalog a chráněný web setup. |
 | Pracovní knihovna v1 | **IMPLEMENTED** | `src/media_desk/user_data.py`, `static/library.js`, `templates/events.html`, `tests/media_desk/test_working_library.py` | Stabilní názvy, lazy přehrávání v kartě, sdílená hlasitost, perzistentní akce a kompaktní práce s originálem. |
+| Library UI Polishing v1.1 | **IMPLEMENTED** | `static/library.js`, `static/library.css`, `tests/media_desk/test_working_library.py` | Viewportový portal menu bez ořezu, ovládací lišta pod náhledem, capture čas včetně sekund, stručné typy a jednotný placeholder bez keyframu. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Lokální uživatelská data (názvy a akce) | **IMPLEMENTED** | `src/media_desk/user_data.py` | Atomický per-workspace JSON mimo workspace; přenosné výběry, ratingy a kolekce zůstávají **ABSENT**. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -74,7 +75,7 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 ## Stav testů
 
-Pracovní knihovna v1: **72 passed, 5 skipped** v celé sadě `tests/media_desk` na Windows 2026-10-25. Přeskočené testy jsou platformní symlink varianty. Cílené testy ověřují jednorázovou Connector projekci, diakritiku, stabilitu názvů, event persistence/filtering, lazy video, browser-local audio preference a zabezpečené otevření Průzkumníku.
+Pracovní knihovna v1 + UI Polishing v1.1: **73 passed, 5 skipped** v celé sadě `tests/media_desk` na Windows 2026-10-25. Přeskočené testy jsou platformní symlink varianty. Cílené testy ověřují jednorázovou Connector projekci, diakritiku, stabilitu názvů, event persistence/filtering, lazy video, browser-local audio preference, viewportový menu portal, hierarchii karty a zabezpečené otevření Průzkumníku.
 
 Cílená S2b sada: **53 passed, 4 skipped** za 32,93 s. Finální FAST sada:
 **200 passed, 7 skipped, 48 deselected** za 18,32 s. S2a/S2b symlink testy

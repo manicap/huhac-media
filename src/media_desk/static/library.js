@@ -33,6 +33,14 @@ if (app) {
   let rowHeight = 260;
   let tileMin = 176;
   let tileGap = 10;
+  let menuAnchor = null;
+  let menuItem = null;
+  const menuOverlay = document.createElement("div");
+  menuOverlay.id = "card-action-menu";
+  menuOverlay.className = "card-menu-overlay";
+  menuOverlay.hidden = true;
+  menuOverlay.innerHTML = '<button type="button" data-card-action="copy-path">Kopírovat cestu</button><button type="button" data-card-action="copy-name">Kopírovat katalogizační název</button><button type="button" data-card-action="copy-id">Kopírovat asset ID</button><button type="button" data-card-action="reveal">Otevřít v Průzkumníku</button>';
+  document.body.append(menuOverlay);
   const metrics = { batchRequests: 0, failedBatchRequests: 0, deduplicatedFetches: 0, maxInflightRequests: 0, peakDomTiles: 0, longTasksOver100ms: 0, initialHeapBytes: globalThis.performance?.memory?.usedJSHeapSize ?? null };
   if (globalThis.PerformanceObserver) {
     try {
@@ -64,9 +72,10 @@ if (app) {
   })[character]);
   const formatCaptureLabel = (item) => {
     if (!item.capture_time) return item.capture_label;
-    const match = item.capture_time.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    const match = item.capture_time.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
     if (!match) return item.capture_label;
-    const label = `${Number(match[3])}. ${Number(match[2])}. ${match[1]} · ${match[4]}:${match[5]}`;
+    const time = `${match[4]}:${match[5]}${match[6] ? `:${match[6]}` : ""}`;
+    const label = `${Number(match[3])}. ${Number(match[2])}. ${match[1]} · ${time}`;
     if (item.capture_filesystem_fallback) return `${label} · čas souboru (nízká důvěra)`;
     if (!(item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"))) return `${label} · bez časové zóny`;
     return label;
@@ -78,25 +87,63 @@ if (app) {
     const hours = Math.floor(rounded / 3600);
     const minutes = Math.floor((rounded % 3600) / 60);
     const rest = rounded % 60;
-    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}` : `${minutes}:${String(rest).padStart(2, "0")}`;
+    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}` : `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
   };
   const cardHtml = (item, index) => {
     const preview = item.preview_url
       ? `<img src="${escapeHtml(item.preview_url)}" alt="Náhled ${escapeHtml(item.display_name)}" width="320" height="210" loading="lazy" decoding="async">`
-      : `<div class="placeholder"><span>${item.media_type === "video" ? "VIDEO" : "FOTO"}</span><small>Bez náhledu</small></div>`;
+      : item.media_type === "video"
+        ? '<div class="placeholder video-placeholder"><span aria-hidden="true">▶</span><small>Bez náhledu</small></div>'
+        : '<div class="placeholder"><span>FOTO</span><small>Bez náhledu</small></div>';
     const url = new URL(`/assets/${item.sha256}`, location.origin);
     url.searchParams.set("return_to", location.pathname + location.search);
     url.searchParams.set("active_asset_id", item.asset_id);
     const duration = item.media_type === "video" ? formatDuration(item) : "";
-    const facts = [formatCaptureLabel(item), duration].filter(Boolean).join(" · ");
-    const type = item.media_type === "video" ? "▶ Video" : "▧ Fotografie";
+    const capture = formatCaptureLabel(item);
+    const type = item.media_type === "video" ? "Video" : "Foto";
+    const secondary = [type, duration].filter(Boolean).join(" · ");
     const play = item.media_type === "video" && item.original_url
-      ? '<button class="tile-play" type="button" aria-label="Přehrát video" title="Přehrát video">▶</button>' : "";
+      ? '<button class="tile-play" type="button" aria-label="Přehrát video"><span aria-hidden="true">▶</span> Přehrát</button>' : "";
     const unavailable = item.original_url ? "" : '<span class="offline-pill">Soubor nedostupný</span>';
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
-      <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a><span class="type-pill type-${item.media_type}">${type}</span>${unavailable}${play}<button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false">•••</button><div class="tile-menu" hidden><button type="button" data-card-action="copy-path" ${item.original_path ? "" : "disabled"}>Kopírovat cestu</button><button type="button" data-card-action="copy-name">Kopírovat katalogizační název</button><button type="button" data-card-action="copy-id">Kopírovat asset ID</button><button type="button" data-card-action="reveal" ${item.original_path ? "" : "disabled"}>Otevřít v Průzkumníku</button></div><span class="tile-file-error" hidden>Soubor nedostupný</span></div>
-      <div class="tile-copy"><strong title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</strong><span>${escapeHtml(facts)}</span></div>
+      <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a>${unavailable}<span class="tile-file-error" hidden>Soubor nedostupný</span></div>
+      <div class="tile-toolbar">${play}<span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
+      <div class="tile-copy"><strong class="tile-capture" title="${escapeHtml(item.capture_time || capture)}">${escapeHtml(capture)}</strong><span class="tile-secondary">${escapeHtml(secondary)}</span><span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span></div>
     </article>`;
+  };
+  const closeMenu = () => {
+    menuAnchor?.setAttribute("aria-expanded", "false");
+    menuOverlay.hidden = true;
+    menuOverlay.style.removeProperty("left");
+    menuOverlay.style.removeProperty("top");
+    menuAnchor = null;
+    menuItem = null;
+  };
+  const positionMenu = () => {
+    if (menuOverlay.hidden || !menuAnchor?.isConnected) return closeMenu();
+    const margin = 8;
+    const gap = 5;
+    const anchor = menuAnchor.getBoundingClientRect();
+    const menu = menuOverlay.getBoundingClientRect();
+    const roomBelow = window.innerHeight - anchor.bottom - margin;
+    const roomAbove = anchor.top - margin;
+    const top = roomBelow >= menu.height + gap || roomBelow >= roomAbove
+      ? anchor.bottom + gap
+      : anchor.top - menu.height - gap;
+    const preferredLeft = anchor.right - menu.width;
+    menuOverlay.style.left = `${Math.max(margin, Math.min(preferredLeft, window.innerWidth - menu.width - margin))}px`;
+    menuOverlay.style.top = `${Math.max(margin, Math.min(top, window.innerHeight - menu.height - margin))}px`;
+  };
+  const openMenu = (button, item) => {
+    if (menuAnchor === button && !menuOverlay.hidden) return closeMenu();
+    closeMenu();
+    menuAnchor = button;
+    menuItem = item;
+    menuOverlay.querySelector('[data-card-action="copy-path"]').disabled = !item?.original_path;
+    menuOverlay.querySelector('[data-card-action="reveal"]').disabled = !item?.original_path;
+    menuOverlay.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    positionMenu();
   };
   const touchCache = (start, items) => {
     cache.delete(start);
@@ -182,6 +229,7 @@ if (app) {
     }
     const signature = `${generation}:${columns}:${start}:${end}:${cards.map((card) => card.slice(0, 120)).join("|")}`;
     if (signature !== renderedSignature) {
+      closeMenu();
       windowElement.innerHTML = cards.join("") || (totalCount ? '<div class="gallery-skeleton">Načítání médií…</div>' : '<div class="empty"><h2>Žádná média</h2><p>Změňte filtry nebo hledání.</p></div>');
       renderedSignature = signature;
     }
@@ -344,8 +392,9 @@ if (app) {
     bindManagedVideo(video);
     try { await video.play(); } catch { /* Browser autoplay policy may still require another user gesture. */ }
   };
-  scrollRoot.addEventListener("scroll", () => { scheduleRender(); saveAnchor(); }, { passive: true });
+  scrollRoot.addEventListener("scroll", () => { closeMenu(); scheduleRender(); saveAnchor(); }, { passive: true });
   new ResizeObserver(() => {
+    closeMenu();
     const oldColumns = columns;
     const oldScrollTop = scrollRoot.scrollTop;
     const oldGalleryTop = galleryTop();
@@ -364,45 +413,44 @@ if (app) {
     const item = itemForTile(tile);
     const menuButton = event.target.closest(".tile-menu-button");
     if (menuButton) {
-      const menu = tile.querySelector(".tile-menu");
-      const opening = menu.hidden;
-      for (const other of windowElement.querySelectorAll(".tile-menu")) other.hidden = true;
-      for (const other of windowElement.querySelectorAll(".tile-menu-button")) other.setAttribute("aria-expanded", "false");
-      menu.hidden = !opening;
-      menuButton.setAttribute("aria-expanded", String(opening));
+      openMenu(menuButton, item);
       return;
     }
     if (event.target.closest(".tile-play")) {
       await activateVideo(tile, item);
       return;
     }
-    const action = event.target.closest("[data-card-action]");
-    if (action) {
-      const name = action.dataset.cardAction;
-      if (name === "copy-path") await copyText(item?.original_path, action);
-      if (name === "copy-name") await copyText(item?.catalog_name, action);
-      if (name === "copy-id") await copyText(item?.asset_id, action);
-      if (name === "reveal") {
-        const response = await fetch(`/api/assets/${item.sha256}/reveal`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-          body: new URLSearchParams({ csrf_token: app.dataset.csrfToken }),
-        });
-        if (!response.ok) {
-          let message = "Soubor nedostupný";
-          try { message = (await response.json()).detail || message; } catch { /* Use safe fallback. */ }
-          showFileError(tile, message);
-        }
-      }
-      return;
-    }
     if (event.target.closest("a")) saveAnchor();
   });
-  document.addEventListener("click", (event) => {
-    if (event.target.closest(".tile-menu, .tile-menu-button")) return;
-    for (const menu of windowElement.querySelectorAll(".tile-menu")) menu.hidden = true;
-    for (const button of windowElement.querySelectorAll(".tile-menu-button")) button.setAttribute("aria-expanded", "false");
+  menuOverlay.addEventListener("click", async (event) => {
+    const action = event.target.closest("[data-card-action]");
+    if (!action || !menuItem) return;
+    const item = menuItem;
+    const tile = menuAnchor?.closest(".media-tile");
+    const name = action.dataset.cardAction;
+    if (name === "copy-path") await copyText(item.original_path, action);
+    if (name === "copy-name") await copyText(item.catalog_name, action);
+    if (name === "copy-id") await copyText(item.asset_id, action);
+    if (name === "reveal") {
+      const response = await fetch(`/api/assets/${item.sha256}/reveal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({ csrf_token: app.dataset.csrfToken }),
+      });
+      if (!response.ok && tile) {
+        let message = "Soubor nedostupný";
+        try { message = (await response.json()).detail || message; } catch { /* Use safe fallback. */ }
+        showFileError(tile, message);
+      }
+    }
+    if (name !== "copy-path" && name !== "copy-name" && name !== "copy-id") closeMenu();
   });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".card-menu-overlay, .tile-menu-button")) return;
+    closeMenu();
+  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
+  window.addEventListener("resize", positionMenu, { passive: true });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const url = new URL("/library", location.origin);

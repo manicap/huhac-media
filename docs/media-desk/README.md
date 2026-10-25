@@ -1,6 +1,6 @@
 # HUHÁČ Media Desk (M1–M1.3 + S2a–S2b)
 
-**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po implementaci Pracovní knihovny v1.
+**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po dokončení Library UI Polishing v1.1.
 
 ## Začni zde — aktuální autoritativní dokumentace
 
@@ -202,6 +202,13 @@ keyframe images use lazy loading, identity ETags, and immutable browser caching.
 Karta vytvoří `<video>` teprve po kliknutí na play; spuštění dalšího přehrávače
 pozastaví předchozí. Hlasitost a mute jsou sdílené mezi kartami i detailem přes
 `localStorage`, bez serverové databáze.
+
+Library UI Polishing v1.1 přesouvá play a nabídku akcí do kompaktní lišty pod
+náhledem. Jediné menu v portálu `<body>` používá viewportové umístění nahoru nebo
+dolů a vodorovný clamp, takže se neořezává malou kartou; při scrollu nebo recyklaci
+karty se zavře. Hlavní text karty je capture datum s dostupnou přesností na
+sekundy, pod ním následuje `Video`/`Foto` s délkou a teprve poté úplný název v
+tooltipu. Video bez keyframu používá neutrální `Bez náhledu` a zůstává přehratelné.
 
 The batch response contains `items`, `next_cursor`, `prev_cursor`,
 `start_index`, `total_count`, and `snapshot_id`. Cursors bind the snapshot,

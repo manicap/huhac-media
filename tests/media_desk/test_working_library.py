@@ -128,6 +128,26 @@ def test_video_card_contract_is_lazy_and_shared_audio_is_browser_local(workspace
     assert "server" not in audio.casefold()
 
 
+def test_card_polish_uses_portal_toolbar_and_capture_time_hierarchy(workspace_builder) -> None:
+    workspace_builder.add_asset(1, "video", preview=False)
+    root = workspace_builder.publish()
+    client = _client(create_app(root))
+
+    script = client.get("/static/library.js").text
+    styles = client.get("/static/library.css").text
+    assert 'document.body.append(menuOverlay)' in script
+    assert 'menuOverlay.className = "card-menu-overlay"' in script
+    assert 'window.innerHeight' in script and 'window.innerWidth' in script
+    assert 'scrollRoot.addEventListener("scroll", () => { closeMenu();' in script
+    assert '<div class="tile-toolbar">' in script
+    assert 'item.media_type === "video" ? "Video" : "Foto"' in script
+    assert '<strong class="tile-capture"' in script
+    assert 'match[6] ? `:${match[6]}`' in script
+    assert 'video-placeholder' in script and 'Bez náhledu' in script
+    assert '.card-menu-overlay { position: fixed;' in styles
+    assert '.tile-play { position: absolute;' not in styles
+
+
 def test_reveal_uses_only_validated_asset_path_and_existing_http_guards(
     workspace_builder, tmp_path: Path, monkeypatch
 ) -> None:
