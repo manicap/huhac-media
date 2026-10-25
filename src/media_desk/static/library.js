@@ -33,6 +33,8 @@ if (app) {
   let rowHeight = 260;
   let tileMin = 176;
   let tileGap = 10;
+  let tileToolbarHeight = 30;
+  let tileFooterHeight = 50;
   let menuAnchor = null;
   let menuItem = null;
   const menuOverlay = document.createElement("div");
@@ -56,9 +58,18 @@ if (app) {
   };
   const readGeometry = () => {
     const styles = getComputedStyle(app);
-    rowHeight = Number.parseFloat(styles.getPropertyValue("--tile-row-height")) || 260;
     tileMin = Number.parseFloat(styles.getPropertyValue("--tile-min")) || 176;
     tileGap = Number.parseFloat(styles.getPropertyValue("--tile-gap")) || 10;
+    tileToolbarHeight = Number.parseFloat(styles.getPropertyValue("--tile-toolbar-height")) || 30;
+    tileFooterHeight = Number.parseFloat(styles.getPropertyValue("--tile-footer-height")) || 50;
+  };
+  const updateRowGeometry = () => {
+    const trackWidth = (viewport.clientWidth - tileGap * (columns - 1)) / columns;
+    const previewWidth = Math.max(1, trackWidth - 2);
+    const tileHeight = previewWidth * 16 / 9 + tileToolbarHeight + tileFooterHeight + 2;
+    rowHeight = tileHeight + tileGap;
+    app.style.setProperty("--tile-height", `${tileHeight}px`);
+    app.style.setProperty("--tile-row-height", `${rowHeight}px`);
   };
   const apiUrl = (path, extra = {}) => {
     const values = params();
@@ -109,13 +120,11 @@ if (app) {
       ? '<button class="tile-play" type="button" aria-label="Přehrát video"><span class="tile-action-icon" aria-hidden="true">▶</span><span class="tile-action-label">Přehrát</span></button>' : "";
     const unavailable = item.original_url ? "" : '<span class="offline-pill">Soubor nedostupný</span>';
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
-      <div class="tile-media-strip"><span aria-hidden="true">${mediaIcon}</span><span>${escapeHtml(mediaLabel)}</span></div>
-      <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a>${unavailable}<span class="tile-file-error" hidden>Soubor nedostupný</span></div>
+      <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a><span class="tile-media-badge"><span aria-hidden="true">${mediaIcon}</span><span>${escapeHtml(mediaLabel)}</span></span><span class="tile-capture-overlay" title="${escapeHtml(item.capture_time || item.capture_label)}"><strong class="tile-time">${escapeHtml(capture.time)}</strong><span class="tile-date">${escapeHtml(capture.date)}</span>${capture.qualifier ? `<span class="tile-capture-qualifier">${escapeHtml(capture.qualifier)}</span>` : ""}</span>${unavailable}<span class="tile-file-error" hidden>Soubor nedostupný</span></div>
       <div class="tile-toolbar">${play}<a class="tile-detail" href="${escapeHtml(url.pathname + url.search)}" aria-label="Otevřít detail média"><span class="tile-action-icon" aria-hidden="true">↗</span><span class="tile-action-label">Detail</span></a><span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
       <div class="tile-copy">
-        <div class="tile-capture" title="${escapeHtml(item.capture_time || item.capture_label)}"><strong class="tile-time">${escapeHtml(capture.time)}</strong><span class="tile-date">${escapeHtml(capture.date)}</span>${capture.qualifier ? `<span class="tile-capture-qualifier">${escapeHtml(capture.qualifier)}</span>` : ""}</div>
-        <span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span>
         <span class="tile-event${item.event_names?.length ? "" : " is-unassigned"}" title="${escapeHtml(eventName)}">${escapeHtml(eventName)}</span>
+        <span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span>
       </div>
     </article>`;
   };
@@ -226,6 +235,7 @@ if (app) {
     renderScheduled = false;
     readGeometry();
     columns = Math.max(1, Math.floor((viewport.clientWidth + tileGap) / (tileMin + tileGap)));
+    updateRowGeometry();
     canvas.style.height = `${Math.max(1, Math.ceil(totalCount / columns) * rowHeight)}px`;
     const { firstRow, start, end } = visibleRange();
     windowElement.style.transform = `translateY(${firstRow * rowHeight}px)`;

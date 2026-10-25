@@ -1,6 +1,6 @@
 # HUHÁČ Media Desk (M1–M1.3 + S2a–S2b)
 
-**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po dokončení redesignu knihovny v1.2.
+**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po dokončení Filmstrip UI v1.3.
 
 ## Začni zde — aktuální autoritativní dokumentace
 
@@ -210,6 +210,15 @@ barva je vyhrazena aktivnímu či přehrávanému médiu. Pod náhledem je kompa
 lišta Přehrát/Pauza, Detail a další akce. Čas `HH:mm` je hlavní údaj, vedle něj je
 datum a níže tlumený název souboru a název perzistentní uživatelské akce odvozený
 z jejích Session Grouper relací. Nepřiřazené médium je výslovně označeno.
+
+Filmstrip UI v1.3 nahrazuje pevnou výšku náhledu obrazovou plochou 9:16, jejíž
+výška se odvozuje od skutečné šířky gridového sloupce. Kompaktní režim používá
+minimum 132 px, standardní 184 px a velký 240 px; počet sloupců se přizpůsobuje
+viewportu a virtualizační řádkový krok se přepočítává ze stejné geometrie.
+Typ s délkou i capture čas a datum jsou malé poloprůhledné prvky přímo nad
+obrazem. Pod obrazem zůstává ovládací lišta a zarovnaná patička s názvem akce
+na prvním řádku a souboru na druhém. Média používají `object-fit: contain`, takže
+odlišné poměry stran ani vložené černé okraje nejsou automaticky ořezávány.
 
 Jediné menu v portálu `<body>` používá viewportové umístění nahoru nebo dolů a
 vodorovný clamp, takže se neořezává kartou; při scrollu nebo recyklaci se zavře.

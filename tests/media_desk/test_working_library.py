@@ -145,7 +145,8 @@ def test_card_polish_uses_portal_toolbar_and_capture_time_hierarchy(workspace_bu
     assert 'scrollRoot.addEventListener("scroll", () => { closeMenu();' in script
     assert '<div class="tile-toolbar">' in script
     assert 'item.media_type === "video" ? "Video" : "Foto"' in script
-    assert 'class="tile-media-strip"' in script
+    assert 'class="tile-media-badge"' in script
+    assert 'class="tile-capture-overlay"' in script
     assert 'class="tile-time"' in script and 'class="tile-date"' in script
     assert 'time: `${match[4]}:${match[5]}`' in script
     assert 'class="tile-detail"' in script
@@ -155,9 +156,11 @@ def test_card_polish_uses_portal_toolbar_and_capture_time_hierarchy(workspace_bu
     assert 'revealAction.hidden = window.matchMedia' in script
     assert 'tile.querySelector("video")?.pause()' in script
     assert '.card-menu-overlay { position: fixed;' in styles
-    assert '.tile-media-strip.type-video' not in styles
-    assert '.tile-media-strip.type-image' not in styles
-    assert '--tile-row-height: 260px' in styles
+    assert '.tile-media-strip' not in styles
+    assert 'aspect-ratio: 9 / 16' in styles
+    assert '--tile-min: 132px' in styles
+    assert 'previewWidth * 16 / 9' in script
+    assert 'app.style.setProperty("--tile-height"' in script
     assert '.tile-event' in styles
     assert '.tile-play { position: absolute;' not in styles
     assert logo.status_code == 200

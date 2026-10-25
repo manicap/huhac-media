@@ -10,7 +10,7 @@
 
 **Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`, `da416df`
 
-**Stav aktualizován:** 2026-10-25; redesign knihovny v1.2 implementován
+**Stav aktualizován:** 2026-10-25; Filmstrip UI v1.3 implementováno
 
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a, S2a.1 a S2b: read-only galerie nad
 > jedním workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
@@ -38,6 +38,7 @@
 | Pracovní knihovna v1 | **IMPLEMENTED** | `src/media_desk/user_data.py`, `static/library.js`, `templates/events.html`, `tests/media_desk/test_working_library.py` | Stabilní názvy, lazy přehrávání v kartě, sdílená hlasitost, perzistentní akce a kompaktní práce s originálem. |
 | Library UI Polishing v1.1 | **IMPLEMENTED; UI SUPERSEDED BY v1.2** | `static/library.js`, `static/library.css`, `tests/media_desk/test_working_library.py` | Portal menu, ovládací lišta a minutový capture čas zůstávají; barevné typové pruhy a původní placeholder nahradil redesign v1.2. |
 | Redesign knihovny v1.2 | **IMPLEMENTED** | `static/library.js`, `static/library.css`, `index.py`, `web.py`, `tests/media_desk/test_working_library.py` | Neutrální typ, dominantnější preview, čas/datum/akce, trvale dostupný Detail, Play/Pauza, dodané fallback logo, responzivní 1–2 sloupce; malý desktopový režim zachovává krok 260 px a min. šířku 142 px. |
+| Filmstrip UI v1.3 | **IMPLEMENTED** | `static/library.js`, `static/library.css`, `tests/media_desk/test_working_library.py` | Skutečná 9:16 obrazová plocha přes šířku karty, overlay typu a capture času, ovládání a zarovnaná patička; virtualizační krok se odvozuje od skutečné šířky sloupce. Kompaktní minimum 132 px zachovává hustotu galerie. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Lokální uživatelská data (názvy a akce) | **IMPLEMENTED** | `src/media_desk/user_data.py` | Atomický per-workspace JSON mimo workspace; přenosné výběry, ratingy a kolekce zůstávají **ABSENT**. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
@@ -76,7 +77,7 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 ## Stav testů
 
-Pracovní knihovna v1 + UI Polishing v1.1: **73 passed, 5 skipped** v celé sadě `tests/media_desk` na Windows 2026-10-25. Přeskočené testy jsou platformní symlink varianty. Cílené testy ověřují jednorázovou Connector projekci, diakritiku, stabilitu názvů, event persistence/filtering, lazy video, browser-local audio preference, viewportový menu portal, hierarchii karty a zabezpečené otevření Průzkumníku.
+Pracovní knihovna v1 až Filmstrip UI v1.3: **73 passed, 5 skipped** v celé sadě `tests/media_desk` na Windows 2026-10-25. Přeskočené testy jsou platformní symlink varianty. Cílené testy ověřují jednorázovou Connector projekci, diakritiku, stabilitu názvů, event persistence/filtering, lazy video, browser-local audio preference, viewportový menu portal, dynamickou 9:16 geometrii karty a zabezpečené otevření Průzkumníku.
 
 Cílená S2b sada: **53 passed, 4 skipped** za 32,93 s. Finální FAST sada:
 **200 passed, 7 skipped, 48 deselected** za 18,32 s. S2a/S2b symlink testy

@@ -80,7 +80,7 @@ def test_library_uses_virtualized_client_and_cursor_api(workspace_builder) -> No
     assert "scrollRoot.addEventListener" in script.text
     assert 'name="density"' in page.text
     assert 'localStorage.setItem("mediaDesk.libraryDensity"' in script.text
-    assert 'getPropertyValue("--tile-row-height")' in script.text
+    assert 'app.style.setProperty("--tile-row-height"' in script.text
     assert "formatCaptureParts" in script.text
     assert "rowHeight = 324" not in script.text
     assert batch.json()["start_index"] == 50
