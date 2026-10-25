@@ -74,7 +74,7 @@ if (app) {
     if (!item.capture_time) return item.capture_label;
     const match = item.capture_time.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
     if (!match) return item.capture_label;
-    const time = `${match[4]}:${match[5]}${match[6] ? `:${match[6]}` : ""}`;
+    const time = `${match[4]}:${match[5]}`;
     const label = `${Number(match[3])}. ${Number(match[2])}. ${match[1]} · ${time}`;
     if (item.capture_filesystem_fallback) return `${label} · čas souboru (nízká důvěra)`;
     if (!(item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"))) return `${label} · bez časové zóny`;
@@ -101,14 +101,15 @@ if (app) {
     const duration = item.media_type === "video" ? formatDuration(item) : "";
     const capture = formatCaptureLabel(item);
     const type = item.media_type === "video" ? "Video" : "Foto";
-    const secondary = [type, duration].filter(Boolean).join(" · ");
+    const mediaLabel = [type, duration].filter(Boolean).join(" · ");
     const play = item.media_type === "video" && item.original_url
       ? '<button class="tile-play" type="button" aria-label="Přehrát video"><span aria-hidden="true">▶</span> Přehrát</button>' : "";
     const unavailable = item.original_url ? "" : '<span class="offline-pill">Soubor nedostupný</span>';
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
+      <div class="tile-media-strip type-${item.media_type}">${escapeHtml(mediaLabel)}</div>
       <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a>${unavailable}<span class="tile-file-error" hidden>Soubor nedostupný</span></div>
       <div class="tile-toolbar">${play}<span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
-      <div class="tile-copy"><strong class="tile-capture" title="${escapeHtml(item.capture_time || capture)}">${escapeHtml(capture)}</strong><span class="tile-secondary">${escapeHtml(secondary)}</span><span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span></div>
+      <div class="tile-copy"><strong class="tile-capture" title="${escapeHtml(item.capture_time || capture)}">${escapeHtml(capture)}</strong><span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span></div>
     </article>`;
   };
   const closeMenu = () => {

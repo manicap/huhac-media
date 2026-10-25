@@ -206,9 +206,10 @@ pozastaví předchozí. Hlasitost a mute jsou sdílené mezi kartami i detailem 
 Library UI Polishing v1.1 přesouvá play a nabídku akcí do kompaktní lišty pod
 náhledem. Jediné menu v portálu `<body>` používá viewportové umístění nahoru nebo
 dolů a vodorovný clamp, takže se neořezává malou kartou; při scrollu nebo recyklaci
-karty se zavře. Hlavní text karty je capture datum s dostupnou přesností na
-sekundy, pod ním následuje `Video`/`Foto` s délkou a teprve poté úplný název v
-tooltipu. Video bez keyframu používá neutrální `Bez náhledu` a zůstává přehratelné.
+karty se zavře. Barevný horní pruh zobrazuje `Video · délka` nebo `Foto`. Hlavní
+text pod náhledem je capture datum a čas s přesností na minuty, následovaný úplným
+názvem v tooltipu; přesný timestamp zůstává dostupný v detailu. Video bez keyframu
+používá neutrální `Bez náhledu` a zůstává přehratelné.
 
 The batch response contains `items`, `next_cursor`, `prev_cursor`,
 `start_index`, `total_count`, and `snapshot_id`. Cursors bind the snapshot,

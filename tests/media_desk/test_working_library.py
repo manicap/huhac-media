@@ -141,10 +141,14 @@ def test_card_polish_uses_portal_toolbar_and_capture_time_hierarchy(workspace_bu
     assert 'scrollRoot.addEventListener("scroll", () => { closeMenu();' in script
     assert '<div class="tile-toolbar">' in script
     assert 'item.media_type === "video" ? "Video" : "Foto"' in script
+    assert 'class="tile-media-strip type-${item.media_type}"' in script
     assert '<strong class="tile-capture"' in script
-    assert 'match[6] ? `:${match[6]}`' in script
+    assert 'const time = `${match[4]}:${match[5]}`' in script
+    assert 'tile-secondary' not in script
     assert 'video-placeholder' in script and 'Bez náhledu' in script
     assert '.card-menu-overlay { position: fixed;' in styles
+    assert '.tile-media-strip.type-video { background: rgba(133, 31, 42, .9); }' in styles
+    assert '.tile-media-strip.type-image { background: rgba(30, 82, 69, .9); }' in styles
     assert '.tile-play { position: absolute;' not in styles
 
 
