@@ -70,15 +70,18 @@ if (app) {
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]);
-  const formatCaptureLabel = (item) => {
-    if (!item.capture_time) return item.capture_label;
+  const formatCaptureParts = (item) => {
+    if (!item.capture_time) return { time: "Čas neznámý", date: "Datum pořízení neznámé" };
     const match = item.capture_time.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
-    if (!match) return item.capture_label;
-    const time = `${match[4]}:${match[5]}`;
-    const label = `${Number(match[3])}. ${Number(match[2])}. ${match[1]} · ${time}`;
-    if (item.capture_filesystem_fallback) return `${label} · čas souboru (nízká důvěra)`;
-    if (!(item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"))) return `${label} · bez časové zóny`;
-    return label;
+    if (!match) return { time: "Čas neznámý", date: item.capture_label || "Datum pořízení neznámé" };
+    let qualifier = "";
+    if (item.capture_filesystem_fallback) qualifier = "čas souboru · nízká důvěra";
+    else if (!(item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"))) qualifier = "bez časové zóny";
+    return {
+      time: `${match[4]}:${match[5]}`,
+      date: `${Number(match[3])}. ${Number(match[2])}. ${match[1]}`,
+      qualifier,
+    };
   };
   const formatDuration = (item) => {
     const seconds = Number(item.technical?.duration_seconds);
@@ -92,24 +95,28 @@ if (app) {
   const cardHtml = (item, index) => {
     const preview = item.preview_url
       ? `<img src="${escapeHtml(item.preview_url)}" alt="Náhled ${escapeHtml(item.display_name)}" width="320" height="210" loading="lazy" decoding="async">`
-      : item.media_type === "video"
-        ? '<div class="placeholder video-placeholder"><span aria-hidden="true">▶</span><small>Bez náhledu</small></div>'
-        : '<div class="placeholder"><span>FOTO</span><small>Bez náhledu</small></div>';
+      : '<div class="placeholder brand-placeholder"><img src="/static/huhac-placeholder.png?v=1.0.0" alt="" width="220" height="124" loading="lazy" decoding="async"><small>Bez náhledu</small></div>';
     const url = new URL(`/assets/${item.sha256}`, location.origin);
     url.searchParams.set("return_to", location.pathname + location.search);
     url.searchParams.set("active_asset_id", item.asset_id);
     const duration = item.media_type === "video" ? formatDuration(item) : "";
-    const capture = formatCaptureLabel(item);
+    const capture = formatCaptureParts(item);
     const type = item.media_type === "video" ? "Video" : "Foto";
     const mediaLabel = [type, duration].filter(Boolean).join(" · ");
+    const mediaIcon = item.media_type === "video" ? "▶" : "▣";
+    const eventName = item.event_names?.length ? item.event_names.join(" / ") : "Bez přiřazené akce";
     const play = item.media_type === "video" && item.original_url
-      ? '<button class="tile-play" type="button" aria-label="Přehrát video"><span aria-hidden="true">▶</span> Přehrát</button>' : "";
+      ? '<button class="tile-play" type="button" aria-label="Přehrát video"><span class="tile-action-icon" aria-hidden="true">▶</span><span class="tile-action-label">Přehrát</span></button>' : "";
     const unavailable = item.original_url ? "" : '<span class="offline-pill">Soubor nedostupný</span>';
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
-      <div class="tile-media-strip type-${item.media_type}">${escapeHtml(mediaLabel)}</div>
+      <div class="tile-media-strip"><span aria-hidden="true">${mediaIcon}</span><span>${escapeHtml(mediaLabel)}</span></div>
       <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a>${unavailable}<span class="tile-file-error" hidden>Soubor nedostupný</span></div>
-      <div class="tile-toolbar">${play}<span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
-      <div class="tile-copy"><strong class="tile-capture" title="${escapeHtml(item.capture_time || capture)}">${escapeHtml(capture)}</strong><span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span></div>
+      <div class="tile-toolbar">${play}<a class="tile-detail" href="${escapeHtml(url.pathname + url.search)}" aria-label="Otevřít detail média"><span class="tile-action-icon" aria-hidden="true">↗</span><span class="tile-action-label">Detail</span></a><span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
+      <div class="tile-copy">
+        <div class="tile-capture" title="${escapeHtml(item.capture_time || item.capture_label)}"><strong class="tile-time">${escapeHtml(capture.time)}</strong><span class="tile-date">${escapeHtml(capture.date)}</span>${capture.qualifier ? `<span class="tile-capture-qualifier">${escapeHtml(capture.qualifier)}</span>` : ""}</div>
+        <span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span>
+        <span class="tile-event${item.event_names?.length ? "" : " is-unassigned"}" title="${escapeHtml(eventName)}">${escapeHtml(eventName)}</span>
+      </div>
     </article>`;
   };
   const closeMenu = () => {
@@ -141,7 +148,9 @@ if (app) {
     menuAnchor = button;
     menuItem = item;
     menuOverlay.querySelector('[data-card-action="copy-path"]').disabled = !item?.original_path;
-    menuOverlay.querySelector('[data-card-action="reveal"]').disabled = !item?.original_path;
+    const revealAction = menuOverlay.querySelector('[data-card-action="reveal"]');
+    revealAction.disabled = !item?.original_path;
+    revealAction.hidden = window.matchMedia("(max-width: 620px), (pointer: coarse)").matches;
     menuOverlay.hidden = false;
     button.setAttribute("aria-expanded", "true");
     positionMenu();
@@ -374,10 +383,26 @@ if (app) {
     button.textContent = "Zkopírováno";
     setTimeout(() => { button.textContent = previous; }, 900);
   };
+  const updatePlayButton = (tile, playing) => {
+    const button = tile.querySelector(".tile-play");
+    if (!button) return;
+    button.setAttribute("aria-label", playing ? "Pozastavit video" : "Přehrát video");
+    const icon = button.querySelector(".tile-action-icon");
+    const label = button.querySelector(".tile-action-label");
+    if (icon) icon.textContent = playing ? "Ⅱ" : "▶";
+    if (label) label.textContent = playing ? "Pauza" : "Přehrát";
+    tile.classList.toggle("is-playing", playing);
+  };
   const activateVideo = async (tile, item) => {
     if (!item?.original_url) return showFileError(tile);
+    const existing = tile.querySelector("video");
+    if (existing) {
+      if (existing.paused) await existing.play();
+      else existing.pause();
+      return;
+    }
     const visual = tile.querySelector(".tile-visual");
-    if (!visual || tile.querySelector("video")) return;
+    if (!visual) return;
     const wrapper = document.createElement("div");
     wrapper.className = "tile-visual is-playing";
     const video = document.createElement("video");
@@ -387,9 +412,11 @@ if (app) {
     video.preload = "metadata";
     video.playsInline = true;
     video.addEventListener("error", () => showFileError(tile), { once: true });
+    video.addEventListener("play", () => updatePlayButton(tile, true));
+    video.addEventListener("pause", () => updatePlayButton(tile, false));
+    video.addEventListener("ended", () => updatePlayButton(tile, false));
     wrapper.append(video);
     visual.replaceWith(wrapper);
-    tile.querySelector(".tile-play")?.remove();
     bindManagedVideo(video);
     try { await video.play(); } catch { /* Browser autoplay policy may still require another user gesture. */ }
   };
@@ -419,6 +446,11 @@ if (app) {
     }
     if (event.target.closest(".tile-play")) {
       await activateVideo(tile, item);
+      return;
+    }
+    if (event.target.closest(".tile-detail")) {
+      tile.querySelector("video")?.pause();
+      saveAnchor();
       return;
     }
     if (event.target.closest("a")) saveAnchor();

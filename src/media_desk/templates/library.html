@@ -2,7 +2,7 @@
 {% block title %}Knihovna{% endblock %}
 {% block content %}
 <section class="library-heading">
-  <div><h1>Knihovna</h1><p class="workspace-meta" title="{{ workspace.workspace_id }}">{{ workspace.workspace_id }}</p></div>
+  <h1>Knihovna</h1>
 </section>
 <form class="library-filters" id="library-filters" action="/library" method="get">
   <label class="search">Hledat<input name="q" value="{{ query }}" placeholder="Název nebo asset ID"></label>
@@ -28,5 +28,5 @@
   <div id="library-viewport" class="library-viewport" tabindex="0" aria-label="Virtualizovaná galerie médií"><div id="library-canvas" class="library-canvas"><div id="library-window" class="library-window" aria-live="polite"></div></div></div>
   <noscript><p class="notice">Pro plynulé dávkové načítání knihovny je potřeba JavaScript.</p></noscript>
 </div>
-<script type="module" src="/static/library.js?v=1.5.1"></script>
+<script type="module" src="/static/library.js?v=1.6.2"></script>
 {% endblock %}

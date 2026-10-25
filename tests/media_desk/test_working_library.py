@@ -96,6 +96,7 @@ def test_events_persist_and_filter_cursor_api(workspace_builder, tmp_path: Path)
     batch = client.get("/api/assets", params={"limit": 10, "event_id": event_id}).json()
     assert batch["total_count"] == 1
     assert batch["items"][0]["asset_id"] == assigned["asset_id"]
+    assert batch["items"][0]["event_names"] == ["Koncert Žluťoučký"]
 
     restarted = _client(create_app(root, user_data_path=data_path))
     page = restarted.get("/library", params={"event_id": event_id})
@@ -119,9 +120,11 @@ def test_video_card_contract_is_lazy_and_shared_audio_is_browser_local(workspace
     assert item["preview_url"] is None
     assert item["original_url"]
     assert item["display_name"] == "VID-0001"
+    assert item["event_names"] == []
     assert "video.preload = \"metadata\"" in script
     assert "await video.play()" in script
     assert "Bez náhledu" in script
+    assert "/static/huhac-placeholder.png" in script
     assert "ověří se při otevření" not in script
     assert 'localStorage.setItem(STORAGE_KEY' in audio
     assert "activeVideo.pause()" in audio
@@ -135,21 +138,31 @@ def test_card_polish_uses_portal_toolbar_and_capture_time_hierarchy(workspace_bu
 
     script = client.get("/static/library.js").text
     styles = client.get("/static/library.css").text
+    logo = client.get("/static/huhac-placeholder.png")
     assert 'document.body.append(menuOverlay)' in script
     assert 'menuOverlay.className = "card-menu-overlay"' in script
     assert 'window.innerHeight' in script and 'window.innerWidth' in script
     assert 'scrollRoot.addEventListener("scroll", () => { closeMenu();' in script
     assert '<div class="tile-toolbar">' in script
     assert 'item.media_type === "video" ? "Video" : "Foto"' in script
-    assert 'class="tile-media-strip type-${item.media_type}"' in script
-    assert '<strong class="tile-capture"' in script
-    assert 'const time = `${match[4]}:${match[5]}`' in script
+    assert 'class="tile-media-strip"' in script
+    assert 'class="tile-time"' in script and 'class="tile-date"' in script
+    assert 'time: `${match[4]}:${match[5]}`' in script
+    assert 'class="tile-detail"' in script
+    assert 'item.event_names?.length' in script
     assert 'tile-secondary' not in script
-    assert 'video-placeholder' in script and 'Bez náhledu' in script
+    assert 'brand-placeholder' in script and 'Bez náhledu' in script
+    assert 'revealAction.hidden = window.matchMedia' in script
+    assert 'tile.querySelector("video")?.pause()' in script
     assert '.card-menu-overlay { position: fixed;' in styles
-    assert '.tile-media-strip.type-video { background: rgba(133, 31, 42, .9); }' in styles
-    assert '.tile-media-strip.type-image { background: rgba(30, 82, 69, .9); }' in styles
+    assert '.tile-media-strip.type-video' not in styles
+    assert '.tile-media-strip.type-image' not in styles
+    assert '--tile-row-height: 260px' in styles
+    assert '.tile-event' in styles
     assert '.tile-play { position: absolute;' not in styles
+    assert logo.status_code == 200
+    assert logo.headers["content-type"] == "image/png"
+    assert len(logo.content) > 100_000
 
 
 def test_reveal_uses_only_validated_asset_path_and_existing_http_guards(

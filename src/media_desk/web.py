@@ -89,7 +89,7 @@ def _safe_path_input(value: str) -> str:
     return value
 
 
-def _asset_payload(asset: Asset) -> dict:
+def _asset_payload(asset: Asset, event_names: tuple[str, ...] = ()) -> dict:
     original_path = None
     if asset.original and asset.original.relative_paths:
         original_path = str(asset.original.source_root.joinpath(*PurePosixPath(asset.original.relative_paths[0]).parts))
@@ -117,6 +117,7 @@ def _asset_payload(asset: Asset) -> dict:
         "original_url": f"/artifacts/{asset.original.token}" if asset.original else None,
         "original_path": original_path,
         "sessions": [reference.__dict__ for reference in asset.sessions],
+        "event_names": list(event_names),
         "vision_result_count": len(asset.vision),
         "faces_result_count": len(asset.faces),
         "anonymous_face_clusters": [reference.__dict__ for reference in asset.face_clusters],
@@ -800,7 +801,13 @@ def create_app(
                     {"error": "snapshot_changed", "message": str(exc), "snapshot_id": app.state.library_index.snapshot_id},
                     status_code=409,
                 )
-            return {**batch, "items": [_asset_payload(asset) for asset in batch["items"]]}
+            return {
+                **batch,
+                "items": [
+                    _asset_payload(asset, app.state.library_index.event_names_for(asset.asset_id))
+                    for asset in batch["items"]
+                ],
+            }
         assets = (
             list(app.state.library_index.query(QuerySpec(media_type, q, sort, date_from, date_to, event_id)))
             if event_id or date_from or date_to or sort != "captured_desc"
@@ -812,7 +819,10 @@ def create_app(
             "page": page,
             "page_size": page_size,
             "total": len(assets),
-            "assets": [_asset_payload(asset) for asset in assets[start : start + page_size]],
+            "assets": [
+                _asset_payload(asset, app.state.library_index.event_names_for(asset.asset_id))
+                for asset in assets[start : start + page_size]
+            ],
         }
 
     @app.get("/library", response_class=HTMLResponse)
@@ -987,7 +997,7 @@ def create_app(
         asset = next((item for item in current.assets if item.sha256 == sha256), None)
         if asset is None:
             raise HTTPException(status_code=404, detail="Asset not found")
-        payload = _asset_payload(asset)
+        payload = _asset_payload(asset, app.state.library_index.event_names_for(asset.asset_id))
         payload["vision"] = [result.__dict__ for result in asset.vision]
         payload["faces"] = [result.__dict__ for result in asset.faces]
         return JSONResponse(payload)

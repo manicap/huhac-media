@@ -1,6 +1,6 @@
 # HUHÁČ Media Desk (M1–M1.3 + S2a–S2b)
 
-**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po dokončení Library UI Polishing v1.1.
+**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po dokončení redesignu knihovny v1.2.
 
 ## Začni zde — aktuální autoritativní dokumentace
 
@@ -203,13 +203,19 @@ Karta vytvoří `<video>` teprve po kliknutí na play; spuštění dalšího př
 pozastaví předchozí. Hlasitost a mute jsou sdílené mezi kartami i detailem přes
 `localStorage`, bez serverové databáze.
 
-Library UI Polishing v1.1 přesouvá play a nabídku akcí do kompaktní lišty pod
-náhledem. Jediné menu v portálu `<body>` používá viewportové umístění nahoru nebo
-dolů a vodorovný clamp, takže se neořezává malou kartou; při scrollu nebo recyklaci
-karty se zavře. Barevný horní pruh zobrazuje `Video · délka` nebo `Foto`. Hlavní
-text pod náhledem je capture datum a čas s přesností na minuty, následovaný úplným
-názvem v tooltipu; přesný timestamp zůstává dostupný v detailu. Video bez keyframu
-používá neutrální `Bez náhledu` a zůstává přehratelné.
+Redesign knihovny v1.2 zachovává virtualizaci i hustý malý režim (minimální šířka
+142 px a řádkový krok 260 px), ale ve středním a velkém režimu zvětšuje obrazovou
+plochu. Neutrální horní indikátor zobrazuje ikonu a `Video · délka` nebo `Foto`;
+barva je vyhrazena aktivnímu či přehrávanému médiu. Pod náhledem je kompaktní
+lišta Přehrát/Pauza, Detail a další akce. Čas `HH:mm` je hlavní údaj, vedle něj je
+datum a níže tlumený název souboru a název perzistentní uživatelské akce odvozený
+z jejích Session Grouper relací. Nepřiřazené médium je výslovně označeno.
+
+Jediné menu v portálu `<body>` používá viewportové umístění nahoru nebo dolů a
+vodorovný clamp, takže se neořezává kartou; při scrollu nebo recyklaci se zavře.
+Na mobilním breakpointu se nezobrazuje lokální Windows akce Průzkumníku. Chybějící
+preview používá dodané logo Huháče na neutrálním pozadí a nemění dostupnost
+originálu. Přesný capture timestamp zůstává dostupný v detailu a tooltipu.
 
 The batch response contains `items`, `next_cursor`, `prev_cursor`,
 `start_index`, `total_count`, and `snapshot_id`. Cursors bind the snapshot,
@@ -217,6 +223,8 @@ filters, and sort; incompatible reuse returns HTTP 409. Batch size defaults to
 50 and is constrained to 10–100. The library keeps visible rows plus overscan
 in the DOM and at most 12 metadata batches in its LRU cache. Anchor restoration
 uses `asset_id` plus pixel offset and `/api/locate`, not preceding downloads.
+Každá položka odpovědi navíc obsahuje `event_names`, odvozené pouze z lokální
+perzistentní evidence akcí Media Desku; prázdný seznam znamená nepřiřazené médium.
 
 ## Calendar time policy
 

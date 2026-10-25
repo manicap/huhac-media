@@ -10,7 +10,7 @@
 
 **Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`, `da416df`
 
-**Stav aktualizován:** 2026-10-25; Library UI Polishing v1.1 implementováno
+**Stav aktualizován:** 2026-10-25; redesign knihovny v1.2 implementován
 
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a, S2a.1 a S2b: read-only galerie nad
 > jedním workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
@@ -36,7 +36,8 @@
 | S2a.1 lazy origin access | **IMPLEMENTED** | `models.py`, `contract.py`, `web.py`; `test_web.py`; `S2A1_STARTUP_PERFORMANCE.md` | Snapshot registruje unchecked source reference bez per-file I/O; GET/Range provádí request-scoped ověření a otevření. 10k p50: 25,77 s → 7,75 s (3,32×). |
 | S2b: inicializace nového archivu | **IMPLEMENTED** | `S2B_VERIFICATION.md`; commity výše | Stabilní JSON CLI, crash-safe retry, empty v1 catalog a chráněný web setup. |
 | Pracovní knihovna v1 | **IMPLEMENTED** | `src/media_desk/user_data.py`, `static/library.js`, `templates/events.html`, `tests/media_desk/test_working_library.py` | Stabilní názvy, lazy přehrávání v kartě, sdílená hlasitost, perzistentní akce a kompaktní práce s originálem. |
-| Library UI Polishing v1.1 | **IMPLEMENTED** | `static/library.js`, `static/library.css`, `tests/media_desk/test_working_library.py` | Viewportový portal menu bez ořezu, ovládací lišta pod náhledem, barevný horní pruh typu a délky, minutový capture čas a jednotný placeholder bez keyframu. |
+| Library UI Polishing v1.1 | **IMPLEMENTED; UI SUPERSEDED BY v1.2** | `static/library.js`, `static/library.css`, `tests/media_desk/test_working_library.py` | Portal menu, ovládací lišta a minutový capture čas zůstávají; barevné typové pruhy a původní placeholder nahradil redesign v1.2. |
+| Redesign knihovny v1.2 | **IMPLEMENTED** | `static/library.js`, `static/library.css`, `index.py`, `web.py`, `tests/media_desk/test_working_library.py` | Neutrální typ, dominantnější preview, čas/datum/akce, trvale dostupný Detail, Play/Pauza, dodané fallback logo, responzivní 1–2 sloupce; malý desktopový režim zachovává krok 260 px a min. šířku 142 px. |
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Lokální uživatelská data (názvy a akce) | **IMPLEMENTED** | `src/media_desk/user_data.py` | Atomický per-workspace JSON mimo workspace; přenosné výběry, ratingy a kolekce zůstávají **ABSENT**. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |

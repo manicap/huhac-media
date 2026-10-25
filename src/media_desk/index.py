@@ -67,6 +67,7 @@ class LibraryIndex:
         self.snapshot = snapshot
         self._events: tuple[EventRecord, ...] = ()
         self._event_assets: dict[str, frozenset[str]] = {}
+        self._asset_event_names: dict[str, tuple[str, ...]] = {}
         self._cache_size = cache_size
         self._query_cache: OrderedDict[str, tuple[Asset, ...]] = OrderedDict()
         self._by_id = {asset.asset_id: asset for asset in snapshot.assets}
@@ -98,8 +99,19 @@ class LibraryIndex:
             )
             for event in self._events
         }
+        names_by_asset: dict[str, list[str]] = {}
+        for event in self._events:
+            for asset_id in self._event_assets[event.event_id]:
+                names_by_asset.setdefault(asset_id, []).append(event.name)
+        self._asset_event_names = {
+            asset_id: tuple(sorted(set(names), key=str.casefold))
+            for asset_id, names in names_by_asset.items()
+        }
         self._query_cache.clear()
         self.snapshot_id = self._snapshot_identity()
+
+    def event_names_for(self, asset_id: str) -> tuple[str, ...]:
+        return self._asset_event_names.get(asset_id, ())
 
     def query(self, spec: QuerySpec) -> tuple[Asset, ...]:
         spec = spec.normalized()
