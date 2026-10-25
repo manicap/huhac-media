@@ -21,7 +21,7 @@ def test_overview_and_calendar_follow_active_asset(workspace_builder) -> None:
     assert "Otevřít knihovnu" in overview.text
     assert calendar.status_code == 200
     assert "1. Říjen 2026" in calendar.text
-    assert "media-1.jpg" in calendar.text
+    assert "IMG-0001" in calendar.text
     assert "is-active" in calendar.text
 
 

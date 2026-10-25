@@ -75,6 +75,13 @@ class FaceClusterReference:
     configuration_fingerprint: str
 
 
+@dataclass(frozen=True)
+class EventRecord:
+    event_id: str
+    name: str
+    session_ids: tuple[str, ...]
+
+
 @dataclass
 class Asset:
     asset_id: str
@@ -93,6 +100,8 @@ class Asset:
     preview: Artifact | None
     preview_status: str
     original: OriginalReference | None
+    display_name: str = ""
+    catalog_name: str = ""
     sessions: list[SessionReference] = field(default_factory=list)
     vision: list[ProcessorResult] = field(default_factory=list)
     faces: list[ProcessorResult] = field(default_factory=list)

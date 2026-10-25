@@ -37,6 +37,11 @@ posloupnost pro tři schválené provozní scénáře.
    [S2B_IMPLEMENTATION_PLAN.md](S2B_IMPLEMENTATION_PLAN.md) a
    [S2B_VERIFICATION.md](S2B_VERIFICATION.md). Lokální-only workspace je omezení
    etapy S2b, ne cílové rozhodnutí o přenosné knihovně nebo centrálních metadatech.
+4a. **Pracovní knihovna v1 — COMPLETE 2026-10-25.** Media Desk má stabilní
+   zobrazovací a katalogizační názvy, lazy přehrávače ve virtualizovaných kartách,
+   browser-local sdílenou hlasitost, lokální evidenci akcí nad Session Grouper
+   relacemi a bezpečnou práci s cestou k originálu. Uživatelská data jsou oddělená
+   od workspace a ingest SQLite; přenosná synchronizace zůstává odložená.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

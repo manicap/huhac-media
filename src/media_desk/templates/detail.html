@@ -1,20 +1,22 @@
 {% extends "base.html" %}
-{% block title %}{{ asset.source_name }}{% endblock %}
+{% block title %}{{ asset.display_name }}{% endblock %}
 {% block content %}
 <a class="back" href="{{ return_to }}">← Zpět</a>
 <section class="detail-head">
   <div class="detail-media">
-    {% if asset.media_type == 'video' and asset.original %}<video src="/artifacts/{{ asset.original.token }}" {% if asset.preview %}poster="/artifacts/{{ asset.preview.token }}"{% endif %} controls preload="metadata"></video>{% elif asset.preview %}<img src="/artifacts/{{ asset.preview.token }}" alt="Náhled {{ asset.source_name }}">{% else %}<div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>{% endif %}
+    {% if asset.media_type == 'video' and asset.original %}<video src="/artifacts/{{ asset.original.token }}" {% if asset.preview %}poster="/artifacts/{{ asset.preview.token }}"{% endif %} controls preload="metadata"></video>{% elif asset.preview %}<img src="/artifacts/{{ asset.preview.token }}" alt="Náhled {{ asset.display_name }}">{% else %}<div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>Bez náhledu</small></div>{% endif %}
   </div>
   <div class="detail-copy">
     <p class="eyebrow">{{ asset.media_type }} · {{ asset.format }}</p>
-    <h1>{{ asset.source_name }}</h1>
+    <h1>{{ asset.display_name }}</h1>
+    <p class="muted">Katalogizační název: {{ asset.catalog_name }}</p>
     <p class="asset-id">{{ asset.asset_id }}</p>
     <dl class="facts">
       <div><dt>Pořízeno</dt><dd>{{ asset.capture_time|datetime_cs }}{% if asset.capture_filesystem_fallback %}<br><small>čas souboru · nízká důvěra</small>{% elif asset.capture_time and not asset.capture_timezone and not asset.capture_time.endswith('Z') %}<br><small>bez časové zóny</small>{% endif %}</dd></div>
       <div><dt>Zdroj času</dt><dd>{{ asset.capture_source or 'Neznámý' }}</dd></div>
       <div><dt>Velikost</dt><dd>{{ asset.size_bytes|size_cs }}</dd></div>
-      <div><dt>Originál</dt><dd>{% if asset.original %}<a href="/artifacts/{{ asset.original.token }}">Otevřít / přehrát</a> <span class="muted">Dostupnost se ověří při otevření.</span>{% else %}<span class="offline-text">Offline nebo bez platného mapování</span>{% endif %}</dd></div>
+      <div><dt>Originál</dt><dd>{% if asset.original %}<a href="/artifacts/{{ asset.original.token }}">Otevřít / přehrát</a>{% else %}<span class="offline-text">Soubor nedostupný</span>{% endif %}</dd></div>
+      {% if asset.media_type == 'video' and asset.technical.get('duration_seconds') is not none %}<div><dt>Délka videa</dt><dd>{{ '%.1f'|format(asset.technical.get('duration_seconds')) }} s</dd></div>{% endif %}
     </dl>
     <nav class="detail-neighbors" aria-label="Předchozí a další médium">{% if previous_asset %}<a id="previous-asset" href="/assets/{{ previous_asset.sha256 }}?return_to={{ return_to|urlencode }}&active_asset_id={{ previous_asset.asset_id|urlencode }}">← Předchozí</a>{% else %}<span></span>{% endif %}{% if next_asset %}<a id="next-asset" href="/assets/{{ next_asset.sha256 }}?return_to={{ return_to|urlencode }}&active_asset_id={{ next_asset.asset_id|urlencode }}">Další →</a>{% endif %}</nav>
   </div>
@@ -52,7 +54,9 @@
     <details><summary>Zobrazit technické JSON</summary><pre>{{ technical_json }}</pre></details>
   </article>
 </section>
-<script>
+<script type="module">
+import { bindManagedVideo } from "/static/media-controls.js?v=1.0.0";
+document.querySelectorAll('.detail-media video').forEach(bindManagedVideo);
 document.addEventListener('keydown', event => {
   if (event.target.matches('input, textarea, select, [contenteditable="true"]')) return;
   if (event.key === 'ArrowLeft') document.querySelector('#previous-asset')?.click();

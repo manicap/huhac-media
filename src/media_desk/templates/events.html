@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Akce{% endblock %}
+{% block content %}
+<section class="settings-head"><div><p class="eyebrow">PRACOVNÍ KNIHOVNA</p><h1>Akce</h1><p class="muted">Názvy jsou uživatelská evidence Media Desku. Session Grouper poskytuje pouze časové relace.</p></div></section>
+{% if notice %}<div class="settings-message is-success" role="status">{{ notice }}</div>{% endif %}
+{% if error %}<div class="settings-message is-error" role="alert">{{ error }}</div>{% endif %}
+<div class="events-grid">
+  {% for event in events %}
+  <section class="panel event-editor">
+    <form action="/events/save" method="post" data-event-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="event_id" value="{{ event.event_id }}">
+      <input type="hidden" name="session_ids" value="{{ event.session_ids|join(',') }}" data-session-values>
+      <label>Název akce<input name="name" maxlength="240" value="{{ event.name }}" required></label>
+      <label>Časové relace<select multiple size="{{ [sessions|length, 4]|min }}" data-session-picker>
+        {% for session in sessions %}<option value="{{ session.session_id }}" {% if session.session_id in event.session_ids %}selected{% endif %}>{{ session.operational_day or session.start or 'Bez data' }} · {{ session.asset_count }} médií · {{ session.session_id }}</option>{% endfor %}
+      </select></label>
+      <div class="event-actions"><button class="primary-action" type="submit">Uložit</button></div>
+    </form>
+    <form action="/events/delete" method="post" class="event-delete">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value="{{ event.event_id }}">
+      <button class="secondary-action" type="submit">Odstranit</button>
+    </form>
+  </section>
+  {% endfor %}
+  <section class="panel event-editor">
+    <p class="eyebrow">NOVÁ AKCE</p>
+    <form action="/events/save" method="post" data-event-form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value=""><input type="hidden" name="session_ids" value="" data-session-values>
+      <label>Název akce<input name="name" maxlength="240" placeholder="Např. koncert nebo svatba" required></label>
+      <label>Časové relace<select multiple size="{{ [sessions|length, 4]|min }}" data-session-picker>
+        {% for session in sessions %}<option value="{{ session.session_id }}">{{ session.operational_day or session.start or 'Bez data' }} · {{ session.asset_count }} médií · {{ session.session_id }}</option>{% endfor %}
+      </select></label>
+      <div class="event-actions"><button class="primary-action" type="submit">Přidat akci</button></div>
+    </form>
+  </section>
+</div>
+<script>
+for (const form of document.querySelectorAll('[data-event-form]')) form.addEventListener('submit', () => {
+  form.querySelector('[data-session-values]').value = [...form.querySelector('[data-session-picker]').selectedOptions].map(option => option.value).join(',');
+});
+</script>
+{% endblock %}

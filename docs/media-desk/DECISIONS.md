@@ -6,7 +6,7 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-23 po schválení D-017 až D-020
+**Rozhodnutí aktualizována:** 2026-10-25 po schválení D-021 a D-022
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -15,11 +15,11 @@ schválení a **REJECTED** se nemá realizovat.
 | ID | Rozhodnutí | Stav | Důvod / důkaz |
 |---|---|---|---|
 | D-001 | Veřejný workspace kontrakt v1 je kompatibilitní hranice; ingest SQLite není veřejné API. | **ACCEPTED + IMPLEMENTED** | `docs/workspace-contract.md`; `src/media_desk/contract.py:475`; `src/huhac_media/storage/database.py:11` |
-| D-002 | Media Desk je read-only vůči workspace a originálům; smí zapisovat pouze lokální instance config. | **ACCEPTED + IMPLEMENTED** | `src/media_desk/config.py:164`; `tests/media_desk/test_settings.py:73` |
+| D-002 | Media Desk je read-only vůči workspace a originálům; zapisovat smí jen lokální instance config a schválená Media Desk-owned uživatelská data mimo workspace. | **ACCEPTED + IMPLEMENTED** | `src/media_desk/config.py`; `src/media_desk/user_data.py`; `tests/media_desk/test_working_library.py` |
 | D-003 | Jedna běžící instance používá jeden workspace a snapshot se aktivuje při startu. | **IMPLEMENTED** | `src/media_desk/config.py:71`; `src/media_desk/web.py:204-212` |
 | D-004 | Precedence je CLI → ENV → explicitní TOML → profil → default, pro každý parametr zvlášť. | **IMPLEMENTED** | `src/media_desk/config.py:52-67`, `tests/media_desk/test_media_desk_settings_config.py:59` |
 | D-005 | Změna workspace z UI vyžaduje restart; žádný HTTP restart ani částečný hot-swap. | **ACCEPTED + IMPLEMENTED** | `src/media_desk/web.py:361-365` |
-| D-006 | Media Storage, Workspace, lokální instance config a budoucí uživatelská data jsou různé vrstvy. | **ACCEPTED** | odpovídá dnešnímu ownership; uživatelská vrstva je dosud **ABSENT** |
+| D-006 | Media Storage, Workspace, lokální instance config a uživatelská data jsou různé vrstvy. | **ACCEPTED + IMPLEMENTED V LOKÁLNÍM ROZSAHU** | `library-data/<workspace_id>.json` vlastní Media Desk; přenosná synchronizace zůstává mimo rozsah |
 | D-007 | Tři provozní scénáře A/B/C jsou cílový workflow. | **TARGET** | aktuální pokrytí je A absent, B implemented v přechodném rozsahu S2a, C implemented |
 | D-008 | Cizí `source_root` se kvůli prohlížení nikdy automaticky nepřepisuje do sdíleného katalogu. | **ACCEPTED** | chrání více hostitelů a veřejnou historii; dnešní Media Desk katalog nezapisuje |
 | D-009 | Interní ingest DB logicky patří k workspace; multi-host zápis přes SMB/NFS je nepodporovaný. Budoucí síťový model musí mít jediného writera a bezpečný backup. | **ACCEPTED** | schváleno 2026-10-22; SQLite WAL a host lock: `src/huhac_media/storage/database.py:24-28`, `src/huhac_media/storage/workspace.py:89-129` |
@@ -34,6 +34,9 @@ schválení a **REJECTED** se nemá realizovat.
 | D-018 | Jedinou veřejnou integrační hranicí S2b je verzované JSON CLI `huhac-media init`; Media Desk neimportuje privátní ingest Python API ani neparsuje textové hlášky. | **ACCEPTED + IMPLEMENTED** | `archive_setup.py` spouští pevný argument list a validuje přesné JSON schema |
 | D-019 | Ready prázdný workspace v1 obsahuje SQLite workspace row a init run, prázdný atomický katalog `assets: []` a manifest publikovaný jako poslední readiness bod. | **ACCEPTED + IMPLEMENTED** | `archive_init.py`; integrační crash/retry testy |
 | D-020 | S2b zakazuje oba směry překryvu Media Storage/Workspace a povoluje workspace pouze na prokazatelně lokálním filesystemu; network i unknown workspace FS fail-closed. Jde o bezpečnostní omezení etapy S2b, nikoli definitivní omezení Media Pipeline. | **ACCEPTED + IMPLEMENTED PRO S2b** | filesystem policy a testy; přenosná knihovna a centrální metadata zůstávají otevřené |
+
+| D-021 | Pracovní knihovna v1 ukládá stabilní katalogizační názvy a uživatelské akce atomicky do per-user JSON mimo workspace. Connector provenance smí být přečtena pouze při jednorázové projekci; requesty ani restart se na privátní Connector stav nevážou. | **ACCEPTED + IMPLEMENTED** | `src/media_desk/user_data.py`; jednoznačné `logical_path` nebo perzistentní `VID/IMG`; akce mapují jednu či více Session Grouper relací |
+| D-022 | Otevření originálu v Průzkumníku je lokální Windows POST akce bez klientské cesty. Použije pouze aktivní katalogový asset, request-scoped confinement/symlink kontrolu a stávající loopback/Host/Origin/CSRF hranici. | **ACCEPTED + IMPLEMENTED** | `POST /api/assets/{sha256}/reveal`; `tests/media_desk/test_working_library.py` |
 
 ## Vyhodnocení otázek E1–E10
 

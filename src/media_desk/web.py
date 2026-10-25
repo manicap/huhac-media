@@ -7,9 +7,11 @@ from importlib.metadata import PackageNotFoundError, version
 import ipaddress
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import secrets
+import subprocess
+import sys
 from typing import BinaryIO, Iterator
 from urllib.parse import parse_qs, urlsplit
 
@@ -34,6 +36,7 @@ from media_desk.originals import (
     validate_mapping_candidate,
 )
 from media_desk.workspace_status import WorkspaceValidation, validate_workspace
+from media_desk.user_data import UserDataError, UserDataStore, library_data_path
 
 
 _PACKAGE_ROOT = Path(__file__).parent
@@ -87,6 +90,9 @@ def _safe_path_input(value: str) -> str:
 
 
 def _asset_payload(asset: Asset) -> dict:
+    original_path = None
+    if asset.original and asset.original.relative_paths:
+        original_path = str(asset.original.source_root.joinpath(*PurePosixPath(asset.original.relative_paths[0]).parts))
     return {
         "asset_id": asset.asset_id,
         "sha256": asset.sha256,
@@ -96,6 +102,8 @@ def _asset_payload(asset: Asset) -> dict:
         "size_bytes": asset.size_bytes,
         "availability": asset.availability,
         "source_name": asset.source_name,
+        "display_name": asset.display_name,
+        "catalog_name": asset.catalog_name,
         "capture_time": asset.capture_time,
         "capture_source": asset.capture_source,
         "capture_timezone": asset.capture_timezone,
@@ -107,6 +115,7 @@ def _asset_payload(asset: Asset) -> dict:
         "original_online": asset.original_online,
         "original_access_state": asset.original_access_state,
         "original_url": f"/artifacts/{asset.original.token}" if asset.original else None,
+        "original_path": original_path,
         "sessions": [reference.__dict__ for reference in asset.sessions],
         "vision_result_count": len(asset.vision),
         "faces_result_count": len(asset.faces),
@@ -144,7 +153,9 @@ def _filtered(snapshot: WorkspaceSnapshot, media_type: str, query: str) -> list[
         assets = [
             asset
             for asset in assets
-            if normalized in asset.source_name.casefold()
+            if normalized in asset.display_name.casefold()
+            or normalized in asset.catalog_name.casefold()
+            or normalized in asset.source_name.casefold()
             or normalized in asset.asset_id.casefold()
         ]
     return assets
@@ -225,12 +236,14 @@ def create_app(
     *,
     settings: Settings | None = None,
     archive_setup_client: ArchiveSetupClient | None = None,
+    user_data_path: Path | None = None,
+    connector_manifest: Path | None = None,
 ) -> FastAPI:
     if settings is None:
         settings = Settings(
             workspace=workspace,
             keyframe_fingerprint=keyframe_fingerprint,
-            profile_config_path=user_config_path(),
+            profile_config_path=None,
             workspace_source="cli" if workspace is not None else "default",
         )
     workspace = settings.workspace
@@ -242,10 +255,26 @@ def create_app(
     app.mount("/static", StaticFiles(directory=str(_PACKAGE_ROOT / "static")), name="static")
     validation = validate_workspace(workspace, keyframe_fingerprint, settings.originals_mapping)
     snapshot = validation.snapshot
+    user_data_store = None
+    if snapshot is not None:
+        resolved_user_data_path = (
+            user_data_path
+            if user_data_path is not None
+            else library_data_path(settings.profile_config_path, snapshot.workspace_id)
+        )
+        user_data_store = UserDataStore(
+            snapshot,
+            resolved_user_data_path,
+            connector_manifest=connector_manifest,
+        )
     app.state.snapshot = snapshot
     app.state.workspace_validation = validation
     app.state.startup_error = None if validation.valid else validation.message
-    app.state.library_index = LibraryIndex(snapshot) if snapshot is not None else None
+    app.state.user_data_store = user_data_store
+    app.state.library_index = (
+        LibraryIndex(snapshot, events=user_data_store.events if user_data_store else ())
+        if snapshot is not None else None
+    )
     app.state.settings = settings
     app.state.csrf_secret = secrets.token_urlsafe(32)
     app.state.archive_setup_client = archive_setup_client or ArchiveSetupClient()
@@ -341,6 +370,9 @@ def create_app(
             name="settings.html",
             context=settings_context(request, **values),
         )
+        return with_csrf_cookie(request, response)
+
+    def with_csrf_cookie(request: Request, response: Response) -> Response:
         if request.cookies.get(_CSRF_COOKIE) != app.state.csrf_secret:
             response.set_cookie(
                 _CSRF_COOKIE,
@@ -402,6 +434,56 @@ def create_app(
                 status_code=503,
             )
         return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+
+    def render_events(request: Request, *, notice: str | None = None, error: str | None = None):
+        current = require_snapshot()
+        store: UserDataStore = app.state.user_data_store
+        response = templates.TemplateResponse(
+            request=request,
+            name="events.html",
+            context={
+                "workspace": current,
+                "events": store.events,
+                "sessions": current.sessions,
+                "notice": notice,
+                "error": error or store.error,
+                "csrf_token": request.cookies.get(_CSRF_COOKIE) or app.state.csrf_secret,
+                "active_asset_id": None,
+            },
+        )
+        return with_csrf_cookie(request, response)
+
+    @app.get("/events", response_class=HTMLResponse)
+    def events_page(request: Request):
+        return render_events(request)
+
+    @app.post("/events/save", response_class=HTMLResponse)
+    async def save_event(request: Request):
+        fields = await protected_form(request, {"csrf_token", "event_id", "name", "session_ids"})
+        current = require_snapshot()
+        store: UserDataStore = app.state.user_data_store
+        try:
+            store.upsert_event(
+                event_id=fields["event_id"] or None,
+                name=fields["name"],
+                session_ids=tuple(value for value in fields["session_ids"].split(",") if value),
+                valid_session_ids={session.session_id for session in current.sessions},
+            )
+        except UserDataError as exc:
+            return render_events(request, error=str(exc))
+        app.state.library_index.update_events(store.events)
+        return render_events(request, notice="Akce byla uložena a filtr knihovny je aktualizovaný.")
+
+    @app.post("/events/delete", response_class=HTMLResponse)
+    async def delete_event(request: Request):
+        fields = await protected_form(request, {"csrf_token", "event_id"})
+        store: UserDataStore = app.state.user_data_store
+        try:
+            store.delete_event(fields["event_id"])
+        except UserDataError as exc:
+            return render_events(request, error=str(exc))
+        app.state.library_index.update_events(store.events)
+        return render_events(request, notice="Akce byla odstraněna.")
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request, recheck: bool = False):
@@ -673,6 +755,7 @@ def create_app(
             query.get("sort", ["captured_desc"])[0],
             query.get("date_from", [None])[0],
             query.get("date_to", [None])[0],
+            query.get("event_id", [None])[0],
         )
         ordered = app.state.library_index.query(spec)
         position = next((index for index, item in enumerate(ordered) if item.asset_id == asset.asset_id), None)
@@ -705,10 +788,11 @@ def create_app(
         snapshot_id: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        event_id: str | None = Query(None, max_length=64),
     ):
         current = require_snapshot()
         if limit is not None or cursor is not None or start is not None or snapshot_id is not None:
-            spec = QuerySpec(media_type, q, sort, date_from, date_to)
+            spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id)
             try:
                 batch = app.state.library_index.batch(spec, limit or 50, cursor, start, snapshot_id)
             except CursorError as exc:
@@ -717,7 +801,11 @@ def create_app(
                     status_code=409,
                 )
             return {**batch, "items": [_asset_payload(asset) for asset in batch["items"]]}
-        assets = _filtered(current, media_type, q)
+        assets = (
+            list(app.state.library_index.query(QuerySpec(media_type, q, sort, date_from, date_to, event_id)))
+            if event_id or date_from or date_to or sort != "captured_desc"
+            else _filtered(current, media_type, q)
+        )
         start = (page - 1) * page_size
         return {
             "workspace_id": current.workspace_id,
@@ -736,9 +824,10 @@ def create_app(
         active_asset_id: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        event_id: str | None = Query(None, max_length=64),
     ):
         current = require_snapshot()
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request=request,
             name="library.html",
             context={
@@ -749,9 +838,13 @@ def create_app(
                 "active_asset_id": active_asset_id,
                 "date_from": date_from,
                 "date_to": date_to,
+                "event_id": event_id,
+                "events": app.state.user_data_store.events,
                 "snapshot_id": app.state.library_index.snapshot_id,
+                "csrf_token": request.cookies.get(_CSRF_COOKIE) or app.state.csrf_secret,
             },
         )
+        return with_csrf_cookie(request, response)
 
     @app.get("/calendar", response_class=HTMLResponse)
     def calendar_view(
@@ -843,9 +936,10 @@ def create_app(
         sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
         date_from: str | None = None,
         date_to: str | None = None,
+        event_id: str | None = Query(None, max_length=64),
     ):
         require_snapshot()
-        spec = QuerySpec(media_type, q, sort, date_from, date_to)
+        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id)
         index = app.state.library_index
         return {
             "snapshot_id": index.snapshot_id,
@@ -864,11 +958,12 @@ def create_app(
         sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
         date_from: str | None = None,
         date_to: str | None = None,
+        event_id: str | None = Query(None, max_length=64),
     ):
         require_snapshot()
         if asset_id is None and year is None:
             raise HTTPException(status_code=422, detail="asset_id or year is required")
-        spec = QuerySpec(media_type, q, sort, date_from, date_to)
+        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id)
         found = app.state.library_index.locate(
             spec, asset_id=asset_id, year=year, month=month, day=day
         )
@@ -881,9 +976,10 @@ def create_app(
         media_type: str = Query("all", pattern="^(all|image|video)$"),
         q: str = "",
         sort: str = Query("captured_desc", pattern="^(captured_desc|captured_asc)$"),
+        event_id: str | None = Query(None, max_length=64),
     ):
         require_snapshot()
-        return app.state.library_index.calendar(QuerySpec(media_type, q, sort))
+        return app.state.library_index.calendar(QuerySpec(media_type, q, sort, event_id=event_id))
 
     @app.get("/api/assets/{sha256}")
     def api_detail(sha256: str):
@@ -895,6 +991,27 @@ def create_app(
         payload["vision"] = [result.__dict__ for result in asset.vision]
         payload["faces"] = [result.__dict__ for result in asset.faces]
         return JSONResponse(payload)
+
+    @app.post("/api/assets/{sha256}/reveal")
+    async def reveal_original(request: Request, sha256: str):
+        await protected_form(request, {"csrf_token"})
+        if not sys.platform.startswith("win"):
+            raise HTTPException(status_code=501, detail="Otevření umístění je dostupné pouze na Windows")
+        current = require_snapshot()
+        asset = next((item for item in current.assets if item.sha256 == sha256), None)
+        if asset is None or asset.original is None:
+            raise HTTPException(status_code=404, detail="Soubor nedostupný")
+        resolved = resolve_mapped_original(asset.original.source_root, asset.original.relative_paths)
+        if resolved is None:
+            raise HTTPException(status_code=404, detail="Soubor nedostupný")
+        try:
+            subprocess.Popen(
+                ["explorer.exe", "/select,", str(resolved)],
+                close_fds=True,
+            )
+        except OSError as exc:
+            raise HTTPException(status_code=503, detail="Průzkumník Windows se nepodařilo otevřít") from exc
+        return {"status": "opened"}
 
     @app.get("/artifacts/{token}")
     def artifact(request: Request, token: str):

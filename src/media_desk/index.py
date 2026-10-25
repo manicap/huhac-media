@@ -8,7 +8,7 @@ import hashlib
 import json
 from typing import Iterable
 
-from media_desk.models import Asset, WorkspaceSnapshot
+from media_desk.models import Asset, EventRecord, WorkspaceSnapshot
 
 
 class CursorError(ValueError):
@@ -22,11 +22,13 @@ class QuerySpec:
     sort: str = "captured_desc"
     date_from: str | None = None
     date_to: str | None = None
+    event_id: str | None = None
 
     def normalized(self) -> "QuerySpec":
         media_type = self.media_type if self.media_type in {"all", "image", "video"} else "all"
         sort = self.sort if self.sort in {"captured_desc", "captured_asc"} else "captured_desc"
-        return QuerySpec(media_type, self.query.strip().casefold(), sort, self.date_from, self.date_to)
+        event_id = self.event_id.strip() if isinstance(self.event_id, str) and self.event_id.strip() else None
+        return QuerySpec(media_type, self.query.strip().casefold(), sort, self.date_from, self.date_to, event_id)
 
     @property
     def fingerprint(self) -> str:
@@ -56,21 +58,48 @@ def capture_label(asset: Asset) -> str:
 
 
 class LibraryIndex:
-    def __init__(self, snapshot: WorkspaceSnapshot, cache_size: int = 24) -> None:
+    def __init__(
+        self,
+        snapshot: WorkspaceSnapshot,
+        cache_size: int = 24,
+        events: Iterable[EventRecord] = (),
+    ) -> None:
         self.snapshot = snapshot
+        self._events: tuple[EventRecord, ...] = ()
+        self._event_assets: dict[str, frozenset[str]] = {}
+        self._cache_size = cache_size
+        self._query_cache: OrderedDict[str, tuple[Asset, ...]] = OrderedDict()
+        self._by_id = {asset.asset_id: asset for asset in snapshot.assets}
+        self.update_events(events)
+
+    def _snapshot_identity(self) -> str:
         identity = {
-            "workspace_id": snapshot.workspace_id,
-            "generated_at": snapshot.generated_at,
+            "workspace_id": self.snapshot.workspace_id,
+            "generated_at": self.snapshot.generated_at,
             "assets": [
                 [asset.asset_id, asset.media_type, asset.capture_time, asset.capture_filesystem_fallback]
-                for asset in snapshot.assets
+                for asset in self.snapshot.assets
+            ],
+            "events": [
+                [event.event_id, event.name, list(event.session_ids)] for event in self._events
             ],
         }
         canonical = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        self.snapshot_id = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-        self._by_id = {asset.asset_id: asset for asset in snapshot.assets}
-        self._cache_size = cache_size
-        self._query_cache: OrderedDict[str, tuple[Asset, ...]] = OrderedDict()
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def update_events(self, events: Iterable[EventRecord]) -> None:
+        self._events = tuple(sorted(events, key=lambda item: item.event_id))
+        sessions = {session.session_id: session for session in self.snapshot.sessions}
+        self._event_assets = {
+            event.event_id: frozenset(
+                asset_id
+                for session_id in event.session_ids
+                for asset_id in (sessions[session_id].asset_ids if session_id in sessions else ())
+            )
+            for event in self._events
+        }
+        self._query_cache.clear()
+        self.snapshot_id = self._snapshot_identity()
 
     def query(self, spec: QuerySpec) -> tuple[Asset, ...]:
         spec = spec.normalized()
@@ -80,13 +109,19 @@ class LibraryIndex:
             self._query_cache.move_to_end(key)
             return cached
         assets: Iterable[Asset] = self.snapshot.assets
+        if spec.event_id:
+            allowed = self._event_assets.get(spec.event_id, frozenset())
+            assets = (asset for asset in assets if asset.asset_id in allowed)
         if spec.media_type != "all":
             assets = (asset for asset in assets if asset.media_type == spec.media_type)
         if spec.query:
             assets = (
                 asset
                 for asset in assets
-                if spec.query in asset.source_name.casefold() or spec.query in asset.asset_id.casefold()
+                if spec.query in asset.display_name.casefold()
+                or spec.query in asset.catalog_name.casefold()
+                or spec.query in asset.source_name.casefold()
+                or spec.query in asset.asset_id.casefold()
             )
         filtered = []
         for asset in assets:

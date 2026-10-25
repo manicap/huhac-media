@@ -1,6 +1,6 @@
 # HUHÁČ Media Desk (M1–M1.3 + S2a–S2b)
 
-**Dokumentace synchronizována:** 2026-10-23 na větvi `mediadesk` po implementaci S2b.
+**Dokumentace synchronizována:** 2026-10-25 na větvi `codex/media-desk-working-library-v1` po implementaci Pracovní knihovny v1.
 
 ## Začni zde — aktuální autoritativní dokumentace
 
@@ -37,6 +37,15 @@ Grouper time relations. It retains completed Vision/Faces results, anonymous
 clusters, explicit keyframe selection, offline originals, and HTTP Range video
 playback from M1. A browser request never opens ingest SQLite, runs a processor,
 decodes a video, creates a thumbnail, or changes the workspace.
+
+Pracovní knihovna v1 přidává stabilní zobrazovací názvy, přehrávání videa přímo
+ve virtualizované kartě, sdílenou browser-local hlasitost, perzistentní uživatelské
+akce nad Session Grouper relacemi a kompaktní práci s originálem. Tato data jsou
+uložena atomicky mimo workspace v `library-data/<workspace_id>.json` vedle per-user
+profilu. Při prvním spuštění lze jednorázově promítnout pouze jednoznačné původní
+názvy z validního Media Connector provenance manifestu; nejednoznačné deduplikované
+assetty dostanou stabilní `VID-####` nebo `IMG-####`. Další HTTP requesty ani
+restart Connector stav nečtou.
 
 ## Install
 
@@ -91,9 +100,10 @@ confirm, and restart. This does not import media or run processors.
 The profile file
 is `%APPDATA%\HUHAC\MediaDesk\config.toml` on Windows and
 `${XDG_CONFIG_HOME:-~/.config}/huhac/media-desk/config.toml` on Linux. The
-browsing runtime remains read-only; the confirmed S2b action delegates workspace
-creation to the producer-owned `huhac-media init` process, while Media Desk
-itself writes only this application config.
+browsing runtime remains read-only vůči workspace a originálům; the confirmed
+S2b action delegates workspace creation to the producer-owned `huhac-media init`
+process, while Media Desk writes only this application config and its separate
+per-user working-library JSON.
 
 ### Originály na jiném hostiteli nebo OS (S2a)
 
@@ -167,6 +177,8 @@ metadata browsable.
 - `GET /library` — virtualized library with type/search/sort/date filters;
 - `GET /calendar` — year/month/day navigation over trustworthy capture dates;
 - `GET /relations` — Session Grouper timeline, explicitly not an Event list;
+- `GET /events` — jednoduchá lokální evidence názvů akcí a přiřazených relací;
+- `POST /events/save`, `POST /events/delete` — loopback/CSRF chráněná editace akcí;
 - `GET /settings` — active path, source, status and application information;
 - `POST /settings/validate` — read-only validation of one submitted path;
 - `POST /settings/save` — revalidation and atomic per-user config update;
@@ -179,6 +191,7 @@ metadata browsable.
 - `GET /api/index` — filtered counts and available time segments;
 - `GET /api/locate` — direct lookup by asset or year/month/day;
 - `GET /api/calendar` and `GET /api/assets/{sha256}` — calendar/detail data;
+- `POST /api/assets/{sha256}/reveal` — bezpečné lokální otevření aktivního originálu v Průzkumníku Windows;
 - `GET /artifacts/{opaque-token}` — only artifacts registered from validated
   public paths and authorized active originals;
 - `GET /health` — workspace readiness.
@@ -186,6 +199,9 @@ metadata browsable.
 Original video responses support one HTTP byte range per request. The browser
 therefore does not need to load a complete video before seeking. Preview and
 keyframe images use lazy loading, identity ETags, and immutable browser caching.
+Karta vytvoří `<video>` teprve po kliknutí na play; spuštění dalšího přehrávače
+pozastaví předchozí. Hlasitost a mute jsou sdílené mezi kartami i detailem přes
+`localStorage`, bez serverové databáze.
 
 The batch response contains `items`, `next_cursor`, `prev_cursor`,
 `start_index`, `total_count`, and `snapshot_id`. Cursors bind the snapshot,
@@ -225,6 +241,12 @@ cookie token. A non-loopback bind remains usable for read-only viewing when
 explicitly requested, but server-side configuration changes are blocked because
 M1.3 has no authentication or TLS.
 
+Stejná loopback/Host/Origin/CSRF hranice chrání editaci akcí a otevření Průzkumníku.
+Reveal endpoint nepřijímá cestu z klienta: asset vyhledá v aktivním snapshotu,
+znovu provede request-scoped canonical confinement a symlink kontrolu a spustí
+pouze `explorer.exe` bez shellu. Na jiném OS zůstává bezpečným workflow kopírování
+absolutní cesty z nabídky karty.
+
 ## Tests
 
 Install test dependencies and run the focused suite:
@@ -252,6 +274,9 @@ every workspace file's content, size, and modification time.
 - No import, upload, processing orchestration, favorites, ratings, collections,
   general storage registry, relocation workflow, or editor integration. S2a
   maps one originals root only for Media Desk.
+- Lokální názvy a akce nejsou přenosná synchronizovaná metadata; patří jednomu
+  uživatelskému profilu Media Desku. Komplexní event calendar a správa událostí
+  zůstávají mimo Pracovní knihovnu v1.
 - Multiple analysis configurations are displayed with their fingerprints;
   video thumbnail selection requires an explicit keyframe fingerprint.
 - Original availability is checked on the backend host. A browser client does

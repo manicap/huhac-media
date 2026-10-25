@@ -18,7 +18,8 @@ checkpoint currently contains six implemented components:
 - **Faces Processor v1** detects and embeds faces in those same public visual
   inputs, then independently clusters embeddings into anonymous groups.
 - **Media Desk** provides the read-only gallery, local workspace/originals
-  configuration, and S2b orchestration of producer-owned empty archive setup.
+  configuration, S2b orchestration of producer-owned empty archive setup, and
+  a local working library with stable names, events and lazy in-card playback.
 
 The semantic Normalizer, OCR, cross-asset Similarity, Quality, Audio,
 event interpretation, a Media Collector, and orchestration are future work and
@@ -96,5 +97,5 @@ their own `analysis/<processor>/` namespace.
 ## Project status
 
 Media Ingest Tool v1, Session Grouper v1, Video Keyframe Extractor v1, Vision
-Processor v1, Faces Processor v1, and Media Desk through S2b are implemented.
+Processor v1, Faces Processor v1, and Media Desk through Pracovní knihovna v1 are implemented.
 The remaining future processors and storage stages stay out of scope.

@@ -35,7 +35,7 @@
   <article class="card">
     <a class="thumb" href="/assets/{{ asset.sha256 }}">
       {% if asset.preview %}
-      <img src="/artifacts/{{ asset.preview.token }}" alt="Preview of {{ asset.source_name }}" loading="lazy">
+      <img src="/artifacts/{{ asset.preview.token }}" alt="Preview of {{ asset.display_name }}" loading="lazy">
       {% else %}
       <div class="placeholder"><span>{{ asset.media_type|upper }}</span><small>{{ asset.preview_status }}</small></div>
       {% endif %}
@@ -43,7 +43,7 @@
       {% if asset.original %}<span class="offline-pill">originál se ověří při otevření</span>{% else %}<span class="offline-pill">originál offline</span>{% endif %}
     </a>
     <div class="card-body">
-      <h2><a href="/assets/{{ asset.sha256 }}">{{ asset.source_name }}</a></h2>
+      <h2><a href="/assets/{{ asset.sha256 }}">{{ asset.display_name }}</a></h2>
       <p>{{ asset.capture_time or 'Capture time unavailable' }}</p>
       <div class="signals">
         {% if asset.sessions %}<span>{{ asset.sessions|length }} time relation{% if asset.sessions|length != 1 %}s{% endif %}</span>{% endif %}

@@ -116,12 +116,21 @@ summary { cursor: pointer; }
 .detail-grid .technical-panel { grid-column: 1 / -1; }
 .cluster { display: flex; flex-direction: column; padding: 8px; margin-top: 8px; border-radius: var(--radius-sm); background: var(--surface-soft); font-size: var(--text-sm); }
 .cluster span, .cluster small { color: var(--muted); }
+.events-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; max-width: 1180px; }
+.event-editor { position: relative; }
+.event-editor form[data-event-form] { display: grid; gap: 10px; }
+.event-editor label { display: grid; gap: 5px; color: var(--subtle); font-size: var(--text-sm); }
+.event-editor input, .event-editor select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); padding: 8px 9px; }
+.event-editor select { min-height: 92px; }
+.event-actions { display: flex; gap: 8px; }
+.event-delete { position: absolute; right: 12px; bottom: 12px; }
 
 button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media (max-width: 800px) {
   .settings-grid { grid-template-columns: 1fr; }
   .settings-originals, .settings-about { grid-column: auto; }
+  .events-grid { grid-template-columns: 1fr; }
   .detail-head { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .detail-grid .technical-panel { grid-column: auto; }

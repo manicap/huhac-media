@@ -6,7 +6,7 @@
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-23 po dokončení S2b
+**Rozhodnutí aktualizována:** 2026-10-25 po dokončení Pracovní knihovny v1
 
 > **IMPLEMENTOVÁNO DNES** — běžící galerie je lokální read-only konzument jednoho
 > veřejného workspace v1. Výslovně potvrzené založení archivu orchestruje přes
@@ -25,6 +25,7 @@
 | Veřejný kontrakt | `workspace.json` → `metadata/catalog.json`, verze 1 | ingest publikuje atomicky | **IMPLEMENTED** |
 | Ingest runtime | `state/catalog.sqlite3`, WAL, locks, reporty | Media Ingest | **IMPLEMENTED**, privátní |
 | Media Desk instance config | jeden TOML v uživatelském profilu hostitele | Media Desk settings endpoint | **IMPLEMENTED** |
+| Lokální uživatelská data Media Desku | stabilní názvy a akce v `library-data/<workspace_id>.json` | Media Desk | **IMPLEMENTED** |
 | Přenosná uživatelská data | budoucí výběry, ratingy, kolekce | nerozhodnuto | **PROPOSED** |
 
 Workspace není synonymum pro Media Storage ani pro lokální konfiguraci aplikace.
@@ -48,6 +49,11 @@ zatímco aktivní zdroj nese relativní cestu.
    se při příštím startu (`src/media_desk/config.py:164-213`).
 6. **IMPLEMENTED S2b:** Media Desk spouští pevné JSON CLI Media Ingestu bez
    Python importu, postvaliduje veřejný kontrakt a až potom uloží profil.
+7. **IMPLEMENTED Pracovní knihovna v1:** po načtení veřejného snapshotu Media Desk
+   připojí lokální per-user názvy a akce. Při prvním použití může jednorázově
+   validovat Connector provenance manifest stejného `workspace_id`; další requesty
+   čtou výhradně Media Desk-owned JSON. Workspace, katalog a ingest SQLite zůstávají
+   read-only.
 
 ## Databázová hranice a síťová úložiště
 
@@ -119,6 +125,9 @@ potvrzenou dostupnost souboru. Baseline a finální měření jsou v
   chybný kandidát nezmění poslední platný profil.
 - **IMPLEMENTED:** S2b preflight/confirm používá tutéž HTTP hranici a navíc
   jednorázový expirovaný nonce svázaný s operation ID a oběma cestami.
+- **IMPLEMENTED:** editace akcí používá stejnou loopback/Host/Origin/CSRF hranici;
+  otevření Průzkumníku navíc nepřijímá klientskou cestu a po request-scoped
+  confinement/symlink kontrole spouští pouze pevný `explorer.exe` bez shellu.
 - **ABSENT:** autentizace a TLS; bezpečný default je `127.0.0.1`.
 
 ## Tři provozní scénáře

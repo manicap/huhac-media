@@ -1,3 +1,5 @@
+import { bindManagedVideo } from "/static/media-controls.js?v=1.0.0";
+
 const app = document.querySelector("#library-app");
 
 if (app) {
@@ -24,6 +26,7 @@ if (app) {
   let columns = 1;
   let generation = 0;
   let renderScheduled = false;
+  let renderedSignature = "";
   let lastFailedStart = 0;
   let activeAssetId = app.dataset.activeAssetId || new URL(location.href).searchParams.get("active_asset_id");
   let segments = [];
@@ -68,16 +71,31 @@ if (app) {
     if (!(item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"))) return `${label} · bez časové zóny`;
     return label;
   };
+  const formatDuration = (item) => {
+    const seconds = Number(item.technical?.duration_seconds);
+    if (!Number.isFinite(seconds) || seconds < 0) return "";
+    const rounded = Math.round(seconds);
+    const hours = Math.floor(rounded / 3600);
+    const minutes = Math.floor((rounded % 3600) / 60);
+    const rest = rounded % 60;
+    return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}` : `${minutes}:${String(rest).padStart(2, "0")}`;
+  };
   const cardHtml = (item, index) => {
     const preview = item.preview_url
-      ? `<img src="${escapeHtml(item.preview_url)}" alt="Náhled ${escapeHtml(item.source_name)}" width="320" height="210" loading="lazy" decoding="async">`
-      : `<div class="placeholder"><span>${item.media_type === "video" ? "VIDEO" : "FOTO"}</span><small>${escapeHtml(item.preview_status)}</small></div>`;
+      ? `<img src="${escapeHtml(item.preview_url)}" alt="Náhled ${escapeHtml(item.display_name)}" width="320" height="210" loading="lazy" decoding="async">`
+      : `<div class="placeholder"><span>${item.media_type === "video" ? "VIDEO" : "FOTO"}</span><small>Bez náhledu</small></div>`;
     const url = new URL(`/assets/${item.sha256}`, location.origin);
     url.searchParams.set("return_to", location.pathname + location.search);
     url.searchParams.set("active_asset_id", item.asset_id);
+    const duration = item.media_type === "video" ? formatDuration(item) : "";
+    const facts = [formatCaptureLabel(item), duration].filter(Boolean).join(" · ");
+    const type = item.media_type === "video" ? "▶ Video" : "▧ Fotografie";
+    const play = item.media_type === "video" && item.original_url
+      ? '<button class="tile-play" type="button" aria-label="Přehrát video" title="Přehrát video">▶</button>' : "";
+    const unavailable = item.original_url ? "" : '<span class="offline-pill">Soubor nedostupný</span>';
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
-      <a class="tile-preview" href="${escapeHtml(url.pathname + url.search)}">${preview}<span class="type-pill">${item.media_type === "video" ? "video" : "foto"}</span>${item.original_access_state === "unchecked" ? '<span class="offline-pill">ověří se při otevření</span>' : '<span class="offline-pill">originál offline</span>'}</a>
-      <div class="tile-copy"><strong title="${escapeHtml(item.source_name)}">${escapeHtml(item.source_name)}</strong><span>${escapeHtml(formatCaptureLabel(item))}</span></div>
+      <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a><span class="type-pill type-${item.media_type}">${type}</span>${unavailable}${play}<button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false">•••</button><div class="tile-menu" hidden><button type="button" data-card-action="copy-path" ${item.original_path ? "" : "disabled"}>Kopírovat cestu</button><button type="button" data-card-action="copy-name">Kopírovat katalogizační název</button><button type="button" data-card-action="copy-id">Kopírovat asset ID</button><button type="button" data-card-action="reveal" ${item.original_path ? "" : "disabled"}>Otevřít v Průzkumníku</button></div><span class="tile-file-error" hidden>Soubor nedostupný</span></div>
+      <div class="tile-copy"><strong title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</strong><span>${escapeHtml(facts)}</span></div>
     </article>`;
   };
   const touchCache = (start, items) => {
@@ -162,7 +180,11 @@ if (app) {
       if (item) cards.push(cardHtml(item, index));
       else needed.add(Math.floor(index / batchSize) * batchSize);
     }
-    windowElement.innerHTML = cards.join("") || (totalCount ? '<div class="gallery-skeleton">Načítání médií…</div>' : '<div class="empty"><h2>Žádná média</h2><p>Změňte filtry nebo hledání.</p></div>');
+    const signature = `${generation}:${columns}:${start}:${end}:${cards.map((card) => card.slice(0, 120)).join("|")}`;
+    if (signature !== renderedSignature) {
+      windowElement.innerHTML = cards.join("") || (totalCount ? '<div class="gallery-skeleton">Načítání médií…</div>' : '<div class="empty"><h2>Žádná média</h2><p>Změňte filtry nebo hledání.</p></div>');
+      renderedSignature = signature;
+    }
     [...needed].slice(0, 2).forEach(fetchBatch);
     const firstItem = itemAt(Math.floor(galleryScrollTop() / rowHeight) * columns);
     periodElement.textContent = firstItem?.capture_label || "";
@@ -280,6 +302,48 @@ if (app) {
       await locateAndRestore(activeAssetId || (sameUrl ? stored.assetId : null), sameUrl ? stored.offset : 0);
     }
   };
+  const itemForTile = (tile) => itemAt(Number(tile?.dataset.index));
+  const showFileError = (tile, message = "Soubor nedostupný") => {
+    const label = tile.querySelector(".tile-file-error");
+    if (label) { label.textContent = message; label.hidden = false; }
+  };
+  const copyText = async (value, button) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const field = document.createElement("textarea");
+      field.value = value;
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.append(field);
+      field.select();
+      document.execCommand("copy");
+      field.remove();
+    }
+    const previous = button.textContent;
+    button.textContent = "Zkopírováno";
+    setTimeout(() => { button.textContent = previous; }, 900);
+  };
+  const activateVideo = async (tile, item) => {
+    if (!item?.original_url) return showFileError(tile);
+    const visual = tile.querySelector(".tile-visual");
+    if (!visual || tile.querySelector("video")) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "tile-visual is-playing";
+    const video = document.createElement("video");
+    video.src = item.original_url;
+    if (item.preview_url) video.poster = item.preview_url;
+    video.controls = true;
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.addEventListener("error", () => showFileError(tile), { once: true });
+    wrapper.append(video);
+    visual.replaceWith(wrapper);
+    tile.querySelector(".tile-play")?.remove();
+    bindManagedVideo(video);
+    try { await video.play(); } catch { /* Browser autoplay policy may still require another user gesture. */ }
+  };
   scrollRoot.addEventListener("scroll", () => { scheduleRender(); saveAnchor(); }, { passive: true });
   new ResizeObserver(() => {
     const oldColumns = columns;
@@ -294,7 +358,51 @@ if (app) {
     if (!insideGallery) scrollRoot.scrollTop = oldScrollTop;
     else if (anchor) scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
   }).observe(scrollRoot);
-  windowElement.addEventListener("click", (event) => { if (event.target.closest("a")) saveAnchor(); });
+  windowElement.addEventListener("click", async (event) => {
+    const tile = event.target.closest(".media-tile");
+    if (!tile) return;
+    const item = itemForTile(tile);
+    const menuButton = event.target.closest(".tile-menu-button");
+    if (menuButton) {
+      const menu = tile.querySelector(".tile-menu");
+      const opening = menu.hidden;
+      for (const other of windowElement.querySelectorAll(".tile-menu")) other.hidden = true;
+      for (const other of windowElement.querySelectorAll(".tile-menu-button")) other.setAttribute("aria-expanded", "false");
+      menu.hidden = !opening;
+      menuButton.setAttribute("aria-expanded", String(opening));
+      return;
+    }
+    if (event.target.closest(".tile-play")) {
+      await activateVideo(tile, item);
+      return;
+    }
+    const action = event.target.closest("[data-card-action]");
+    if (action) {
+      const name = action.dataset.cardAction;
+      if (name === "copy-path") await copyText(item?.original_path, action);
+      if (name === "copy-name") await copyText(item?.catalog_name, action);
+      if (name === "copy-id") await copyText(item?.asset_id, action);
+      if (name === "reveal") {
+        const response = await fetch(`/api/assets/${item.sha256}/reveal`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+          body: new URLSearchParams({ csrf_token: app.dataset.csrfToken }),
+        });
+        if (!response.ok) {
+          let message = "Soubor nedostupný";
+          try { message = (await response.json()).detail || message; } catch { /* Use safe fallback. */ }
+          showFileError(tile, message);
+        }
+      }
+      return;
+    }
+    if (event.target.closest("a")) saveAnchor();
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".tile-menu, .tile-menu-button")) return;
+    for (const menu of windowElement.querySelectorAll(".tile-menu")) menu.hidden = true;
+    for (const button of windowElement.querySelectorAll(".tile-menu-button")) button.setAttribute("aria-expanded", "false");
+  });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const url = new URL("/library", location.origin);
@@ -314,6 +422,7 @@ if (app) {
   timeSelect.addEventListener("change", () => jumpToPeriod(timeSelect.value));
   form.elements.media_type.addEventListener("change", () => form.requestSubmit());
   form.elements.sort.addEventListener("change", () => form.requestSubmit());
+  form.elements.event_id.addEventListener("change", () => form.requestSubmit());
   densityControls.forEach((control) => control.addEventListener("change", () => applyDensity(control.value)));
   let initialDensity = "medium";
   try { initialDensity = localStorage.getItem("mediaDesk.libraryDensity") || initialDensity; } catch { /* Optional preference. */ }
