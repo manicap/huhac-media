@@ -94,6 +94,22 @@ SQLite, logs, run state, locks, and ingest Python APIs are internal. Consumers
 start at `workspace.json`, follow `metadata/catalog.json`, and write only under
 their own `analysis/<processor>/` namespace.
 
+## Clean runtime bundle
+
+Create a portable runtime ZIP without tests, development dependencies, Git
+metadata, documentation sources, caches, virtual environments, local media, or
+generated output:
+
+```powershell
+.\scripts\build-runtime-bundle.cmd
+```
+
+The result is written to `dist/huhac-media-runtime-<version>.zip`. It contains
+one validated Python wheel, `config.example.toml`, the third-party model notice,
+an installation guide, and a SHA-256 manifest. The wheel includes all runtime
+Python packages and the Media Desk HTML/CSS/JavaScript assets. Building fails if
+development-only paths or Python bytecode enter the wheel or outer ZIP.
+
 ## Project status
 
 Media Ingest Tool v1, Session Grouper v1, Video Keyframe Extractor v1, Vision

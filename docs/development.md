@@ -58,6 +58,16 @@ that touch real tool integration or before completing M1.
 Never commit `.venv`, real user media, local configuration, credentials, or a
 runtime workspace.
 
+## Runtime distribution
+
+Use `scripts/build-runtime-bundle.cmd` to create the supported source-built
+runtime handoff in `dist/`. The allowlisted bundle contains a validated wheel,
+configuration example, third-party model notice, installation instructions,
+and a checksum manifest. Tests, documentation sources, Git metadata, caches,
+virtual environments, local media, runtime workspaces, and generated output are
+excluded and rejected by validation. Keep `tests/` and `docs/` in the repository;
+they are development evidence and are not production payload.
+
 Session Grouper is a separate package under `src/session_grouper`. Its tests use
 only synthetic public-contract fixtures. Production code in this package must
 not import `huhac_media`, open ingest SQLite, or write outside its own
