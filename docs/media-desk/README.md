@@ -47,6 +47,13 @@ názvy z validního Media Connector provenance manifestu; nejednoznačné dedupl
 assetty dostanou stabilní `VID-####` nebo `IMG-####`. Další HTTP requesty ani
 restart Connector stav nečtou.
 
+Správa akcí v1.4 dovoluje rozdělit jednu Session Grouper relaci do více
+uživatelských akcí pomocí místních časových hranic Europe/Prague. Intervaly jsou
+polouzavřené `[start, end)`, ruční přiřazení konkrétního assetu má přednost a
+neznámý nebo nedůvěryhodný capture čas zůstane nepřiřazený. Knihovna zobrazuje
+filtrované výsledky v samostatně virtualizovaných, sbalitelných sekcích a
+inline přehrávač ukazuje skutečné `currentTime` na desetiny sekundy.
+
 ## Install
 
 Python 3.11 or newer is required. Media Desk has its own optional dependency
@@ -177,8 +184,9 @@ metadata browsable.
 - `GET /library` — virtualized library with type/search/sort/date filters;
 - `GET /calendar` — year/month/day navigation over trustworthy capture dates;
 - `GET /relations` — Session Grouper timeline, explicitly not an Event list;
-- `GET /events` — jednoduchá lokální evidence názvů akcí a přiřazených relací;
-- `POST /events/save`, `POST /events/delete` — loopback/CSRF chráněná editace akcí;
+- `GET /events` — správce názvů, intervalů a ručních přiřazení akcí;
+- `POST /events/save`, `/events/delete`, `/events/split`, `/events/boundary`,
+  `/events/assign` — loopback/Host/Origin/CSRF a revizí chráněná editace;
 - `GET /settings` — active path, source, status and application information;
 - `POST /settings/validate` — read-only validation of one submitted path;
 - `POST /settings/save` — revalidation and atomic per-user config update;
@@ -188,7 +196,7 @@ metadata browsable.
 - `GET /assets/{sha256}` — asset detail;
 - `GET /api/assets?limit=50&cursor=...` — snapshot-bound batches; legacy
   `page`/`page_size` remains compatible;
-- `GET /api/index` — filtered counts and available time segments;
+- `GET /api/index` — filtrované počty, časové segmenty a hranice sekcí akcí;
 - `GET /api/locate` — direct lookup by asset or year/month/day;
 - `GET /api/calendar` and `GET /api/assets/{sha256}` — calendar/detail data;
 - `POST /api/assets/{sha256}/reveal` — bezpečné lokální otevření aktivního originálu v Průzkumníku Windows;
@@ -234,6 +242,7 @@ in the DOM and at most 12 metadata batches in its LRU cache. Anchor restoration
 uses `asset_id` plus pixel offset and `/api/locate`, not preceding downloads.
 Každá položka odpovědi navíc obsahuje `event_names`, odvozené pouze z lokální
 perzistentní evidence akcí Media Desku; prázdný seznam znamená nepřiřazené médium.
+`event_assignment` navíc rozlišuje automatické intervalové a ruční přiřazení.
 
 ## Calendar time policy
 
@@ -300,8 +309,8 @@ every workspace file's content, size, and modification time.
   general storage registry, relocation workflow, or editor integration. S2a
   maps one originals root only for Media Desk.
 - Lokální názvy a akce nejsou přenosná synchronizovaná metadata; patří jednomu
-  uživatelskému profilu Media Desku. Komplexní event calendar a správa událostí
-  zůstávají mimo Pracovní knihovnu v1.
+  uživatelskému profilu Media Desku. Kalendářové pozvánky a synchronizace
+  událostí zůstávají mimo rozsah.
 - Multiple analysis configurations are displayed with their fingerprints;
   video thumbnail selection requires an explicit keyframe fingerprint.
 - Original availability is checked on the backend host. A browser client does

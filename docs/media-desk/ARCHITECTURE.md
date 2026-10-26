@@ -1,12 +1,12 @@
 # HUHÁČ Media Pipeline / Media Desk — aktuální architektura
 
-**Auditováno:** 2026-10-22
+**Auditováno:** 2026-10-26
 
-**Větev:** `mediadesk`
+**Větev:** `codex/media-desk-working-library-v1`
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-25 po dokončení Pracovní knihovny v1
+**Rozhodnutí aktualizována:** 2026-10-26 po dokončení Správy akcí v1.4
 
 > **IMPLEMENTOVÁNO DNES** — běžící galerie je lokální read-only konzument jednoho
 > veřejného workspace v1. Výslovně potvrzené založení archivu orchestruje přes
@@ -54,6 +54,12 @@ zatímco aktivní zdroj nese relativní cestu.
    validovat Connector provenance manifest stejného `workspace_id`; další requesty
    čtou výhradně Media Desk-owned JSON. Workspace, katalog a ingest SQLite zůstávají
    read-only.
+8. **IMPLEMENTED Správa akcí v1.4:** Media Desk-owned JSON schema 2 zachovává
+   stabilní event ID, intervaly `[start, end)` nad Session Grouper relacemi,
+   ruční per-asset výjimky a monotónní revizi. Migrace schema 1 zachová původní
+   celé relace. Split i posun sdílené hranice jsou jeden atomický zápis; stale
+   revize je odmítnuta. Neznámý, filesystem-fallback nebo timezone-naive capture
+   čas se do intervalu automaticky nezařadí.
 
 ## Databázová hranice a síťová úložiště
 
@@ -128,6 +134,8 @@ potvrzenou dostupnost souboru. Baseline a finální měření jsou v
 - **IMPLEMENTED:** editace akcí používá stejnou loopback/Host/Origin/CSRF hranici;
   otevření Průzkumníku navíc nepřijímá klientskou cestu a po request-scoped
   confinement/symlink kontrole spouští pouze pevný `explorer.exe` bez shellu.
+- **IMPLEMENTED:** všechny zapisující endpointy správce akcí používají revizi
+  formuláře; souběžná změna se odmítne a store znovu načte vítězný atomický JSON.
 - **ABSENT:** autentizace a TLS; bezpečný default je `127.0.0.1`.
 
 ## Tři provozní scénáře

@@ -8,7 +8,7 @@
   <label class="search">Hledat<input name="q" value="{{ query }}" placeholder="Název nebo asset ID"></label>
   <label>Typ<select name="media_type"><option value="all" {% if media_type == 'all' %}selected{% endif %}>Vše</option><option value="image" {% if media_type == 'image' %}selected{% endif %}>Obrázky</option><option value="video" {% if media_type == 'video' %}selected{% endif %}>Video</option></select></label>
   <label>Řazení<select name="sort"><option value="captured_desc" {% if sort == 'captured_desc' %}selected{% endif %}>Nejnovější</option><option value="captured_asc" {% if sort == 'captured_asc' %}selected{% endif %}>Nejstarší</option></select></label>
-  <label>Akce<select name="event_id"><option value="">Všechny akce</option>{% for event in events %}<option value="{{ event.event_id }}" {% if event_id == event.event_id %}selected{% endif %}>{{ event.name }}</option>{% endfor %}</select></label>
+  <label>Akce<select name="event_id"><option value="">Všechny akce</option>{% for event in events %}<option value="{{ event.event_id }}" {% if event_id == event.event_id %}selected{% endif %}>{{ event.name }}</option>{% endfor %}<option value="unassigned" {% if event_id == 'unassigned' %}selected{% endif %}>Bez přiřazené akce</option></select></label>
   <fieldset class="density-control"><legend>Velikost</legend><div class="density-options">
     <label class="density-small" title="Malé náhledy"><input type="radio" name="density" value="small"><span class="density-icon" aria-hidden="true"></span><span class="sr-only">Malé</span></label>
     <label class="density-medium" title="Střední náhledy"><input type="radio" name="density" value="medium" checked><span class="density-icon" aria-hidden="true"></span><span class="sr-only">Střední</span></label>
@@ -28,5 +28,16 @@
   <div id="library-viewport" class="library-viewport" tabindex="0" aria-label="Virtualizovaná galerie médií"><div id="library-canvas" class="library-canvas"><div id="library-window" class="library-window" aria-live="polite"></div></div></div>
   <noscript><p class="notice">Pro plynulé dávkové načítání knihovny je potřeba JavaScript.</p></noscript>
 </div>
-<script type="module" src="/static/library.js?v=1.7.0"></script>
+<dialog id="event-split-dialog" class="event-dialog">
+  <form method="dialog" id="event-split-form">
+    <header><h2>Nová akce od tohoto média</h2><button value="cancel" aria-label="Zavřít">×</button></header>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="event_id"><input type="hidden" name="session_id"><input type="hidden" name="revision">
+    <label>Název nové akce<input name="new_name" maxlength="240" required></label>
+    <label>Začátek v Europe/Prague<input type="datetime-local" name="boundary" required></label>
+    <p id="event-split-preview" class="event-split-preview">Nejprve zkontrolujte náhled rozdělení.</p>
+    <div class="event-dialog-actions"><button type="button" data-split-preview>Náhled</button><button type="button" class="primary-action" data-split-confirm disabled>Potvrdit rozdělení</button><button value="cancel">Zrušit</button></div>
+  </form>
+</dialog>
+<script type="module" src="/static/library.js?v=1.8.0"></script>
 {% endblock %}

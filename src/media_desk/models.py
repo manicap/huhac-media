@@ -76,10 +76,18 @@ class FaceClusterReference:
 
 
 @dataclass(frozen=True)
+class EventInterval:
+    session_id: str
+    start: str | None = None
+    end: str | None = None
+
+
+@dataclass(frozen=True)
 class EventRecord:
     event_id: str
     name: str
     session_ids: tuple[str, ...]
+    intervals: tuple[EventInterval, ...] = ()
 
 
 @dataclass

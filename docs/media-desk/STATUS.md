@@ -1,8 +1,8 @@
 # HUHÁČ Media Desk — aktuální stav
 
-**Auditováno:** 2026-10-22
+**Auditováno:** 2026-10-26
 
-**Větev:** `mediadesk`
+**Větev:** `codex/media-desk-working-library-v1`
 
 **Implementační commity S2a:** `cafcdb7`, `5b0b497`, `333571a`, `afff7f5`
 
@@ -10,7 +10,7 @@
 
 **Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`, `da416df`
 
-**Stav aktualizován:** 2026-10-25; Filmstrip UI v1.3 implementováno
+**Stav aktualizován:** 2026-10-26; Správa akcí a časová navigace v1.4 implementována
 
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a, S2a.1 a S2b: read-only galerie nad
 > jedním workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
@@ -77,7 +77,13 @@ až po restartu (`src/media_desk/web.py:361-365`).
 
 ## Stav testů
 
-Pracovní knihovna v1 až Filmstrip UI v1.3: **73 passed, 5 skipped** v celé sadě `tests/media_desk` na Windows 2026-10-25. Přeskočené testy jsou platformní symlink varianty. Cílené testy ověřují jednorázovou Connector projekci, diakritiku, stabilitu názvů, event persistence/filtering, lazy video, browser-local audio preference, viewportový menu portal, dynamickou 9:16 geometrii karty a zabezpečené otevření Průzkumníku.
+Pracovní knihovna v1 až Správa akcí a časová navigace v1.4: **76 passed,
+5 skipped** v celé sadě `tests/media_desk` na Windows 2026-10-26. Přeskočené
+testy jsou platformní symlink varianty. Cílené testy ověřují jednorázovou
+Connector projekci, diakritiku, stabilitu názvů, event persistence/filtering,
+lazy video, browser-local audio preference, viewportový menu portal, dynamickou
+9:16 geometrii karty, zabezpečené otevření Průzkumníku, polouzavřený split,
+ruční výjimky, revizní konflikt a restartovou perzistenci.
 
 Cílená S2b sada: **53 passed, 4 skipped** za 32,93 s. Finální FAST sada:
 **200 passed, 7 skipped, 48 deselected** za 18,32 s. S2a/S2b symlink testy

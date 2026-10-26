@@ -15,6 +15,9 @@ if (app) {
   const periodElement = document.querySelector("#library-period");
   const timeNavigator = document.querySelector("#time-navigator");
   const timeSelect = document.querySelector("#time-select");
+  const splitDialog = document.querySelector("#event-split-dialog");
+  const splitForm = document.querySelector("#event-split-form");
+  const splitOutput = document.querySelector("#event-split-preview");
   const densityControls = [...form.querySelectorAll('input[name="density"]')];
   const batchSize = Number(app.dataset.batchSize || 50);
   const overscanRows = 3;
@@ -30,6 +33,11 @@ if (app) {
   let lastFailedStart = 0;
   let activeAssetId = app.dataset.activeAssetId || new URL(location.href).searchParams.get("active_asset_id");
   let segments = [];
+  let sections = [];
+  let eventsRevision = 0;
+  let layoutRows = [];
+  const collapsedSections = new Set();
+  const sectionHeaderHeight = 42;
   let rowHeight = 260;
   let tileMin = 176;
   let tileGap = 10;
@@ -41,7 +49,7 @@ if (app) {
   menuOverlay.id = "card-action-menu";
   menuOverlay.className = "card-menu-overlay";
   menuOverlay.hidden = true;
-  menuOverlay.innerHTML = '<button type="button" data-card-action="copy-path">Kopírovat cestu</button><button type="button" data-card-action="copy-name">Kopírovat katalogizační název</button><button type="button" data-card-action="copy-id">Kopírovat asset ID</button><button type="button" data-card-action="reveal">Otevřít v Průzkumníku</button>';
+  menuOverlay.innerHTML = '<button type="button" data-card-action="split">Zahájit novou akci od tohoto média</button><button type="button" data-card-action="manage">Spravovat akce…</button><button type="button" data-card-action="copy-path">Kopírovat cestu</button><button type="button" data-card-action="copy-name">Kopírovat katalogizační název</button><button type="button" data-card-action="copy-id">Kopírovat asset ID</button><button type="button" data-card-action="reveal">Otevřít v Průzkumníku</button>';
   document.body.append(menuOverlay);
   const metrics = { batchRequests: 0, failedBatchRequests: 0, deduplicatedFetches: 0, maxInflightRequests: 0, peakDomTiles: 0, longTasksOver100ms: 0, initialHeapBytes: globalThis.performance?.memory?.usedJSHeapSize ?? null };
   if (globalThis.PerformanceObserver) {
@@ -121,9 +129,10 @@ if (app) {
     const unavailable = item.original_url ? "" : '<span class="offline-pill">Soubor nedostupný</span>';
     return `<article class="media-tile${item.asset_id === activeAssetId ? " is-active" : ""}" data-index="${index}" data-asset-id="${escapeHtml(item.asset_id)}">
       <div class="tile-preview"><a class="tile-visual" href="${escapeHtml(url.pathname + url.search)}">${preview}</a><span class="tile-media-badge"><span aria-hidden="true">${mediaIcon}</span><span>${escapeHtml(mediaLabel)}</span></span><span class="tile-capture-overlay" title="${escapeHtml(item.capture_time || item.capture_label)}"><strong class="tile-time">${escapeHtml(capture.time)}</strong><span class="tile-date">${escapeHtml(capture.date)}</span>${capture.qualifier ? `<span class="tile-capture-qualifier">${escapeHtml(capture.qualifier)}</span>` : ""}</span>${unavailable}<span class="tile-file-error" hidden>Soubor nedostupný</span></div>
-      <div class="tile-toolbar">${play}<a class="tile-detail" href="${escapeHtml(url.pathname + url.search)}" aria-label="Otevřít detail média"><span class="tile-action-icon" aria-hidden="true">↗</span><span class="tile-action-label">Detail</span></a><span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
+      <div class="tile-toolbar">${play}<a class="tile-detail" href="${escapeHtml(url.pathname + url.search)}" aria-label="Otevřít detail média"><span class="tile-action-icon" aria-hidden="true">↗</span><span class="tile-action-label">Detail</span></a><span class="tile-playback-clock" hidden>00:00.0 / 00:00.0</span><span class="tile-toolbar-spacer"></span><button class="tile-menu-button" type="button" aria-label="Akce s médiem" aria-expanded="false" aria-controls="card-action-menu">•••</button></div>
       <div class="tile-copy">
         <span class="tile-event${item.event_names?.length ? "" : " is-unassigned"}" title="${escapeHtml(eventName)}">${escapeHtml(eventName)}</span>
+        <span class="tile-capture-inline" title="${escapeHtml(item.capture_time || item.capture_label)}">${escapeHtml(capture.time)} · ${escapeHtml(capture.date)}</span>
         <span class="tile-name" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</span>
       </div>
     </article>`;
@@ -156,6 +165,9 @@ if (app) {
     closeMenu();
     menuAnchor = button;
     menuItem = item;
+    const splitAction = menuOverlay.querySelector('[data-card-action="split"]');
+    const trustedTime = item?.capture_time && !item.capture_filesystem_fallback && (item.capture_timezone || item.capture_time.endsWith("Z") || item.capture_time.slice(10).includes("+"));
+    splitAction.disabled = !(trustedTime && item?.event_assignment && item?.sessions?.length);
     menuOverlay.querySelector('[data-card-action="copy-path"]').disabled = !item?.original_path;
     const revealAction = menuOverlay.querySelector('[data-card-action="reveal"]');
     revealAction.disabled = !item?.original_path;
@@ -207,10 +219,39 @@ if (app) {
     metrics.maxInflightRequests = Math.max(metrics.maxInflightRequests, inflight.size);
     return promise;
   };
-  const visibleRange = () => {
-    const firstRow = Math.max(0, Math.floor(galleryScrollTop() / rowHeight) - overscanRows);
-    const visibleRows = Math.ceil(scrollRoot.clientHeight / rowHeight) + overscanRows * 2;
-    return { firstRow, start: firstRow * columns, end: Math.min(totalCount, (firstRow + visibleRows) * columns) };
+  const buildLayout = () => {
+    layoutRows = [];
+    let top = 0;
+    for (const section of sections) {
+      layoutRows.push({ type: "header", top, height: sectionHeaderHeight, section });
+      top += sectionHeaderHeight;
+      if (!collapsedSections.has(section.event_id)) {
+        for (let start = section.start_index; start < section.start_index + section.count; start += columns) {
+          const end = Math.min(start + columns, section.start_index + section.count);
+          layoutRows.push({ type: "cards", top, height: rowHeight, start, end, section });
+          top += rowHeight;
+        }
+      }
+    }
+    canvas.style.height = `${Math.max(1, top)}px`;
+  };
+  const rowAtScroll = (value = galleryScrollTop()) => {
+    const forward = layoutRows.find((row) => row.top + row.height > value && row.type === "cards");
+    if (forward) return forward;
+    for (let index = layoutRows.length - 1; index >= 0; index -= 1) {
+      if (layoutRows[index].type === "cards") return layoutRows[index];
+    }
+    return null;
+  };
+  const topForIndex = (index) => layoutRows.find((row) => row.type === "cards" && index >= row.start && index < row.end)?.top ?? 0;
+  const ensureIndexVisible = (index) => {
+    const section = sections.find((item) => index >= item.start_index && index < item.start_index + item.count);
+    if (section && collapsedSections.delete(section.event_id)) buildLayout();
+  };
+  const visibleRows = () => {
+    const from = Math.max(0, galleryScrollTop() - overscanRows * rowHeight);
+    const to = galleryScrollTop() + scrollRoot.clientHeight + overscanRows * rowHeight;
+    return layoutRows.filter((row) => row.top + row.height >= from && row.top <= to);
   };
   const galleryTop = () => viewport.getBoundingClientRect().top - scrollRoot.getBoundingClientRect().top + scrollRoot.scrollTop;
   const galleryScrollTop = () => Math.max(0, scrollRoot.scrollTop - galleryTop());
@@ -236,25 +277,41 @@ if (app) {
     readGeometry();
     columns = Math.max(1, Math.floor((viewport.clientWidth + tileGap) / (tileMin + tileGap)));
     updateRowGeometry();
-    canvas.style.height = `${Math.max(1, Math.ceil(totalCount / columns) * rowHeight)}px`;
-    const { firstRow, start, end } = visibleRange();
-    windowElement.style.transform = `translateY(${firstRow * rowHeight}px)`;
-    windowElement.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
-    const cards = [];
+    buildLayout();
+    const visible = visibleRows();
+    const firstTop = visible[0]?.top || 0;
+    const cardRows = visible.filter((row) => row.type === "cards");
+    const start = cardRows[0]?.start || 0;
+    const end = cardRows.at(-1)?.end || 0;
+    windowElement.style.transform = `translateY(${firstTop}px)`;
+    const rows = [];
     const needed = new Set();
-    for (let index = start; index < end; index += 1) {
-      const item = itemAt(index);
-      if (item) cards.push(cardHtml(item, index));
-      else needed.add(Math.floor(index / batchSize) * batchSize);
+    let cursorTop = firstTop;
+    for (const row of visible) {
+      if (row.top > cursorTop) rows.push(`<div style="height:${row.top - cursorTop}px"></div>`);
+      if (row.type === "header") {
+        const collapsed = collapsedSections.has(row.section.event_id);
+        const date = row.section.date ? new Intl.DateTimeFormat("cs-CZ", { dateStyle: "medium" }).format(new Date(`${row.section.date}T12:00:00`)) : "Bez spolehlivého data";
+        rows.push(`<section class="library-section" style="height:${row.height}px"><button type="button" data-section-toggle="${escapeHtml(row.section.event_id)}" aria-expanded="${!collapsed}"><span aria-hidden="true">${collapsed ? "▸" : "▾"}</span><strong>${escapeHtml(row.section.name)}</strong><span>${escapeHtml(date)} · ${row.section.count} médií</span></button></section>`);
+      } else {
+        const cards = [];
+        for (let index = row.start; index < row.end; index += 1) {
+          const item = itemAt(index);
+          if (item) cards.push(cardHtml(item, index));
+          else needed.add(Math.floor(index / batchSize) * batchSize);
+        }
+        rows.push(`<div class="library-card-row" style="height:${row.height}px;grid-template-columns:repeat(${columns},minmax(0,1fr))">${cards.join("")}</div>`);
+      }
+      cursorTop = row.top + row.height;
     }
-    const signature = `${generation}:${columns}:${start}:${end}:${cards.map((card) => card.slice(0, 120)).join("|")}`;
+    const signature = `${generation}:${columns}:${firstTop}:${start}:${end}:${[...collapsedSections].join(",")}:${rows.map((row) => row.slice(0, 120)).join("|")}`;
     if (signature !== renderedSignature) {
       closeMenu();
-      windowElement.innerHTML = cards.join("") || (totalCount ? '<div class="gallery-skeleton">Načítání médií…</div>' : '<div class="empty"><h2>Žádná média</h2><p>Změňte filtry nebo hledání.</p></div>');
+      windowElement.innerHTML = rows.join("") || (totalCount ? '<div class="gallery-skeleton">Načítání médií…</div>' : '<div class="empty"><h2>Žádná média</h2><p>Změňte filtry nebo hledání.</p></div>');
       renderedSignature = signature;
     }
     [...needed].slice(0, 2).forEach(fetchBatch);
-    const firstItem = itemAt(Math.floor(galleryScrollTop() / rowHeight) * columns);
+    const firstItem = itemAt(rowAtScroll()?.start ?? 0);
     periodElement.textContent = firstItem?.capture_label || "";
     if (firstItem) setActivePeriod(firstItem);
     updateDebug(start, end);
@@ -296,7 +353,8 @@ if (app) {
       index = (await response.json()).index;
     }
     await fetchBatch(Math.floor(index / batchSize) * batchSize);
-    scrollRoot.scrollTop = galleryTop() + Math.floor(index / columns) * rowHeight;
+    ensureIndexVisible(index);
+    scrollRoot.scrollTop = galleryTop() + topForIndex(index);
     scheduleRender();
     viewport.focus({ preventScroll: true });
   };
@@ -308,13 +366,14 @@ if (app) {
   };
   const saveAnchor = () => {
     const currentGalleryScroll = galleryScrollTop();
-    const index = Math.floor(currentGalleryScroll / rowHeight) * columns;
+    const currentRow = rowAtScroll(currentGalleryScroll);
+    const index = currentRow?.start ?? 0;
     const item = itemAt(index);
     if (!item) return;
     sessionStorage.setItem(storageKey, JSON.stringify({
       url: location.pathname + location.search,
       assetId: item.asset_id,
-      offset: currentGalleryScroll - Math.floor(index / columns) * rowHeight,
+      offset: currentGalleryScroll - (currentRow?.top ?? 0),
       snapshotId,
     }));
   };
@@ -324,28 +383,28 @@ if (app) {
     if (!response.ok) return false;
     const located = await response.json();
     await fetchBatch(Math.floor(located.index / batchSize) * batchSize);
-    scrollRoot.scrollTop = galleryTop() + Math.floor(located.index / columns) * rowHeight + offset;
+    ensureIndexVisible(located.index);
+    scrollRoot.scrollTop = galleryTop() + topForIndex(located.index) + offset;
     scheduleRender();
     return true;
   };
   const applyDensity = (density, preserveAnchor = true) => {
     const allowed = new Set(["small", "medium", "large"]);
     const next = allowed.has(density) ? density : "medium";
-    const oldRowHeight = rowHeight;
-    const oldColumns = columns;
     const oldScrollTop = scrollRoot.scrollTop;
     const oldGalleryTop = galleryTop();
     const insideGallery = oldScrollTop > oldGalleryTop;
     const currentGalleryScroll = Math.max(0, oldScrollTop - oldGalleryTop);
-    const anchorIndex = Math.floor(currentGalleryScroll / oldRowHeight) * oldColumns;
-    const offset = currentGalleryScroll % oldRowHeight;
+    const anchorRow = rowAtScroll(currentGalleryScroll);
+    const anchorIndex = anchorRow?.start ?? 0;
+    const offset = currentGalleryScroll - (anchorRow?.top ?? 0);
     app.dataset.density = next;
     densityControls.forEach((control) => { control.checked = control.value === next; });
     try { localStorage.setItem("mediaDesk.libraryDensity", next); } catch { /* Preference persistence is optional. */ }
     requestAnimationFrame(() => {
       render();
       if (!preserveAnchor || !insideGallery) scrollRoot.scrollTop = oldScrollTop;
-      else scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
+      else scrollRoot.scrollTop = galleryTop() + topForIndex(anchorIndex) + offset;
     });
   };
   const reset = async ({ restore = true } = {}) => {
@@ -360,6 +419,8 @@ if (app) {
     snapshotId = payload.snapshot_id;
     totalCount = payload.total_count;
     segments = payload.segments;
+    sections = payload.sections;
+    eventsRevision = payload.events_revision;
     countElement.textContent = `${new Intl.NumberFormat("cs-CZ").format(totalCount)} médií`;
     renderTimeNavigator();
     render();
@@ -403,6 +464,18 @@ if (app) {
     if (label) label.textContent = playing ? "Pauza" : "Přehrát";
     tile.classList.toggle("is-playing", playing);
   };
+  const formatPlayback = (seconds) => {
+    const safe = Number.isFinite(seconds) && seconds >= 0 ? seconds : 0;
+    const minutes = Math.floor(safe / 60);
+    const rest = (safe % 60).toFixed(1).padStart(4, "0");
+    return `${String(minutes).padStart(2, "0")}:${rest}`;
+  };
+  const updatePlaybackClock = (tile, video) => {
+    const clock = tile.querySelector(".tile-playback-clock");
+    if (!clock) return;
+    clock.hidden = false;
+    clock.textContent = `${formatPlayback(video.currentTime)} / ${formatPlayback(video.duration)}`;
+  };
   const activateVideo = async (tile, item) => {
     if (!item?.original_url) return showFileError(tile);
     const existing = tile.querySelector("video");
@@ -421,10 +494,14 @@ if (app) {
     video.controls = true;
     video.preload = "metadata";
     video.playsInline = true;
+    tile.classList.add("has-player");
     video.addEventListener("error", () => showFileError(tile), { once: true });
     video.addEventListener("play", () => updatePlayButton(tile, true));
     video.addEventListener("pause", () => updatePlayButton(tile, false));
     video.addEventListener("ended", () => updatePlayButton(tile, false));
+    for (const name of ["loadedmetadata", "durationchange", "timeupdate", "seeking", "seeked", "pause"]) {
+      video.addEventListener(name, () => updatePlaybackClock(tile, video));
+    }
     wrapper.append(video);
     visual.replaceWith(wrapper);
     bindManagedVideo(video);
@@ -433,19 +510,27 @@ if (app) {
   scrollRoot.addEventListener("scroll", () => { closeMenu(); scheduleRender(); saveAnchor(); }, { passive: true });
   new ResizeObserver(() => {
     closeMenu();
-    const oldColumns = columns;
     const oldScrollTop = scrollRoot.scrollTop;
     const oldGalleryTop = galleryTop();
     const insideGallery = oldScrollTop > oldGalleryTop;
     const currentGalleryScroll = galleryScrollTop();
-    const anchorIndex = Math.floor(currentGalleryScroll / rowHeight) * oldColumns;
+    const anchorRow = rowAtScroll(currentGalleryScroll);
+    const anchorIndex = anchorRow?.start ?? 0;
     const anchor = itemAt(anchorIndex);
-    const offset = currentGalleryScroll % rowHeight;
+    const offset = currentGalleryScroll - (anchorRow?.top ?? 0);
     render();
     if (!insideGallery) scrollRoot.scrollTop = oldScrollTop;
-    else if (anchor) scrollRoot.scrollTop = galleryTop() + Math.floor(anchorIndex / columns) * rowHeight + offset;
+    else if (anchor) scrollRoot.scrollTop = galleryTop() + topForIndex(anchorIndex) + offset;
   }).observe(scrollRoot);
   windowElement.addEventListener("click", async (event) => {
+    const sectionToggle = event.target.closest("[data-section-toggle]");
+    if (sectionToggle) {
+      const id = sectionToggle.dataset.sectionToggle;
+      if (collapsedSections.has(id)) collapsedSections.delete(id); else collapsedSections.add(id);
+      renderedSignature = "";
+      render();
+      return;
+    }
     const tile = event.target.closest(".media-tile");
     if (!tile) return;
     const item = itemForTile(tile);
@@ -474,6 +559,17 @@ if (app) {
     if (name === "copy-path") await copyText(item.original_path, action);
     if (name === "copy-name") await copyText(item.catalog_name, action);
     if (name === "copy-id") await copyText(item.asset_id, action);
+    if (name === "split") {
+      splitForm.elements.event_id.value = item.event_assignment.event_id;
+      splitForm.elements.session_id.value = item.sessions[0].session_id;
+      splitForm.elements.revision.value = eventsRevision;
+      splitForm.elements.boundary.value = item.capture_time.slice(0, 16);
+      splitForm.elements.new_name.value = "Nová akce";
+      splitOutput.textContent = "Nejprve zkontrolujte náhled rozdělení.";
+      splitForm.querySelector("[data-split-confirm]").disabled = true;
+      splitDialog.showModal();
+    }
+    if (name === "manage") location.href = "/events";
     if (name === "reveal") {
       const response = await fetch(`/api/assets/${item.sha256}/reveal`, {
         method: "POST",
@@ -494,6 +590,33 @@ if (app) {
   });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
   window.addEventListener("resize", positionMenu, { passive: true });
+  const splitRequest = async (path) => {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams(new FormData(splitForm)),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+    return payload;
+  };
+  const summarizeSplit = (payload) => `Původní akce: ${payload.retained_count} · nová akce: ${payload.moved_count} · bez spolehlivého času: ${payload.unknown_count} · ručně přiřazené: ${payload.manual_count}`;
+  splitForm.addEventListener("input", () => { splitForm.querySelector("[data-split-confirm]").disabled = true; });
+  splitForm.querySelector("[data-split-preview]").addEventListener("click", async () => {
+    try {
+      const payload = await splitRequest("/events/split/preview");
+      splitOutput.textContent = summarizeSplit(payload);
+      splitForm.querySelector("[data-split-confirm]").disabled = false;
+    } catch (error) { splitOutput.textContent = error.message; }
+  });
+  splitForm.querySelector("[data-split-confirm]").addEventListener("click", async () => {
+    try {
+      const payload = await splitRequest("/events/split");
+      splitOutput.textContent = summarizeSplit(payload);
+      splitDialog.close();
+      await reset({ restore: false });
+    } catch (error) { splitOutput.textContent = error.message; }
+  });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const url = new URL("/library", location.origin);

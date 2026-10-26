@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import calendar as calendar_module
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import hmac
 from importlib.metadata import PackageNotFoundError, version
 import ipaddress
@@ -89,7 +89,11 @@ def _safe_path_input(value: str) -> str:
     return value
 
 
-def _asset_payload(asset: Asset, event_names: tuple[str, ...] = ()) -> dict:
+def _asset_payload(
+    asset: Asset,
+    event_names: tuple[str, ...] = (),
+    event_assignment: dict | None = None,
+) -> dict:
     original_path = None
     if asset.original and asset.original.relative_paths:
         original_path = str(asset.original.source_root.joinpath(*PurePosixPath(asset.original.relative_paths[0]).parts))
@@ -118,6 +122,7 @@ def _asset_payload(asset: Asset, event_names: tuple[str, ...] = ()) -> dict:
         "original_path": original_path,
         "sessions": [reference.__dict__ for reference in asset.sessions],
         "event_names": list(event_names),
+        "event_assignment": event_assignment,
         "vision_result_count": len(asset.vision),
         "faces_result_count": len(asset.faces),
         "anonymous_face_clusters": [reference.__dict__ for reference in asset.face_clusters],
@@ -143,6 +148,29 @@ def _datetime_cs(value: str | None) -> str:
     except ValueError:
         return value
     return f"{parsed.day}. {parsed.month}. {parsed.year} · {parsed:%H:%M}"
+
+
+def _prague_boundary(value: str) -> datetime:
+    """Interpret an HTML local datetime with Europe/Prague civil-time rules."""
+    try:
+        local = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise UserDataError("Neplatná časová hranice") from exc
+    if local.tzinfo is not None:
+        return local
+    march_last = calendar_module.monthrange(local.year, 3)[1]
+    october_last = calendar_module.monthrange(local.year, 10)[1]
+    march_sunday = march_last - ((datetime(local.year, 3, march_last).weekday() + 1) % 7)
+    october_sunday = october_last - ((datetime(local.year, 10, october_last).weekday() + 1) % 7)
+    spring = datetime(local.year, 3, march_sunday, 2)
+    autumn = datetime(local.year, 10, october_sunday, 3)
+    if spring <= local < spring + timedelta(hours=1):
+        raise UserDataError("Tento místní čas v Europe/Prague neexistuje kvůli změně na letní čas")
+    ambiguous_start = autumn - timedelta(hours=1)
+    if ambiguous_start <= local < autumn:
+        raise UserDataError("Tento místní čas je v Europe/Prague při změně času nejednoznačný")
+    offset = timedelta(hours=2 if spring + timedelta(hours=1) <= local < autumn else 1)
+    return local.replace(tzinfo=timezone(offset))
 
 
 def _filtered(snapshot: WorkspaceSnapshot, media_type: str, query: str) -> list[Asset]:
@@ -273,7 +301,11 @@ def create_app(
     app.state.startup_error = None if validation.valid else validation.message
     app.state.user_data_store = user_data_store
     app.state.library_index = (
-        LibraryIndex(snapshot, events=user_data_store.events if user_data_store else ())
+        LibraryIndex(
+            snapshot,
+            events=user_data_store.events if user_data_store else (),
+            manual_assignments=user_data_store.manual_assignments if user_data_store else {},
+        )
         if snapshot is not None else None
     )
     app.state.settings = settings
@@ -385,7 +417,12 @@ def create_app(
             )
         return response
 
-    async def protected_form(request: Request, expected_fields: set[str]) -> dict[str, str]:
+    async def protected_form(
+        request: Request,
+        expected_fields: set[str],
+        optional_fields: set[str] | None = None,
+    ) -> dict[str, str]:
+        optional_fields = optional_fields or set()
         current_settings: Settings = app.state.settings
         if not _is_loopback(current_settings.host):
             raise HTTPException(status_code=403, detail="Změny nastavení jsou povoleny jen při loopback bindu.")
@@ -409,17 +446,21 @@ def create_app(
             parsed = parse_qs(
                 body.decode("utf-8"),
                 keep_blank_values=True,
-                max_num_fields=max(4, len(expected_fields)),
+                max_num_fields=max(4, len(expected_fields | optional_fields)),
             )
         except (UnicodeDecodeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail="Neplatný formulář.") from exc
-        if set(parsed) != expected_fields or any(len(items) != 1 for items in parsed.values()):
+        if (
+            not expected_fields.issubset(parsed)
+            or not set(parsed).issubset(expected_fields | optional_fields)
+            or any(len(items) != 1 for items in parsed.values())
+        ):
             raise HTTPException(status_code=400, detail="Formulář obsahuje neočekávaná pole.")
         cookie = request.cookies.get(_CSRF_COOKIE, "")
         token = parsed["csrf_token"][0]
         if not cookie or not hmac.compare_digest(cookie, token) or not hmac.compare_digest(token, app.state.csrf_secret):
             raise HTTPException(status_code=403, detail="Neplatný CSRF token.")
-        return {key: items[0] for key, items in parsed.items()}
+        return {key: parsed[key][0] if key in parsed else "" for key in expected_fields | optional_fields}
 
     @app.exception_handler(HTTPException)
     async def friendly_workspace_error(request: Request, exc: HTTPException):
@@ -446,6 +487,12 @@ def create_app(
                 "workspace": current,
                 "events": store.events,
                 "sessions": current.sessions,
+                "assets": current.assets,
+                "event_counts": {
+                    event.event_id: len(app.state.library_index.query(QuerySpec(event_id=event.event_id)))
+                    for event in store.events
+                },
+                "revision": store.revision,
                 "notice": notice,
                 "error": error or store.error,
                 "csrf_token": request.cookies.get(_CSRF_COOKIE) or app.state.csrf_secret,
@@ -460,7 +507,9 @@ def create_app(
 
     @app.post("/events/save", response_class=HTMLResponse)
     async def save_event(request: Request):
-        fields = await protected_form(request, {"csrf_token", "event_id", "name", "session_ids"})
+        fields = await protected_form(
+            request, {"csrf_token", "event_id", "name", "session_ids"}, {"revision"}
+        )
         current = require_snapshot()
         store: UserDataStore = app.state.user_data_store
         try:
@@ -469,22 +518,145 @@ def create_app(
                 name=fields["name"],
                 session_ids=tuple(value for value in fields["session_ids"].split(",") if value),
                 valid_session_ids={session.session_id for session in current.sessions},
+                expected_revision=int(fields["revision"]) if fields["revision"] else None,
             )
         except UserDataError as exc:
             return render_events(request, error=str(exc))
-        app.state.library_index.update_events(store.events)
+        app.state.library_index.update_events(store.events, store.manual_assignments)
         return render_events(request, notice="Akce byla uložena a filtr knihovny je aktualizovaný.")
 
     @app.post("/events/delete", response_class=HTMLResponse)
     async def delete_event(request: Request):
-        fields = await protected_form(request, {"csrf_token", "event_id"})
+        fields = await protected_form(request, {"csrf_token", "event_id"}, {"revision"})
         store: UserDataStore = app.state.user_data_store
         try:
-            store.delete_event(fields["event_id"])
+            store.delete_event(
+                fields["event_id"],
+                expected_revision=int(fields["revision"]) if fields["revision"] else None,
+            )
         except UserDataError as exc:
             return render_events(request, error=str(exc))
-        app.state.library_index.update_events(store.events)
+        app.state.library_index.update_events(store.events, store.manual_assignments)
         return render_events(request, notice="Akce byla odstraněna.")
+
+    def split_preview(event_id: str, session_id: str, boundary: str) -> dict:
+        current = require_snapshot()
+        store: UserDataStore = app.state.user_data_store
+        event = next((item for item in store.events if item.event_id == event_id), None)
+        session = next((item for item in current.sessions if item.session_id == session_id), None)
+        if event is None or session is None or session_id not in event.session_ids:
+            raise UserDataError("Akce nebo její časová relace neexistuje")
+        local = _prague_boundary(boundary)
+        boundary_iso = local.isoformat()
+        interval = next((value for value in event.intervals if value.session_id == session_id), None)
+        if interval:
+            point = datetime.fromisoformat(boundary_iso)
+            if (interval.start and point <= datetime.fromisoformat(interval.start)) or (
+                interval.end and point >= datetime.fromisoformat(interval.end)
+            ):
+                raise UserDataError("Hranice musí ležet uvnitř intervalu akce")
+        retained = moved = unknown = manual = 0
+        assets = {asset.asset_id: asset for asset in current.assets}
+        for asset_id in session.asset_ids:
+            asset = assets.get(asset_id)
+            if asset_id in store.manual_assignments:
+                manual += 1
+            elif asset is None or not asset.capture_time or asset.capture_filesystem_fallback:
+                # A whole-session legacy event owns unknown capture times. Once
+                # it has an interval, those assets are already unassigned and a
+                # later split must not report them as affected again.
+                if interval is None:
+                    unknown += 1
+            else:
+                try:
+                    captured = datetime.fromisoformat(asset.capture_time.replace("Z", "+00:00"))
+                except ValueError:
+                    if interval is None:
+                        unknown += 1
+                    continue
+                if captured.tzinfo is None or captured.utcoffset() is None:
+                    if interval is None:
+                        unknown += 1
+                elif interval and (
+                    (interval.start and captured < datetime.fromisoformat(interval.start))
+                    or (interval.end and captured >= datetime.fromisoformat(interval.end))
+                ):
+                    continue
+                elif captured >= datetime.fromisoformat(boundary_iso):
+                    moved += 1
+                else:
+                    retained += 1
+        return {
+            "boundary": boundary_iso,
+            "retained_count": retained,
+            "moved_count": moved,
+            "unknown_count": unknown,
+            "manual_count": manual,
+        }
+
+    @app.post("/events/split/preview")
+    async def preview_event_split(request: Request):
+        fields = await protected_form(
+            request, {"csrf_token", "event_id", "session_id", "boundary", "new_name", "revision"}
+        )
+        try:
+            result = split_preview(fields["event_id"], fields["session_id"], fields["boundary"])
+        except UserDataError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {**result, "revision": app.state.user_data_store.revision}
+
+    @app.post("/events/split")
+    async def confirm_event_split(request: Request):
+        fields = await protected_form(
+            request, {"csrf_token", "event_id", "session_id", "boundary", "new_name", "revision"}
+        )
+        try:
+            preview = split_preview(fields["event_id"], fields["session_id"], fields["boundary"])
+            created = app.state.user_data_store.split_event(
+                event_id=fields["event_id"],
+                session_id=fields["session_id"],
+                boundary=preview["boundary"],
+                new_name=fields["new_name"],
+                expected_revision=int(fields["revision"]),
+            )
+        except (UserDataError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        store = app.state.user_data_store
+        app.state.library_index.update_events(store.events, store.manual_assignments)
+        return {**preview, "event_id": created.event_id, "revision": store.revision}
+
+    @app.post("/events/assign")
+    async def assign_event_asset(request: Request):
+        fields = await protected_form(request, {"csrf_token", "asset_id", "event_id", "revision"})
+        store: UserDataStore = app.state.user_data_store
+        try:
+            store.assign_asset(
+                fields["asset_id"], fields["event_id"] or None,
+                {asset.asset_id for asset in require_snapshot().assets},
+                expected_revision=int(fields["revision"]),
+            )
+        except (UserDataError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        app.state.library_index.update_events(store.events, store.manual_assignments)
+        return {"revision": store.revision, "assignment": app.state.library_index.assignment_for(fields["asset_id"])}
+
+    @app.post("/events/boundary")
+    async def move_event_boundary(request: Request):
+        fields = await protected_form(
+            request,
+            {"csrf_token", "event_id", "session_id", "edge", "boundary", "revision"},
+        )
+        store: UserDataStore = app.state.user_data_store
+        try:
+            store.move_boundary(
+                event_id=fields["event_id"], session_id=fields["session_id"],
+                edge=fields["edge"], boundary=_prague_boundary(fields["boundary"]).isoformat(),
+                expected_revision=int(fields["revision"]),
+            )
+        except (UserDataError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        app.state.library_index.update_events(store.events, store.manual_assignments)
+        return {"revision": store.revision}
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request, recheck: bool = False):
@@ -804,7 +976,11 @@ def create_app(
             return {
                 **batch,
                 "items": [
-                    _asset_payload(asset, app.state.library_index.event_names_for(asset.asset_id))
+                    _asset_payload(
+                        asset,
+                        app.state.library_index.event_names_for(asset.asset_id),
+                        app.state.library_index.assignment_for(asset.asset_id),
+                    )
                     for asset in batch["items"]
                 ],
             }
@@ -820,7 +996,11 @@ def create_app(
             "page_size": page_size,
             "total": len(assets),
             "assets": [
-                _asset_payload(asset, app.state.library_index.event_names_for(asset.asset_id))
+                _asset_payload(
+                    asset,
+                    app.state.library_index.event_names_for(asset.asset_id),
+                    app.state.library_index.assignment_for(asset.asset_id),
+                )
                 for asset in assets[start : start + page_size]
             ],
         }
@@ -955,6 +1135,8 @@ def create_app(
             "snapshot_id": index.snapshot_id,
             "total_count": len(index.query(spec)),
             "segments": index.time_segments(spec),
+            "sections": index.sections(spec),
+            "events_revision": app.state.user_data_store.revision,
         }
 
     @app.get("/api/locate")
@@ -997,7 +1179,11 @@ def create_app(
         asset = next((item for item in current.assets if item.sha256 == sha256), None)
         if asset is None:
             raise HTTPException(status_code=404, detail="Asset not found")
-        payload = _asset_payload(asset, app.state.library_index.event_names_for(asset.asset_id))
+        payload = _asset_payload(
+            asset,
+            app.state.library_index.event_names_for(asset.asset_id),
+            app.state.library_index.assignment_for(asset.asset_id),
+        )
         payload["vision"] = [result.__dict__ for result in asset.vision]
         payload["faces"] = [result.__dict__ for result in asset.faces]
         return JSONResponse(payload)

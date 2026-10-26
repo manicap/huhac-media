@@ -124,6 +124,18 @@ summary { cursor: pointer; }
 .event-editor select { min-height: 92px; }
 .event-actions { display: flex; gap: 8px; }
 .event-delete { position: absolute; right: 12px; bottom: 12px; }
+.event-editor h2 { margin: 0 0 10px; }
+.event-editor h2 small { color: var(--muted); font-size: var(--text-sm); font-weight: 500; }
+.event-intervals { display: grid; gap: 6px; margin: 12px 0 0; color: var(--muted); font-size: var(--text-xs); }
+.event-intervals form { display: flex; align-items: end; gap: 6px; }
+.event-intervals label { min-width: 190px; }
+.event-split { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.event-split summary { color: var(--accent); cursor: pointer; }
+.event-split form { margin-top: 10px; padding-bottom: 42px; }
+.event-manual-assignment { max-width: 1180px; margin-top: 12px; }
+.event-manual-assignment form { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .5fr) auto; gap: 10px; align-items: end; }
+.event-manual-assignment label { display: grid; gap: 5px; color: var(--subtle); font-size: var(--text-sm); }
+.event-manual-assignment select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); padding: 8px 9px; }
 
 button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -140,6 +152,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   :root { --text-md: 13px; --text-title: 20px; }
   .detail-media { aspect-ratio: 4 / 3; }
   .facts { grid-template-columns: 1fr; }
+  .event-manual-assignment form { grid-template-columns: 1fr; }
+  .event-intervals form { align-items: stretch; flex-direction: column; }
+  .event-intervals label { min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -42,6 +42,10 @@ posloupnost pro tři schválené provozní scénáře.
    browser-local sdílenou hlasitost, lokální evidenci akcí nad Session Grouper
    relacemi a bezpečnou práci s cestou k originálu. Uživatelská data jsou oddělená
    od workspace a ingest SQLite; přenosná synchronizace zůstává odložená.
+4b. **Správa akcí a časová navigace v1.4 — COMPLETE 2026-10-26.** Jedna relace
+   může obsahovat více intervalových akcí, ruční výjimky mají přednost a knihovna
+   zachovává virtualizaci při zobrazení sbalitelných sekcí. Zápisy jsou atomické,
+   revizně chráněné a zůstávají pouze v Media Desk-owned per-user JSON.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

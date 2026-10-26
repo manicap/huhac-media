@@ -63,11 +63,14 @@ class LibraryIndex:
         snapshot: WorkspaceSnapshot,
         cache_size: int = 24,
         events: Iterable[EventRecord] = (),
+        manual_assignments: dict[str, str | None] | None = None,
     ) -> None:
         self.snapshot = snapshot
         self._events: tuple[EventRecord, ...] = ()
         self._event_assets: dict[str, frozenset[str]] = {}
         self._asset_event_names: dict[str, tuple[str, ...]] = {}
+        self._asset_assignment: dict[str, tuple[str, str, str]] = {}
+        self._manual_assignments = dict(manual_assignments or {})
         self._cache_size = cache_size
         self._query_cache: OrderedDict[str, tuple[Asset, ...]] = OrderedDict()
         self._by_id = {asset.asset_id: asset for asset in snapshot.assets}
@@ -82,36 +85,65 @@ class LibraryIndex:
                 for asset in self.snapshot.assets
             ],
             "events": [
-                [event.event_id, event.name, list(event.session_ids)] for event in self._events
+                [event.event_id, event.name, list(event.session_ids), [interval.__dict__ for interval in event.intervals]] for event in self._events
             ],
+            "manual_assignments": self._manual_assignments,
         }
         canonical = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-    def update_events(self, events: Iterable[EventRecord]) -> None:
+    def update_events(self, events: Iterable[EventRecord], manual_assignments: dict[str, str | None] | None = None) -> None:
         self._events = tuple(sorted(events, key=lambda item: item.event_id))
+        if manual_assignments is not None:
+            self._manual_assignments = dict(manual_assignments)
         sessions = {session.session_id: session for session in self.snapshot.sessions}
-        self._event_assets = {
-            event.event_id: frozenset(
-                asset_id
-                for session_id in event.session_ids
-                for asset_id in (sessions[session_id].asset_ids if session_id in sessions else ())
-            )
-            for event in self._events
-        }
-        names_by_asset: dict[str, list[str]] = {}
+        automatic: dict[str, list[tuple[str, str]]] = {}
         for event in self._events:
-            for asset_id in self._event_assets[event.event_id]:
-                names_by_asset.setdefault(asset_id, []).append(event.name)
-        self._asset_event_names = {
-            asset_id: tuple(sorted(set(names), key=str.casefold))
-            for asset_id, names in names_by_asset.items()
-        }
+            intervals_by_session = {interval.session_id: interval for interval in event.intervals}
+            for session_id in event.session_ids:
+                session = sessions.get(session_id)
+                if session is None:
+                    continue
+                interval = intervals_by_session.get(session_id)
+                for asset_id in session.asset_ids:
+                    asset = self._by_id.get(asset_id)
+                    if asset is None or (interval and not self._in_interval(asset, interval.start, interval.end)):
+                        continue
+                    automatic.setdefault(asset_id, []).append((event.event_id, event.name))
+        self._asset_assignment = {}
+        for asset in self.snapshot.assets:
+            if asset.asset_id in self._manual_assignments:
+                event_id = self._manual_assignments[asset.asset_id]
+                event = next((item for item in self._events if item.event_id == event_id), None)
+                if event:
+                    self._asset_assignment[asset.asset_id] = (event.event_id, event.name, "manual")
+            else:
+                candidates = automatic.get(asset.asset_id, [])
+                if len(candidates) == 1:
+                    self._asset_assignment[asset.asset_id] = (*candidates[0], "interval")
+        self._event_assets = {event.event_id: frozenset(asset_id for asset_id, value in self._asset_assignment.items() if value[0] == event.event_id) for event in self._events}
+        self._asset_event_names = {asset_id: (value[1],) for asset_id, value in self._asset_assignment.items()}
         self._query_cache.clear()
         self.snapshot_id = self._snapshot_identity()
 
     def event_names_for(self, asset_id: str) -> tuple[str, ...]:
         return self._asset_event_names.get(asset_id, ())
+
+    def assignment_for(self, asset_id: str) -> dict | None:
+        value = self._asset_assignment.get(asset_id)
+        return {"event_id": value[0], "name": value[1], "source": value[2]} if value else None
+
+    @staticmethod
+    def _in_interval(asset: Asset, start: str | None, end: str | None) -> bool:
+        if not asset.capture_time or asset.capture_filesystem_fallback:
+            return False
+        try:
+            value = datetime.fromisoformat(asset.capture_time.replace("Z", "+00:00"))
+            if value.tzinfo is None or value.utcoffset() is None:
+                return False
+            return (start is None or value >= datetime.fromisoformat(start)) and (end is None or value < datetime.fromisoformat(end))
+        except ValueError:
+            return False
 
     def query(self, spec: QuerySpec) -> tuple[Asset, ...]:
         spec = spec.normalized()
@@ -122,7 +154,8 @@ class LibraryIndex:
             return cached
         assets: Iterable[Asset] = self.snapshot.assets
         if spec.event_id:
-            allowed = self._event_assets.get(spec.event_id, frozenset())
+            allowed = (frozenset(asset.asset_id for asset in self.snapshot.assets if asset.asset_id not in self._asset_assignment)
+                       if spec.event_id == "unassigned" else self._event_assets.get(spec.event_id, frozenset()))
             assets = (asset for asset in assets if asset.asset_id in allowed)
         if spec.media_type != "all":
             assets = (asset for asset in assets if asset.media_type == spec.media_type)
@@ -150,12 +183,33 @@ class LibraryIndex:
         known.sort(key=lambda asset: asset.asset_id)
         known.sort(key=lambda asset: asset.capture_time or "", reverse=reverse)
         unknown.sort(key=lambda asset: asset.asset_id)
-        result = tuple(known + unknown)
+        chronological = known + unknown
+        groups: OrderedDict[str, list[Asset]] = OrderedDict()
+        for asset in chronological:
+            assignment = self._asset_assignment.get(asset.asset_id)
+            groups.setdefault(assignment[0] if assignment else "unassigned", []).append(asset)
+        result = tuple(asset for group in groups.values() for asset in group)
         self._query_cache[key] = result
         self._query_cache.move_to_end(key)
         while len(self._query_cache) > self._cache_size:
             self._query_cache.popitem(last=False)
         return result
+
+    def sections(self, spec: QuerySpec) -> list[dict]:
+        sections: list[dict] = []
+        previous: str | None = None
+        for index, asset in enumerate(self.query(spec)):
+            assignment = self._asset_assignment.get(asset.asset_id)
+            key = assignment[0] if assignment else "unassigned"
+            if key != previous:
+                sections.append({"event_id": key, "name": assignment[1] if assignment else "Bez přiřazené akce", "start_index": index, "count": 0, "date": None})
+                previous = key
+            section = sections[-1]
+            section["count"] += 1
+            date = capture_date(asset)
+            if date and section["date"] is None:
+                section["date"] = date.isoformat()
+        return sections
 
     def _cursor(self, spec: QuerySpec, start: int) -> str:
         value = {"v": 1, "s": self.snapshot_id, "q": spec.fingerprint, "i": start}
@@ -240,10 +294,13 @@ class LibraryIndex:
     def time_segments(self, spec: QuerySpec) -> list[dict]:
         segments: OrderedDict[tuple[int, int], dict] = OrderedDict()
         unknown = 0
+        first_unknown: int | None = None
         for index, asset in enumerate(self.query(spec)):
             date = capture_date(asset)
             if date is None:
                 unknown += 1
+                if first_unknown is None:
+                    first_unknown = index
                 continue
             key = (date.year, date.month)
             segment = segments.setdefault(
@@ -252,5 +309,5 @@ class LibraryIndex:
             segment["count"] += 1
         result = list(segments.values())
         if unknown:
-            result.append({"year": None, "month": None, "count": unknown, "index": len(self.query(spec)) - unknown})
+            result.append({"year": None, "month": None, "count": unknown, "index": first_unknown})
         return result

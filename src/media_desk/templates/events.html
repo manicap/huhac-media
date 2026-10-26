@@ -7,9 +7,11 @@
 <div class="events-grid">
   {% for event in events %}
   <section class="panel event-editor">
+    <h2>{{ event.name }} <small>{{ event_counts[event.event_id] }} médií</small></h2>
     <form action="/events/save" method="post" data-event-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="event_id" value="{{ event.event_id }}">
+      <input type="hidden" name="revision" value="{{ revision }}">
       <input type="hidden" name="session_ids" value="{{ event.session_ids|join(',') }}" data-session-values>
       <label>Název akce<input name="name" maxlength="240" value="{{ event.name }}" required></label>
       <label>Časové relace<select multiple size="{{ [sessions|length, 4]|min }}" data-session-picker>
@@ -18,15 +20,29 @@
       <div class="event-actions"><button class="primary-action" type="submit">Uložit</button></div>
     </form>
     <form action="/events/delete" method="post" class="event-delete">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value="{{ event.event_id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value="{{ event.event_id }}"><input type="hidden" name="revision" value="{{ revision }}">
       <button class="secondary-action" type="submit">Odstranit</button>
     </form>
+    {% if event.intervals %}<div class="event-intervals">{% for interval in event.intervals %}<code>{{ interval.start or 'začátek' }} ≤ čas &lt; {{ interval.end or 'konec' }}</code>
+      {% if interval.start %}<form data-boundary-form><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="revision" value="{{ revision }}"><input type="hidden" name="event_id" value="{{ event.event_id }}"><input type="hidden" name="session_id" value="{{ interval.session_id }}"><input type="hidden" name="edge" value="start"><label>Posunout začátek<input type="datetime-local" name="boundary" value="{{ interval.start[:16] }}" required></label><button type="submit">Uložit hranici</button><span data-boundary-result></span></form>{% endif %}
+      {% if interval.end %}<form data-boundary-form><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="revision" value="{{ revision }}"><input type="hidden" name="event_id" value="{{ event.event_id }}"><input type="hidden" name="session_id" value="{{ interval.session_id }}"><input type="hidden" name="edge" value="end"><label>Posunout konec<input type="datetime-local" name="boundary" value="{{ interval.end[:16] }}" required></label><button type="submit">Uložit hranici</button><span data-boundary-result></span></form>{% endif %}
+    {% endfor %}</div>{% endif %}
+    <details class="event-split"><summary>Rozdělit akci podle času</summary>
+      <form data-split-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value="{{ event.event_id }}"><input type="hidden" name="revision" value="{{ revision }}">
+        <label>Časová relace<select name="session_id">{% for session in sessions %}{% if session.session_id in event.session_ids %}<option value="{{ session.session_id }}">{{ session.operational_day or session.start or 'Bez data' }} · {{ session.asset_count }} médií</option>{% endif %}{% endfor %}</select></label>
+        <label>Název nové akce<input name="new_name" maxlength="240" required></label>
+        <label>Hranice v Europe/Prague<input type="datetime-local" name="boundary" required></label>
+        <p data-split-result class="event-split-preview">Rozdělení se provede až po náhledu a potvrzení.</p>
+        <div class="event-actions"><button type="button" data-preview>Náhled</button><button type="button" data-confirm disabled>Potvrdit</button></div>
+      </form>
+    </details>
   </section>
   {% endfor %}
   <section class="panel event-editor">
     <p class="eyebrow">NOVÁ AKCE</p>
     <form action="/events/save" method="post" data-event-form>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value=""><input type="hidden" name="session_ids" value="" data-session-values>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="event_id" value=""><input type="hidden" name="revision" value="{{ revision }}"><input type="hidden" name="session_ids" value="" data-session-values>
       <label>Název akce<input name="name" maxlength="240" placeholder="Např. koncert nebo svatba" required></label>
       <label>Časové relace<select multiple size="{{ [sessions|length, 4]|min }}" data-session-picker>
         {% for session in sessions %}<option value="{{ session.session_id }}">{{ session.operational_day or session.start or 'Bez data' }} · {{ session.asset_count }} médií · {{ session.session_id }}</option>{% endfor %}
@@ -35,9 +51,20 @@
     </form>
   </section>
 </div>
+<section class="panel event-manual-assignment">
+  <p class="eyebrow">RUČNÍ VÝJIMKA</p><h2>Přiřadit jednotlivé médium</h2>
+  <p class="muted">Ruční přiřazení má přednost před časovými intervaly a zůstane zachované při jejich úpravě.</p>
+  <form data-assignment-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="revision" value="{{ revision }}">
+    <label>Médium<select name="asset_id">{% for asset in assets %}<option value="{{ asset.asset_id }}">{{ asset.display_name }} · {{ asset.capture_time|datetime_cs }}</option>{% endfor %}</select></label>
+    <label>Akce<select name="event_id"><option value="">Bez přiřazené akce</option>{% for event in events %}<option value="{{ event.event_id }}">{{ event.name }}</option>{% endfor %}</select></label>
+    <div class="event-actions"><button type="submit">Uložit ruční přiřazení</button></div><p data-assignment-result class="event-split-preview"></p>
+  </form>
+</section>
 <script>
 for (const form of document.querySelectorAll('[data-event-form]')) form.addEventListener('submit', () => {
   form.querySelector('[data-session-values]').value = [...form.querySelector('[data-session-picker]').selectedOptions].map(option => option.value).join(',');
 });
 </script>
+<script type="module" src="/static/events.js?v=1.0.0"></script>
 {% endblock %}

@@ -8,6 +8,7 @@ import re
 from fastapi.testclient import TestClient
 
 from media_desk.config import Settings
+from media_desk.models import EventInterval
 from media_desk.web import create_app
 
 
@@ -212,3 +213,150 @@ def test_reveal_uses_only_validated_asset_path_and_existing_http_guards(
     assert foreign.status_code == 403
     assert injected.status_code == 400
     assert len(calls) == 1
+
+
+def test_event_split_is_half_open_atomic_and_manual_assignment_wins(
+    workspace_builder, tmp_path: Path
+) -> None:
+    before = workspace_builder.add_asset(16)
+    boundary = workspace_builder.add_asset(17)
+    after = workspace_builder.add_asset(18)
+    unknown = workspace_builder.add_asset(19)
+    workspace_builder.add_analysis(before, "b" * 64)
+    session_path = next((workspace_builder.root / "analysis/session-grouper").rglob("*.json"))
+    session_payload = json.loads(session_path.read_text(encoding="utf-8"))
+    session_payload["result"]["sessions"][0]["assets"] = [
+        {"asset_id": item["asset_id"]} for item in (before, boundary, after, unknown)
+    ]
+    session_path.write_text(json.dumps(session_payload), encoding="utf-8")
+    times = {
+        before["asset_id"]: "2026-10-16T21:34:59+02:00",
+        boundary["asset_id"]: "2026-10-16T21:35:00+02:00",
+        after["asset_id"]: "2026-10-16T22:00:00+02:00",
+    }
+    for item in (before, boundary, after, unknown):
+        path = workspace_builder.root / item["metadata_location"]
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if item is unknown:
+            payload["capture"] = {"datetime": None, "source": None, "timezone_offset": None, "filesystem_fallback": False}
+        else:
+            payload["capture"]["datetime"] = times[item["asset_id"]]
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    root = workspace_builder.publish()
+    data_path = tmp_path / "events-v2.json"
+    client = _client(create_app(root, user_data_path=data_path))
+    token = _csrf(client)
+    revision = json.loads(data_path.read_text(encoding="utf-8"))["revision"]
+    client.post(
+        "/events/save",
+        data={"csrf_token": token, "event_id": "", "name": "Exploze", "session_ids": "session-synthetic", "revision": revision},
+        headers={"Origin": "http://127.0.0.1"},
+    )
+    stored = json.loads(data_path.read_text(encoding="utf-8"))
+    event_id, revision = stored["events"][0]["event_id"], stored["revision"]
+    assigned = client.post(
+        "/events/assign",
+        data={"csrf_token": token, "asset_id": after["asset_id"], "event_id": event_id, "revision": revision},
+        headers={"Origin": "http://127.0.0.1"},
+    )
+    revision = assigned.json()["revision"]
+    form = {
+        "csrf_token": token, "event_id": event_id, "session_id": "session-synthetic",
+        "boundary": "2026-10-16T21:35", "new_name": "COVER INCI", "revision": revision,
+    }
+    preview = client.post("/events/split/preview", data=form, headers={"Origin": "http://127.0.0.1"})
+    assert preview.status_code == 200
+    assert {key: preview.json()[key] for key in ("retained_count", "moved_count", "unknown_count", "manual_count")} == {
+        "retained_count": 1, "moved_count": 1, "unknown_count": 1, "manual_count": 1,
+    }
+    split = client.post("/events/split", data=form, headers={"Origin": "http://127.0.0.1"})
+    assert split.status_code == 200
+    new_event = split.json()["event_id"]
+    assert client.get("/api/index", params={"event_id": event_id}).json()["total_count"] == 2
+    assert client.get("/api/index", params={"event_id": new_event}).json()["total_count"] == 1
+    assert client.get("/api/index", params={"event_id": "unassigned"}).json()["total_count"] == 1
+    assert json.loads(data_path.read_text(encoding="utf-8"))["manual_assignments"][after["asset_id"]] == event_id
+    second_preview = client.post(
+        "/events/split/preview",
+        data={**form, "boundary": "2026-10-16T21:34:30", "revision": split.json()["revision"]},
+        headers={"Origin": "http://127.0.0.1"},
+    )
+    assert second_preview.status_code == 200
+    assert {
+        key: second_preview.json()[key]
+        for key in ("retained_count", "moved_count", "unknown_count", "manual_count")
+    } == {"retained_count": 0, "moved_count": 1, "unknown_count": 0, "manual_count": 1}
+    moved = client.post(
+        "/events/boundary",
+        data={
+            "csrf_token": token, "event_id": event_id, "session_id": "session-synthetic",
+            "edge": "end", "boundary": "2026-10-16T21:34:30", "revision": split.json()["revision"],
+        },
+        headers={"Origin": "http://127.0.0.1"},
+    )
+    assert moved.status_code == 200
+    assert client.get("/api/index", params={"event_id": event_id}).json()["total_count"] == 1
+    assert client.get("/api/index", params={"event_id": new_event}).json()["total_count"] == 2
+    restarted = _client(create_app(root, user_data_path=data_path))
+    assert restarted.get("/api/index", params={"event_id": new_event}).json()["total_count"] == 2
+    restart_token = _csrf(restarted)
+    deleted = restarted.post(
+        "/events/delete",
+        data={"csrf_token": restart_token, "event_id": new_event, "revision": moved.json()["revision"]},
+        headers={"Origin": "http://127.0.0.1"},
+    )
+    assert deleted.status_code == 200
+    assert restarted.get("/api/index").json()["total_count"] == 4
+
+
+def test_v1_event_data_migrates_and_stale_revision_is_rejected(workspace_builder, tmp_path: Path) -> None:
+    asset = workspace_builder.add_asset(1)
+    workspace_builder.add_analysis(asset, "c" * 64)
+    root = workspace_builder.publish()
+    path = tmp_path / "legacy.json"
+    event_id = "event-" + "a" * 32
+    path.write_text(json.dumps({
+        "schema_version": 1, "workspace_id": workspace_builder.workspace_id,
+        "catalog_names": {}, "display_names": {},
+        "events": [{"event_id": event_id, "name": "Legacy", "session_ids": ["session-synthetic"]}],
+        "provenance_projection": None,
+    }), encoding="utf-8")
+    client = _client(create_app(root, user_data_path=path))
+    token = _csrf(client)
+    migrated = json.loads(path.read_text(encoding="utf-8"))
+    assert migrated["schema_version"] == 2 and migrated["events"][0]["intervals"] == []
+    stale = client.post(
+        "/events/assign",
+        data={"csrf_token": token, "asset_id": asset["asset_id"], "event_id": event_id, "revision": migrated["revision"] - 1},
+        headers={"Origin": "http://127.0.0.1"},
+    )
+    assert stale.status_code == 409
+
+
+def test_event_edit_drops_intervals_for_removed_sessions(workspace_builder, tmp_path: Path) -> None:
+    workspace_builder.add_asset(1)
+    root = workspace_builder.publish()
+    data_path = tmp_path / "events-v2.json"
+    app = create_app(root, user_data_path=data_path)
+    store = app.state.user_data_store
+    event = store.add_event(
+        "Dvě relace",
+        ("session-a", "session-b"),
+        (
+            EventInterval("session-a", None, "2026-10-16T21:35:00+02:00"),
+            EventInterval("session-b", "2026-10-17T18:00:00+02:00", None),
+        ),
+    )
+
+    updated = store.upsert_event(
+        event_id=event.event_id,
+        name=event.name,
+        session_ids=("session-b",),
+        valid_session_ids={"session-a", "session-b"},
+        expected_revision=store.revision,
+    )
+
+    assert updated.session_ids == ("session-b",)
+    assert [interval.session_id for interval in updated.intervals] == ["session-b"]
+    restarted = create_app(root, user_data_path=data_path)
+    assert restarted.state.user_data_store.events[0].session_ids == ("session-b",)

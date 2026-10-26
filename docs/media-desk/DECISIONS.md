@@ -1,12 +1,12 @@
 # HUHÁČ Media Desk — registr architektonických rozhodnutí
 
-**Auditováno:** 2026-10-22
+**Auditováno:** 2026-10-26
 
-**Větev:** `mediadesk`
+**Větev:** `codex/media-desk-working-library-v1`
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-25 po schválení D-021 a D-022
+**Rozhodnutí aktualizována:** 2026-10-26 po implementaci D-023
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -37,6 +37,7 @@ schválení a **REJECTED** se nemá realizovat.
 
 | D-021 | Pracovní knihovna v1 ukládá stabilní katalogizační názvy a uživatelské akce atomicky do per-user JSON mimo workspace. Connector provenance smí být přečtena pouze při jednorázové projekci; requesty ani restart se na privátní Connector stav nevážou. | **ACCEPTED + IMPLEMENTED** | `src/media_desk/user_data.py`; jednoznačné `logical_path` nebo perzistentní `VID/IMG`; akce mapují jednu či více Session Grouper relací |
 | D-022 | Otevření originálu v Průzkumníku je lokální Windows POST akce bez klientské cesty. Použije pouze aktivní katalogový asset, request-scoped confinement/symlink kontrolu a stávající loopback/Host/Origin/CSRF hranici. | **ACCEPTED + IMPLEMENTED** | `POST /api/assets/{sha256}/reveal`; `tests/media_desk/test_working_library.py` |
+| D-023 | Session Grouper relace je pouze časový podklad; Media Desk může jednu relaci rozdělit do více uživatelských akcí pomocí intervalů `[start, end)`. Spolehlivý capture start určuje automatické přiřazení, ruční asset výjimka má přednost. | **ACCEPTED + IMPLEMENTED** | schema 2 v `user_data.py`; atomický split/posun sdílené hranice; revizní ochrana; cílené testy |
 
 ## Vyhodnocení otázek E1–E10
 
