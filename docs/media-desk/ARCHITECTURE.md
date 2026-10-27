@@ -1,6 +1,6 @@
 # HUHÁČ Media Pipeline / Media Desk — aktuální architektura
 
-**Auditováno:** 2026-10-26
+**Auditováno:** 2026-10-27
 
 **Větev:** `codex/media-desk-working-library-v1`
 
@@ -15,6 +15,20 @@
 
 > **NADÁLE NEIMPLEMENTOVÁNO** — import z webu, orchestrace procesorů, obecný
 > storage lifecycle, síťový workspace writer a cílová přenosná metadata.
+
+## Normalizer N3 boundary — IMPLEMENTED
+
+At application creation, a public read-only adapter selects an exact
+`configuration_fingerprint` and `input_set_fingerprint`. It does not import
+Normalizer internals. It validates namespace confinement, manifest, configuration
+fingerprint, asset identities and content hashes. The result extends the existing
+`WorkspaceSnapshot`/`Asset`; later requests do not read Normalizer files. Invalid,
+missing, stale or ambiguous data only disables the projection.
+
+`EffectiveAssetView` composes NormalizedAsset with Media Desk-owned user data.
+User names and manual/interval event assignments override only corresponding
+effective fields; source facts, machine candidates, sessions and provenance remain.
+User-store schema 2 is unchanged. Exact facet filters participate in cursor identity.
 
 ## Pojmy a vlastnictví
 

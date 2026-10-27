@@ -23,6 +23,20 @@
 </section>
 
 <section class="detail-grid">
+  <article class="panel unified-panel">
+    <p class="eyebrow">NORMALIZER V1</p>
+    <h2>Sjednocené informace</h2>
+    {% if normalized %}
+      <p><strong>Efektivní akce:</strong> {{ effective.event.name if effective.event else 'Bez přiřazené akce' }} <small>({{ effective.sources.event }})</small></p>
+      <p><strong>Stav sémantiky:</strong> {{ normalized.semantic.status }}</p>
+      {% for name, values in normalized.semantic.facets.items() %}{% if values %}<div class="facet-values"><strong>{{ name }}</strong>{% for value in values %}<span class="facet-chip">{{ value.value }}</span>{% endfor %}</div>{% endif %}{% endfor %}
+      {% if normalized.people.vision_people_observations or normalized.people.face_observations %}<p><strong>Lidé:</strong> {{ normalized.people.vision_people_observations|length }} vizuálních pozorování, {{ normalized.people.face_observations|length }} pozorování tváří.</p>{% endif %}
+      {% if normalized.temporal.session_candidates %}<p><strong>Session:</strong> {% for session in normalized.temporal.session_candidates %}{{ session.session_id }}{% if not loop.last %}, {% endif %}{% endfor %} <small>Session není akce.</small></p>{% endif %}
+      <p><strong>Úplnost:</strong> {% for name, analysis in normalized.completeness.analyses.items() %}<span class="status-chip">{{ name }}: {{ analysis.status }}</span>{% endfor %}</p>
+      {% if asset.media_type == 'video' %}<details><summary>Pozorování videa po keyframech</summary>{% for observation in normalized.semantic.observations %}<div class="result"><strong>{{ observation.input_id }}</strong><p>{{ observation.description or 'Bez popisu' }}</p><small>{{ observation.keyframe_timestamp_s }} s · {{ observation.provenance.processor.name }}</small></div>{% endfor %}</details>{% endif %}
+      <details><summary>Provenance a normalizovaný JSON</summary><pre>{{ normalized_json }}</pre></details>
+    {% else %}<p class="muted">{{ normalizer_status.message }} Zdrojové informace Media Desk zůstávají dostupné.</p>{% endif %}
+  </article>
   <article class="panel">
     <p class="eyebrow">TIME RELATIONS</p>
     <h2>Session Grouper v1</h2>

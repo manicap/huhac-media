@@ -3,3 +3,5 @@ workspace = "D:/Media/_processing"
 host = "127.0.0.1"
 port = 8000
 # keyframe_fingerprint = "64 lowercase hexadecimal characters"
+# normalizer_configuration_fingerprint = "64 lowercase hexadecimal characters"
+# normalizer_input_set_fingerprint = "64 lowercase hexadecimal characters"

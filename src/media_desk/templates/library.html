@@ -9,6 +9,9 @@
   <label>Typ<select name="media_type"><option value="all" {% if media_type == 'all' %}selected{% endif %}>Vše</option><option value="image" {% if media_type == 'image' %}selected{% endif %}>Obrázky</option><option value="video" {% if media_type == 'video' %}selected{% endif %}>Video</option></select></label>
   <label>Řazení<select name="sort"><option value="captured_desc" {% if sort == 'captured_desc' %}selected{% endif %}>Nejnovější</option><option value="captured_asc" {% if sort == 'captured_asc' %}selected{% endif %}>Nejstarší</option></select></label>
   <label>Akce<select name="event_id"><option value="">Všechny akce</option>{% for event in events %}<option value="{{ event.event_id }}" {% if event_id == event.event_id %}selected{% endif %}>{{ event.name }}</option>{% endfor %}<option value="unassigned" {% if event_id == 'unassigned' %}selected{% endif %}>Bez přiřazené akce</option></select></label>
+  {% for facet, label in [('activities', 'Aktivity'), ('objects', 'Objekty'), ('environment', 'Prostředí'), ('visual_attributes', 'Vizuální vlastnosti'), ('tags', 'Štítky')] %}
+  {% if facet_options.get(facet) %}<details class="facet-filter"><summary>{{ label }}</summary>{% for option in facet_options[facet] %}<label><input type="checkbox" name="{{ facet }}" value="{{ option.value }}" {% if option.value in selected_facets[facet] %}checked{% endif %}>{{ option.value }} <small>{{ option.count }}</small></label>{% endfor %}</details>{% endif %}
+  {% endfor %}
   <fieldset class="density-control"><legend>Velikost</legend><div class="density-options">
     <label class="density-small" title="Malé náhledy"><input type="radio" name="density" value="small"><span class="density-icon" aria-hidden="true"></span><span class="sr-only">Malé</span></label>
     <label class="density-medium" title="Střední náhledy"><input type="radio" name="density" value="medium" checked><span class="density-icon" aria-hidden="true"></span><span class="sr-only">Střední</span></label>
@@ -17,6 +20,7 @@
   {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from }}">{% endif %}{% if date_to %}<input type="hidden" name="date_to" value="{{ date_to }}">{% endif %}
   <button type="submit">Filtrovat</button>
 </form>
+{% if normalizer_status.state != 'available' %}<p class="notice">Normalizer: {{ normalizer_status.message }}</p>{% endif %}
 <div id="library-app" data-snapshot-id="{{ snapshot_id }}" data-workspace-id="{{ workspace.workspace_id }}" data-active-asset-id="{{ active_asset_id or '' }}" data-csrf-token="{{ csrf_token }}" data-batch-size="50">
   <div class="library-meta-row">
     <div class="library-status" aria-live="polite"><span id="library-count">Načítání indexu…</span><span id="library-period"></span></div>

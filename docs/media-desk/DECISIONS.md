@@ -1,12 +1,12 @@
 # HUHÁČ Media Desk — registr architektonických rozhodnutí
 
-**Auditováno:** 2026-10-26
+**Auditováno:** 2026-10-27
 
 **Větev:** `codex/media-desk-working-library-v1`
 
 **Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
 
-**Rozhodnutí aktualizována:** 2026-10-26 po implementaci D-023
+**Rozhodnutí aktualizována:** 2026-10-27 po závěrečném auditu D-024
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -38,6 +38,19 @@ schválení a **REJECTED** se nemá realizovat.
 | D-021 | Pracovní knihovna v1 ukládá stabilní katalogizační názvy a uživatelské akce atomicky do per-user JSON mimo workspace. Connector provenance smí být přečtena pouze při jednorázové projekci; requesty ani restart se na privátní Connector stav nevážou. | **ACCEPTED + IMPLEMENTED** | `src/media_desk/user_data.py`; jednoznačné `logical_path` nebo perzistentní `VID/IMG`; akce mapují jednu či více Session Grouper relací |
 | D-022 | Otevření originálu v Průzkumníku je lokální Windows POST akce bez klientské cesty. Použije pouze aktivní katalogový asset, request-scoped confinement/symlink kontrolu a stávající loopback/Host/Origin/CSRF hranici. | **ACCEPTED + IMPLEMENTED** | `POST /api/assets/{sha256}/reveal`; `tests/media_desk/test_working_library.py` |
 | D-023 | Session Grouper relace je pouze časový podklad; Media Desk může jednu relaci rozdělit do více uživatelských akcí pomocí intervalů `[start, end)`. Spolehlivý capture start určuje automatické přiřazení, ruční asset výjimka má přednost. | **ACCEPTED + IMPLEMENTED** | schema 2 v `user_data.py`; atomický split/posun sdílené hranice; revizní ochrana; cílené testy |
+| D-024 | Normalizer N3 je explicitní read-only startup projekce; fingerprintový výběr nikdy nepoužívá čas vytvoření a user store zůstává oddělený. | **ACCEPTED + IMPLEMENTED** | `normalizer_adapter.py`, `effective_view.py`, `test_normalizer_integration.py` |
+
+## D-024 — Normalizer N3 is an explicit read-only startup projection
+
+**ACCEPTED + IMPLEMENTED 2026-10-26 (TASK-NORM-003).** Media Desk reads only the
+public immutable path `analysis/normalizer/normalizer-v1/<config>/<input>/`.
+Selection is fingerprint-based; creation time never decides. If an explicit config
+contains exactly one input snapshot it may be selected unambiguously; multiple
+candidates are `ambiguous`. Failure safely degrades to source Media Desk data.
+
+Normalizer is the source/machine layer. Media Desk user data remains separate
+writer-owned schema 2 and overrides only effective names or events. Session is not
+an event. List API projections stay compact; full NormalizedAsset belongs to detail.
 
 ## Vyhodnocení otázek E1–E10
 

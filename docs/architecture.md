@@ -2,8 +2,9 @@
 
 The system boundary is producer/consumer. Media Ingest is a general media
 workspace producer. Session Grouper v1, Video Keyframe Extractor v1, Vision
-Processor v1, and Faces Processor v1 are the implemented consumers. OCR,
-Quality, Audio, cross-asset Similarity, semantic normalization, indexing, and
+Processor v1, Faces Processor v1, and Metadata Normalizer v1/N1–N2 are the
+implemented consumers. Normalizer N3 is an implemented read-only Media Desk
+projection. OCR, Quality, Audio, cross-asset Similarity, enrichment, and
 domain-specific interpretation are future, not implemented consumers. Ingest
 neither knows their models nor schedules or stores their processing state.
 
@@ -41,7 +42,15 @@ FACES PROCESSOR V1 (implemented consumer)
   <- read public image previews and completed Video Keyframe v1 results
   -> write detection, embeddings, and anonymous clusters only under analysis/faces/
 
-OCR / QUALITY / AUDIO / SIMILARITY / NORMALIZER (future, not implemented)
+METADATA NORMALIZER V1 / N1-N2 (implemented consumer)
+  <- read public workspace/metadata plus explicitly selected processor JSON
+  -> write immutable provenance/completeness snapshots under analysis/normalizer/
+
+MEDIA DESK / NORMALIZER N3 (implemented read-only consumer)
+  <- validate one explicit immutable Normalizer snapshot
+  -> in-memory exact facet index and effective user-data overlay
+
+OCR / QUALITY / AUDIO / SIMILARITY / ENRICHMENT (future, not implemented)
   <- read producer-owned contract files
   -> write only their namespace under analysis/
 ```
@@ -125,6 +134,15 @@ Ingest reserves the top-level directory but never creates synthetic analysis
 results or interprets consumer data. Processor results use asset content
 identity and a provenance envelope, so changing a model, prompt, or
 configuration can be recomputed independently without changing ingest.
+
+Normalizer N1–N2 is an aggregate snapshot consumer without mutable state. Its
+configuration and exact semantic input set have separate SHA-256 fingerprints.
+It writes all assets to a sibling staging directory, publishes a manifest last,
+and atomically moves the complete directory into its immutable final path. It
+does not open originals, raw metadata, SQLite, or Media Desk user data. N2 reads
+only selected public Session/Keyframes/Vision/Faces JSON and validates their
+identity/provenance without invoking a model or decoding media. See [normalizer.md](normalizer.md) and
+[ADR-N1](ADR-N1-normalizer-contract.md).
 
 The complete public/private file boundary and processor result schema are in
 [workspace-contract.md](workspace-contract.md).

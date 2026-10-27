@@ -92,6 +92,8 @@ class Settings:
     port_source: str = "default"
     keyframe_fingerprint_source: str = "default"
     originals_mapping: OriginalsMapping | None = None
+    normalizer_configuration_fingerprint: str | None = None
+    normalizer_input_set_fingerprint: str | None = None
 
     @property
     def workspace_editable(self) -> bool:
@@ -104,6 +106,8 @@ def load_settings(
     host: str | None,
     port: int | None,
     keyframe_fingerprint: str | None,
+    normalizer_configuration_fingerprint: str | None = None,
+    normalizer_input_set_fingerprint: str | None = None,
     config_path: Path | None,
     config_dir: Path | None = None,
     environ: Mapping[str, str] | None = None,
@@ -148,6 +152,20 @@ def load_settings(
         profile.get("keyframe_fingerprint"),
         None,
     )
+    normalizer_config, _ = _selected(
+        normalizer_configuration_fingerprint,
+        env.get("MEDIA_DESK_NORMALIZER_CONFIGURATION_FINGERPRINT"),
+        explicit.get("normalizer_configuration_fingerprint"),
+        profile.get("normalizer_configuration_fingerprint"),
+        None,
+    )
+    normalizer_input, _ = _selected(
+        normalizer_input_set_fingerprint,
+        env.get("MEDIA_DESK_NORMALIZER_INPUT_SET_FINGERPRINT"),
+        explicit.get("normalizer_input_set_fingerprint"),
+        profile.get("normalizer_input_set_fingerprint"),
+        None,
+    )
 
     if workspace_value is not None and not isinstance(workspace_value, str):
         raise ConfigurationError("Workspace must be a path string")
@@ -161,6 +179,10 @@ def load_settings(
         raise ConfigurationError("Port must be between 1 and 65535")
     if fingerprint is not None and not isinstance(fingerprint, str):
         raise ConfigurationError("Keyframe fingerprint must be a string")
+    if normalizer_config is not None and not isinstance(normalizer_config, str):
+        raise ConfigurationError("Normalizer configuration fingerprint must be a string")
+    if normalizer_input is not None and not isinstance(normalizer_input, str):
+        raise ConfigurationError("Normalizer input-set fingerprint must be a string")
 
     originals_mapping = _parse_originals_mapping(profile.get("originals_mapping"))
 
@@ -175,6 +197,8 @@ def load_settings(
         port_source=port_source,
         keyframe_fingerprint_source=fingerprint_source,
         originals_mapping=originals_mapping,
+        normalizer_configuration_fingerprint=normalizer_config,
+        normalizer_input_set_fingerprint=normalizer_input,
     )
 
 

@@ -1,7 +1,12 @@
 # huhac-media
 
+> **Implemented 2026-10-26:** Normalizer v1 / N3 read-only integration in Media
+> Desk, including explicit snapshot fingerprints, unified detail, exact facets,
+> completeness diagnostics, and preserved user-data ownership. Enrichment and
+> Quality Processor remain planned.
+
 `huhac-media` is a local, Windows-oriented media workspace pipeline. The stable
-checkpoint currently contains six implemented components:
+checkpoint currently contains seven implemented components:
 
 - **Media Ingest Tool v1** scans immutable originals, tracks source history,
   deduplicates content by SHA-256, extracts metadata, creates image previews,
@@ -17,13 +22,16 @@ checkpoint currently contains six implemented components:
   output and a strictly validated canonical result.
 - **Faces Processor v1** detects and embeds faces in those same public visual
   inputs, then independently clusters embeddings into anonymous groups.
-- **Media Desk** provides the read-only gallery, local workspace/originals
+- **Metadata Normalizer v1 / N1–N2** deterministically projects public ingest
+  facts plus explicitly selected Session, Keyframes, Vision, Faces, and
+  anonymous-cluster results into provenance-rich immutable snapshots.
+- **Media Desk** provides the read-only gallery, Normalizer N3 unified detail
+  and exact facets, local workspace/originals
   configuration, S2b orchestration of producer-owned empty archive setup, and
   a local working library with stable names, events and lazy in-card playback.
 
-The semantic Normalizer, OCR, cross-asset Similarity, Quality, Audio,
-event interpretation, a Media Collector, and orchestration are future work and
-are not implemented.
+OCR, cross-asset Similarity, Quality, Audio, enrichment, a Media Collector,
+and orchestration are future work and are not implemented.
 
 ## Quick start
 
@@ -47,6 +55,22 @@ Run ingest and then Session Grouper:
 ```powershell
 huhac-media ingest --input 'D:\Media' --yes
 session-grouper analyze --workspace 'D:\Media\_processing'
+```
+
+Plan and publish a basic normalized metadata snapshot:
+
+```powershell
+normalizer plan --workspace 'D:\Media\_processing'
+normalizer analyze --workspace 'D:\Media\_processing'
+normalizer status --workspace 'D:\Media\_processing'
+```
+
+Select N2 upstream results explicitly when required:
+
+```powershell
+normalizer analyze --workspace 'D:\Media\_processing' `
+  --keyframes-fingerprint <sha256> `
+  --vision-fingerprint <sha256> --faces-fingerprint <sha256>
 ```
 
 Initialize a new empty archive without scanning or importing media:
@@ -76,6 +100,10 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
   canonical schema, repair, provenance, and reuse.
 - [Faces Processor v1](docs/faces.md): YuNet detection, OpenVINO embeddings,
   deterministic complete-link clustering, provenance, and reuse.
+- [Metadata Normalizer v1](docs/normalizer.md): N1 source facts plus N2 upstream
+  projections, exact facets, provenance, completeness, snapshots, and CLI.
+- [ADR-N1](docs/ADR-N1-normalizer-contract.md): accepted ownership,
+  fingerprint, publication, and forward-compatibility decisions.
 - [Third-party models](THIRD_PARTY_MODELS.md): official weight sources and
   licenses for optional model-backed processors.
 - [Media workspace contract](docs/workspace-contract.md): the public JSON
@@ -113,5 +141,6 @@ development-only paths or Python bytecode enter the wheel or outer ZIP.
 ## Project status
 
 Media Ingest Tool v1, Session Grouper v1, Video Keyframe Extractor v1, Vision
-Processor v1, Faces Processor v1, and Media Desk through Pracovní knihovna v1 are implemented.
-The remaining future processors and storage stages stay out of scope.
+Processor v1, Faces Processor v1, Metadata Normalizer v1/N1–N2, and Media Desk
+through Normalizer N3 are implemented. The remaining future processors and
+storage stages stay out of scope.

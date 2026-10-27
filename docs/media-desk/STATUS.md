@@ -1,6 +1,6 @@
 # HUHÁČ Media Desk — aktuální stav
 
-**Auditováno:** 2026-10-26
+**Auditováno:** 2026-10-27
 
 **Větev:** `codex/media-desk-working-library-v1`
 
@@ -21,6 +21,16 @@
 > **NADÁLE MIMO ROZSAH** — import, orchestrace procesorů, obecná správa lifecycle
 > úložišť, přenosná metadata a síťový workspace writer. Varianty vyžadují nové
 > rozhodnutí v [RFC](SETUP_STORAGE_RFC.md).
+
+> **IMPLEMENTED 2026-10-26 — Normalizer v1 / N3.** Explicitly selected immutable
+> snapshot is validated and loaded once. Unified detail, exact facets,
+> completeness and provenance are read-only projections. Targeted N3 tests:
+> 19 passed, 1 skipped; combined Media Desk + Normalizer: 127 passed, 7 skipped.
+>
+> Final synthetic Windows benchmark (1,000 assets / 30 requests): off/on startup
+> 2779.5/5198.8 ms, Python peak 5.28/19.63 MiB, batch p50 11.41/13.48 ms;
+> exact-facet no-match p50 4.94 ms. Development measurement, not an SLA; see
+> [N3_PERFORMANCE.md](N3_PERFORMANCE.md).
 
 ## Etapy
 

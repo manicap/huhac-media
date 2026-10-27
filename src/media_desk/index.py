@@ -23,12 +23,23 @@ class QuerySpec:
     date_from: str | None = None
     date_to: str | None = None
     event_id: str | None = None
+    activities: tuple[str, ...] = ()
+    objects: tuple[str, ...] = ()
+    environment: tuple[str, ...] = ()
+    visual_attributes: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
 
     def normalized(self) -> "QuerySpec":
         media_type = self.media_type if self.media_type in {"all", "image", "video"} else "all"
         sort = self.sort if self.sort in {"captured_desc", "captured_asc"} else "captured_desc"
         event_id = self.event_id.strip() if isinstance(self.event_id, str) and self.event_id.strip() else None
-        return QuerySpec(media_type, self.query.strip().casefold(), sort, self.date_from, self.date_to, event_id)
+        normalize_values = lambda values: tuple(sorted({value.strip() for value in values if value.strip()}))
+        return QuerySpec(
+            media_type, self.query.strip().casefold(), sort, self.date_from, self.date_to, event_id,
+            normalize_values(self.activities), normalize_values(self.objects),
+            normalize_values(self.environment), normalize_values(self.visual_attributes),
+            normalize_values(self.tags),
+        )
 
     @property
     def fingerprint(self) -> str:
@@ -74,6 +85,15 @@ class LibraryIndex:
         self._cache_size = cache_size
         self._query_cache: OrderedDict[str, tuple[Asset, ...]] = OrderedDict()
         self._by_id = {asset.asset_id: asset for asset in snapshot.assets}
+        self._facet_assets: dict[str, dict[str, frozenset[str]]] = {}
+        for facet in ("activities", "objects", "environment", "visual_attributes", "tags"):
+            values: dict[str, set[str]] = {}
+            for asset in snapshot.assets:
+                facets = asset.normalized.get("semantic", {}).get("facets", {}) if asset.normalized else {}
+                for item in facets.get(facet, []):
+                    if isinstance(item, dict) and isinstance(item.get("value"), str):
+                        values.setdefault(item["value"], set()).add(asset.asset_id)
+            self._facet_assets[facet] = {value: frozenset(ids) for value, ids in values.items()}
         self.update_events(events)
 
     def _snapshot_identity(self) -> str:
@@ -159,6 +179,18 @@ class LibraryIndex:
             assets = (asset for asset in assets if asset.asset_id in allowed)
         if spec.media_type != "all":
             assets = (asset for asset in assets if asset.media_type == spec.media_type)
+        selected_facets = {
+            "activities": spec.activities, "objects": spec.objects,
+            "environment": spec.environment, "visual_attributes": spec.visual_attributes,
+            "tags": spec.tags,
+        }
+        allowed_by_facets: set[str] | None = None
+        for facet, selected in selected_facets.items():
+            for value in selected:
+                ids = set(self._facet_assets.get(facet, {}).get(value, frozenset()))
+                allowed_by_facets = ids if allowed_by_facets is None else allowed_by_facets & ids
+        if allowed_by_facets is not None:
+            assets = (asset for asset in assets if asset.asset_id in allowed_by_facets)
         if spec.query:
             assets = (
                 asset
@@ -194,6 +226,19 @@ class LibraryIndex:
         while len(self._query_cache) > self._cache_size:
             self._query_cache.popitem(last=False)
         return result
+
+    def facet_counts(self, spec: QuerySpec) -> dict[str, list[dict]]:
+        """Counts are scoped by all non-facet filters and remain pre-indexed by value."""
+        base = QuerySpec(spec.media_type, spec.query, spec.sort, spec.date_from, spec.date_to, spec.event_id)
+        visible = {asset.asset_id for asset in self.query(base)}
+        return {
+            facet: [
+                {"value": value, "count": len(ids & visible)}
+                for value, ids in sorted(values.items(), key=lambda item: (item[0].casefold(), item[0]))
+                if ids & visible
+            ]
+            for facet, values in self._facet_assets.items()
+        }
 
     def sections(self, spec: QuerySpec) -> list[dict]:
         sections: list[dict] = []

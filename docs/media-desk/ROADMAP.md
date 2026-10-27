@@ -55,6 +55,11 @@ posloupnost pro tři schválené provozní scénáře.
 7. **Portable user data — DEFERRED.** Samostatné schema/ownership/backup ADR;
    nepatří do storage setup etapy.
 
+> **COMPLETE 2026-10-26 — Normalizer v1 / N3.** One explicit immutable snapshot
+> is loaded through the read-only adapter. Detail exposes unified information and
+> the library provides exact facets with stable cursors. Enrichment/ontology and
+> Quality Processor remain **PLANNED / ABSENT**.
+
 ## Akceptace dokončené S2a
 
 - Windows vytvořený workspace se na Linuxu otevře beze změny kteréhokoli souboru

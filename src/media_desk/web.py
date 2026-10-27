@@ -30,6 +30,8 @@ from media_desk.config import (
 from media_desk.archive_setup import ArchiveSetupClient, ArchiveSetupError, ArchiveSetupResult, ConfirmationStore
 from media_desk.index import CursorError, LibraryIndex, QuerySpec, capture_date, capture_label
 from media_desk.models import Artifact, Asset, OriginalReference, WorkspaceSnapshot
+from media_desk.normalizer_adapter import attach_normalizer_snapshot
+from media_desk.effective_view import effective_asset_view
 from media_desk.originals import (
     MappingValidation,
     resolve_mapped_original,
@@ -97,6 +99,9 @@ def _asset_payload(
     original_path = None
     if asset.original and asset.original.relative_paths:
         original_path = str(asset.original.source_root.joinpath(*PurePosixPath(asset.original.relative_paths[0]).parts))
+    facets = asset.normalized.get("semantic", {}).get("facets", {}) if asset.normalized else {}
+    completeness = asset.normalized.get("completeness", {}) if asset.normalized else {}
+    effective = effective_asset_view(asset, event_assignment)
     return {
         "asset_id": asset.asset_id,
         "sha256": asset.sha256,
@@ -126,7 +131,48 @@ def _asset_payload(
         "vision_result_count": len(asset.vision),
         "faces_result_count": len(asset.faces),
         "anonymous_face_clusters": [reference.__dict__ for reference in asset.face_clusters],
+        "semantic_facets": {
+            name: [item.get("value") for item in values if isinstance(item, dict) and isinstance(item.get("value"), str)]
+            for name, values in facets.items()
+        },
+        "completeness_summary": {
+            "available": asset.normalized is not None,
+            "source_available": completeness.get("source_available"),
+            "warning_count": completeness.get("warning_count", 0),
+            "analysis_statuses": {
+                name: value.get("status") for name, value in completeness.get("analyses", {}).items()
+                if isinstance(value, dict)
+            },
+        },
+        "effective_event": effective.event,
     }
+
+
+def _detail_asset_payload(asset: Asset, event_assignment: dict | None) -> dict:
+    payload = _asset_payload(asset, (), event_assignment)
+    effective = effective_asset_view(asset, event_assignment)
+    normalized = _normalized_detail(asset)
+    payload.update(
+        normalized=normalized,
+        effective_event=effective.event,
+        detail_provenance={
+            "effective_fields": effective.sources,
+            "event_candidates": list(effective.event_candidates),
+            "normalized_field_sources": (
+                normalized.get("provenance", {}).get("field_sources", {})
+                if normalized else {}
+            ),
+        },
+    )
+    return payload
+
+
+def _normalized_detail(asset: Asset) -> dict | None:
+    if asset.normalized_payload is None:
+        return None
+    payload = json.loads(asset.normalized_payload)
+    result = payload.get("result") if isinstance(payload, dict) else None
+    return result if isinstance(result, dict) else None
 
 
 def _size_cs(value: int) -> str:
@@ -284,6 +330,16 @@ def create_app(
     app.mount("/static", StaticFiles(directory=str(_PACKAGE_ROOT / "static")), name="static")
     validation = validate_workspace(workspace, keyframe_fingerprint, settings.originals_mapping)
     snapshot = validation.snapshot
+    if snapshot is not None:
+        snapshot = attach_normalizer_snapshot(
+            snapshot,
+            settings.normalizer_configuration_fingerprint,
+            settings.normalizer_input_set_fingerprint,
+        )
+        validation = WorkspaceValidation(
+            validation.state, validation.label, validation.message,
+            validation.requested_path, validation.resolved_path, snapshot,
+        )
     user_data_store = None
     if snapshot is not None:
         resolved_user_data_path = (
@@ -929,11 +985,15 @@ def create_app(
             query.get("date_from", [None])[0],
             query.get("date_to", [None])[0],
             query.get("event_id", [None])[0],
+            tuple(query.get("activities", [])), tuple(query.get("objects", [])),
+            tuple(query.get("environment", [])), tuple(query.get("visual_attributes", [])),
+            tuple(query.get("tags", [])),
         )
         ordered = app.state.library_index.query(spec)
         position = next((index for index, item in enumerate(ordered) if item.asset_id == asset.asset_id), None)
         previous_asset = ordered[position - 1] if position is not None and position > 0 else None
         next_asset = ordered[position + 1] if position is not None and position + 1 < len(ordered) else None
+        normalized_detail = _normalized_detail(asset)
         return templates.TemplateResponse(
             request=request,
             name="detail.html",
@@ -945,6 +1005,10 @@ def create_app(
                 "previous_asset": previous_asset,
                 "next_asset": next_asset,
                 "technical_json": json.dumps(asset.technical, ensure_ascii=False, indent=2, sort_keys=True),
+                "normalized": normalized_detail,
+                "normalized_json": json.dumps(normalized_detail, ensure_ascii=False, indent=2, sort_keys=True) if normalized_detail else None,
+                "effective": effective_asset_view(asset, app.state.library_index.assignment_for(asset.asset_id)),
+                "normalizer_status": current.normalizer,
             },
         )
 
@@ -962,10 +1026,17 @@ def create_app(
         date_from: str | None = None,
         date_to: str | None = None,
         event_id: str | None = Query(None, max_length=64),
+        activities: list[str] = Query(default=[]),
+        objects: list[str] = Query(default=[]),
+        environment: list[str] = Query(default=[]),
+        visual_attributes: list[str] = Query(default=[]),
+        tags: list[str] = Query(default=[]),
     ):
         current = require_snapshot()
+        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id,
+                         tuple(activities), tuple(objects), tuple(environment),
+                         tuple(visual_attributes), tuple(tags))
         if limit is not None or cursor is not None or start is not None or snapshot_id is not None:
-            spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id)
             try:
                 batch = app.state.library_index.batch(spec, limit or 50, cursor, start, snapshot_id)
             except CursorError as exc:
@@ -985,8 +1056,8 @@ def create_app(
                 ],
             }
         assets = (
-            list(app.state.library_index.query(QuerySpec(media_type, q, sort, date_from, date_to, event_id)))
-            if event_id or date_from or date_to or sort != "captured_desc"
+            list(app.state.library_index.query(spec))
+            if event_id or date_from or date_to or sort != "captured_desc" or any((activities, objects, environment, visual_attributes, tags))
             else _filtered(current, media_type, q)
         )
         start = (page - 1) * page_size
@@ -1015,6 +1086,11 @@ def create_app(
         date_from: str | None = None,
         date_to: str | None = None,
         event_id: str | None = Query(None, max_length=64),
+        activities: list[str] = Query(default=[]),
+        objects: list[str] = Query(default=[]),
+        environment: list[str] = Query(default=[]),
+        visual_attributes: list[str] = Query(default=[]),
+        tags: list[str] = Query(default=[]),
     ):
         current = require_snapshot()
         response = templates.TemplateResponse(
@@ -1029,6 +1105,12 @@ def create_app(
                 "date_from": date_from,
                 "date_to": date_to,
                 "event_id": event_id,
+                "selected_facets": {"activities": activities, "objects": objects,
+                    "environment": environment, "visual_attributes": visual_attributes, "tags": tags},
+                "facet_options": app.state.library_index.facet_counts(
+                    QuerySpec(media_type, q, sort, date_from, date_to, event_id)
+                ),
+                "normalizer_status": current.normalizer,
                 "events": app.state.user_data_store.events,
                 "snapshot_id": app.state.library_index.snapshot_id,
                 "csrf_token": request.cookies.get(_CSRF_COOKIE) or app.state.csrf_secret,
@@ -1127,9 +1209,16 @@ def create_app(
         date_from: str | None = None,
         date_to: str | None = None,
         event_id: str | None = Query(None, max_length=64),
+        activities: list[str] = Query(default=[]),
+        objects: list[str] = Query(default=[]),
+        environment: list[str] = Query(default=[]),
+        visual_attributes: list[str] = Query(default=[]),
+        tags: list[str] = Query(default=[]),
     ):
         require_snapshot()
-        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id)
+        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id,
+                         tuple(activities), tuple(objects), tuple(environment),
+                         tuple(visual_attributes), tuple(tags))
         index = app.state.library_index
         return {
             "snapshot_id": index.snapshot_id,
@@ -1137,6 +1226,8 @@ def create_app(
             "segments": index.time_segments(spec),
             "sections": index.sections(spec),
             "events_revision": app.state.user_data_store.revision,
+            "facets": index.facet_counts(spec),
+            "normalizer": app.state.snapshot.normalizer.__dict__,
         }
 
     @app.get("/api/locate")
@@ -1151,11 +1242,18 @@ def create_app(
         date_from: str | None = None,
         date_to: str | None = None,
         event_id: str | None = Query(None, max_length=64),
+        activities: list[str] = Query(default=[]),
+        objects: list[str] = Query(default=[]),
+        environment: list[str] = Query(default=[]),
+        visual_attributes: list[str] = Query(default=[]),
+        tags: list[str] = Query(default=[]),
     ):
         require_snapshot()
         if asset_id is None and year is None:
             raise HTTPException(status_code=422, detail="asset_id or year is required")
-        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id)
+        spec = QuerySpec(media_type, q, sort, date_from, date_to, event_id,
+                         tuple(activities), tuple(objects), tuple(environment),
+                         tuple(visual_attributes), tuple(tags))
         found = app.state.library_index.locate(
             spec, asset_id=asset_id, year=year, month=month, day=day
         )
@@ -1179,11 +1277,10 @@ def create_app(
         asset = next((item for item in current.assets if item.sha256 == sha256), None)
         if asset is None:
             raise HTTPException(status_code=404, detail="Asset not found")
-        payload = _asset_payload(
-            asset,
-            app.state.library_index.event_names_for(asset.asset_id),
-            app.state.library_index.assignment_for(asset.asset_id),
+        payload = _detail_asset_payload(
+            asset, app.state.library_index.assignment_for(asset.asset_id)
         )
+        payload["event_names"] = list(app.state.library_index.event_names_for(asset.asset_id))
         payload["vision"] = [result.__dict__ for result in asset.vision]
         payload["faces"] = [result.__dict__ for result in asset.faces]
         return JSONResponse(payload)

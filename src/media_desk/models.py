@@ -90,6 +90,16 @@ class EventRecord:
     intervals: tuple[EventInterval, ...] = ()
 
 
+@dataclass(frozen=True)
+class NormalizerSnapshotStatus:
+    state: str = "not_configured"
+    message: str = "Normalizer snapshot is not configured."
+    configuration_fingerprint: str | None = None
+    input_set_fingerprint: str | None = None
+    summary: dict[str, Any] = field(default_factory=dict)
+    diagnostics: tuple[str, ...] = ()
+
+
 @dataclass
 class Asset:
     asset_id: str
@@ -114,6 +124,8 @@ class Asset:
     vision: list[ProcessorResult] = field(default_factory=list)
     faces: list[ProcessorResult] = field(default_factory=list)
     face_clusters: list[FaceClusterReference] = field(default_factory=list)
+    normalized: dict[str, Any] | None = None
+    normalized_payload: bytes | None = None
 
     @property
     def original_online(self) -> bool:
@@ -143,3 +155,4 @@ class WorkspaceSnapshot:
     originals_mapping_message: str = ""
     originals_mapping_sampled_assets: int = 0
     originals_mapping_eligible_assets: int = 0
+    normalizer: NormalizerSnapshotStatus = field(default_factory=NormalizerSnapshotStatus)

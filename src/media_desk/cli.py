@@ -20,6 +20,8 @@ def _parser() -> argparse.ArgumentParser:
         "--keyframe-fingerprint",
         help="explicit Video Keyframe v1 configuration fingerprint",
     )
+    parser.add_argument("--normalizer-configuration-fingerprint")
+    parser.add_argument("--normalizer-input-set-fingerprint")
     return parser
 
 
@@ -31,6 +33,8 @@ def main(argv: list[str] | None = None) -> int:
             host=args.host,
             port=args.port,
             keyframe_fingerprint=args.keyframe_fingerprint,
+            normalizer_configuration_fingerprint=args.normalizer_configuration_fingerprint,
+            normalizer_input_set_fingerprint=args.normalizer_input_set_fingerprint,
             config_path=args.config,
         )
     except ConfigurationError as exc:

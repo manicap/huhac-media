@@ -54,6 +54,22 @@ neznámý nebo nedůvěryhodný capture čas zůstane nepřiřazený. Knihovna z
 filtrované výsledky v samostatně virtualizovaných, sbalitelných sekcích a
 inline přehrávač ukazuje skutečné `currentTime` na desetiny sekundy.
 
+## Normalizer N3 setup
+
+Run Normalizer first, then start Media Desk with the immutable snapshot identity:
+
+```powershell
+media-desk --workspace 'D:\Media\_processing' `
+  --normalizer-configuration-fingerprint '<64 lowercase hex>' `
+  --normalizer-input-set-fingerprint '<64 lowercase hex>'
+```
+
+The same keys work in `[media_desk]` TOML and the environment variables are
+`MEDIA_DESK_NORMALIZER_CONFIGURATION_FINGERPRINT` and
+`MEDIA_DESK_NORMALIZER_INPUT_SET_FINGERPRINT`. Omitting both disables N3 without
+affecting the gallery. A config-only selection is accepted only when exactly one
+input snapshot exists; ambiguity is reported and no snapshot is guessed.
+
 ## Install
 
 Python 3.11 or newer is required. Media Desk has its own optional dependency

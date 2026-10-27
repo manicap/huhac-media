@@ -138,6 +138,11 @@ summary { cursor: pointer; }
 .event-manual-assignment select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); padding: 8px 9px; }
 
 button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.unified-panel { grid-column: 1 / -1; }
+.facet-filter { min-width: 150px; }
+.facet-filter label { display: block; padding: 3px 0; white-space: nowrap; }
+.facet-chip, .status-chip { display: inline-block; margin: 3px; padding: 3px 7px; border-radius: 999px; background: var(--surface-raised, #eef1f4); font-size: var(--text-xs); }
+.facet-values { margin: 8px 0; }
 
 @media (max-width: 800px) {
   .settings-grid { grid-template-columns: 1fr; }

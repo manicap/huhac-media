@@ -1,8 +1,13 @@
 # Media pipeline system overview
 
-The implemented system currently has six components: Media Ingest Tool v1,
+> **IMPLEMENTED:** Media Desk consumes one explicitly selected Normalizer N1/N2
+> snapshot as the N3 read-only integration. User assertions remain separate,
+> facets use exact values, and Media Desk does not orchestrate processors.
+
+The implemented system currently has seven components: Media Ingest Tool v1,
 Session Grouper v1, Video Keyframe Extractor v1, Vision Processor v1, and
-Faces Processor v1, plus the read-only Media Desk with S2b archive setup.
+Faces Processor v1, Metadata Normalizer v1/N1–N2, plus the read-only Media Desk
+with S2b archive setup.
 Everything else in this overview is explicitly future work.
 
 ```text
@@ -32,11 +37,14 @@ Standardized media workspace -- IMPLEMENTED
     +--> Faces Processor v1 -- IMPLEMENTED
     |      face detection + embeddings -> anonymous complete-link clusters
     |
-    +--> Media Desk -- IMPLEMENTED
-    |      read-only gallery + ingest-owned empty archive initialization
+    +--> Metadata Normalizer v1 / N1-N2 -- IMPLEMENTED
+    |      source + selected analyses -> provenance/completeness -> immutable snapshot
+    |
+    +--> Media Desk / Normalizer N3 -- IMPLEMENTED
+    |      read-only unified detail/exact facets + empty archive initialization
     |
     +--> FUTURE independent processors -- NOT IMPLEMENTED
-           Similarity | OCR | Quality | Audio | Normalizer
+           Similarity | OCR | Quality | Audio | Enrichment
               |
               v
            FUTURE Knowledge layer -- NOT IMPLEMENTED
@@ -76,6 +84,13 @@ Faces Processor independently consumes the same public image previews and
 completed Video Keyframe v1 artifacts. Detection and embedding results are
 reusable independently of anonymous clustering. All output stays beneath
 `analysis/faces/`; it performs no identity naming or demographic inference.
+
+Metadata Normalizer N1–N2 independently reads the workspace manifest, catalog,
+public per-asset metadata, and explicitly selected Session, Keyframes, Vision,
+Faces, and anonymous-clustering JSON. It writes only immutable snapshots beneath
+`analysis/normalizer/`, does not open originals or private state, and never
+reads Media Desk assertions. Media Desk N3 consumes one explicitly selected
+snapshot read-only and keeps user assertions in its separately owned store.
 
 Each future processor is expected to read public artifacts and own a versioned
 namespace under `analysis/<processor>/`. A model, configuration, or processor
