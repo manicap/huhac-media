@@ -24,6 +24,7 @@ video-keyframes = "video_keyframes.cli:main"
 vision = "vision.cli:main"
 faces = "faces.cli:main"
 media-desk = "media_desk.cli:main"
+normalizer = "normalizer.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -71,3 +71,21 @@ available. Raw ExifTool and ffprobe documents are stored by asset under
 `metadata/raw/<shard>/`; normalized asset documents and source-version documents
 are separate. Neither source identity nor asset identity depends on an absolute
 path or filename.
+
+## NormalizedAsset v1 projection
+
+Metadata Normalizer N1–N2 adds an independent, rebuildable projection; it does not
+replace the ingest metadata document. Each output keeps the same SHA-256 asset
+identity and stable sections for identity, technical, temporal, future semantic/
+people/event/quality data, field provenance, and completeness. N1 populates
+source facts; N2 adds selected session relationships, per-preview/keyframe
+Vision and Faces observations, exact facets, anonymous cluster references, and
+processor/input completeness. Event and quality remain explicit placeholders.
+
+Typed values use an allowlist. Missing and invalid source values remain
+different: missing values appear in `missing_fields`, while rejected raw JSON
+values retain pointer and reason in `invalid_values`, warnings, and provenance.
+The immutable snapshot is identified by separate configuration and input-set
+fingerprints and validated by a manifest containing content hashes for every
+asset result. Selected upstream JSON byte hashes and missing/invalid sentinels
+also enter input identity. This projection has no database and no user assertions.

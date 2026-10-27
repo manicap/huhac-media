@@ -49,6 +49,7 @@ pytest -m external
 pytest tests/session_grouper
 pytest tests/video_keyframes
 pytest tests/vision
+pytest tests/normalizer
 ```
 
 The default suite excludes integration and external tests. Run the nearest unit
@@ -83,6 +84,13 @@ Vision Processor is a separate package under `src/vision`. Production code
 reads only public image previews and completed Video Keyframe v1 results and
 writes only below `analysis/vision/`. Tests use fake Ollama responses and must
 not download a vision model or contact Ollama in the normal FAST suite.
+
+Metadata Normalizer is a separate package under `src/normalizer`. Production
+code reads only the public workspace, catalog, per-asset metadata, and selected
+public processor JSON, never imports ingest internals, and writes only below
+`analysis/normalizer/`.
+Its tests use temporary synthetic workspaces and no originals, databases,
+models, or external services.
 
 Before each logical commit, run the nearest tests, the relevant wider suite,
 `git diff`, `git diff --cached`, and `git status`. Commit only source,

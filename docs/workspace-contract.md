@@ -256,6 +256,24 @@ that affects grouping. Its aggregate output contract is documented in
 [session-grouper.md](session-grouper.md). This remains processor-owned output;
 it does not extend or mutate the Media Ingest producer contract.
 
+Metadata Normalizer v1/N1–N2 is another documented aggregate snapshot processor.
+It writes:
+
+```text
+analysis/normalizer/normalizer-v1/
+  <configuration-fingerprint>/<input-set-fingerprint>/
+    manifest.json
+    assets/<sha-prefix>/<sha256>.json
+```
+
+N1 reads this contract's manifest, catalog, and per-asset metadata. N2 may also
+read explicitly selected public Session Grouper, Video Keyframes, Vision,
+Faces, and Faces Clustering v1 JSON. It does not read SQLite, originals, raw
+metadata documents, or Media Desk user data. A manifest validates the complete immutable snapshot and
+is published last; details are in [normalizer.md](normalizer.md) and
+[ADR-N1](ADR-N1-normalizer-contract.md). This is an additive processor contract
+and does not change workspace contract major version 1.
+
 Ingest may create the empty top-level `analysis/` directory, but it never owns,
 deletes, interprets, or fabricates processor results. Processors must likewise
 not put results into ingest's `asset_stages` table or asset metadata documents.
