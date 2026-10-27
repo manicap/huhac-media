@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from video_keyframes.models import KeyframeConfig
+from video_keyframes.models import DEFAULT_CLIP_MODEL, LEGACY_CLIP_MODEL, KeyframeConfig
 from video_keyframes.output import configuration_fingerprint, result_path
 from video_keyframes.service import prepare_workspace
 
@@ -14,6 +14,26 @@ def test_configuration_fingerprint_covers_model_and_threshold() -> None:
     assert default == configuration_fingerprint(KeyframeConfig())
     assert default != configuration_fingerprint(KeyframeConfig(coverage_similarity=0.9))
     assert default != configuration_fingerprint(KeyframeConfig(clip_model="different"))
+
+
+def test_quickgelu_default_and_legacy_results_have_stable_distinct_fingerprints(
+    keyframe_workspace_factory,
+) -> None:
+    workspace_path, _ = keyframe_workspace_factory([{}])
+    corrected = KeyframeConfig()
+    legacy = KeyframeConfig(clip_model=LEGACY_CLIP_MODEL)
+
+    corrected_run = prepare_workspace(workspace_path, corrected)
+    legacy_run = prepare_workspace(workspace_path, legacy)
+
+    assert corrected.clip_model == DEFAULT_CLIP_MODEL
+    assert corrected_run.configuration_fingerprint == (
+        "1b339d6eb4fd53c926338d2f93b0894afbbb473d7b0dd49d5f5b63b2b882783a"
+    )
+    assert legacy_run.configuration_fingerprint == (
+        "4046e8696c035f5753c3ec08aa0d71a8bf5e4821c7403c79d83813b308e890d1"
+    )
+    assert corrected_run.plans[0].output_path != legacy_run.plans[0].output_path
 
 
 def test_result_path_is_asset_scoped_and_deterministic(keyframe_workspace_factory) -> None:

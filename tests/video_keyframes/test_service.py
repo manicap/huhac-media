@@ -6,7 +6,7 @@ import pytest
 from PIL import Image
 
 from video_keyframes.cli import main
-from video_keyframes.models import KeyframeConfig
+from video_keyframes.models import LEGACY_CLIP_MODEL, KeyframeConfig
 from video_keyframes.service import execute_prepared, prepare_workspace
 from video_keyframes.tools import ToolError
 
@@ -82,6 +82,29 @@ def test_process_reuse_and_temporary_cleanup(keyframe_workspace_factory) -> None
     assert embedder.calls == 1
 
 
+def test_legacy_model_result_remains_reusable_and_isolated_from_corrected_default(
+    keyframe_workspace_factory,
+) -> None:
+    workspace_path, _ = keyframe_workspace_factory([{}])
+    legacy = KeyframeConfig(clip_model=LEGACY_CLIP_MODEL)
+    first = prepare_workspace(workspace_path, legacy)
+    result = execute_prepared(
+        first,
+        dry_run=False,
+        ffprobe=FakeProbe(1.0),
+        ffmpeg=FakeFFmpeg(),
+        embedder=FakeEmbedder(),
+    )
+
+    legacy_again = prepare_workspace(workspace_path, legacy)
+    corrected = prepare_workspace(workspace_path, KeyframeConfig())
+
+    assert result.processed == 1
+    assert legacy_again.plans[0].action == "reuse"
+    assert corrected.plans[0].action == "process"
+    assert legacy_again.plans[0].output_path != corrected.plans[0].output_path
+
+
 def test_one_failed_asset_does_not_stop_other_video(keyframe_workspace_factory) -> None:
     workspace_path, _ = keyframe_workspace_factory(
         [
@@ -132,6 +155,79 @@ def test_dry_run_never_invokes_tools_or_creates_analysis(
     assert report["would_process"] == 1
     assert report["assets"][0]["action"] == "process"
     assert not (workspace_path / "analysis").exists()
+
+
+def test_cli_dry_run_selects_repeated_asset_ids_without_duplicates(
+    keyframe_workspace_factory, capsys
+) -> None:
+    workspace_path, _ = keyframe_workspace_factory([{}, {}, {}])
+    catalog = json.loads(
+        (workspace_path / "metadata" / "catalog.json").read_text(encoding="utf-8")
+    )
+    selected = [catalog["assets"][1]["asset_id"], catalog["assets"][0]["asset_id"]]
+
+    exit_code = main(
+        [
+            "analyze",
+            "--workspace",
+            str(workspace_path),
+            "--dry-run",
+            "--json",
+            "--asset-id",
+            selected[0],
+            "--asset-id",
+            selected[1],
+            "--asset-id",
+            selected[0],
+        ]
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert report["video_asset_count"] == 2
+    assert report["would_process"] == 2
+    assert [asset["asset_id"] for asset in report["assets"]] == sorted(selected)
+    assert not (workspace_path / "analysis").exists()
+
+
+def test_cli_without_asset_id_keeps_all_video_assets(
+    keyframe_workspace_factory, capsys
+) -> None:
+    workspace_path, _ = keyframe_workspace_factory(
+        [{}, {}, {"media_type": "image"}]
+    )
+
+    exit_code = main(
+        ["analyze", "--workspace", str(workspace_path), "--dry-run", "--json"]
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert report["video_asset_count"] == 2
+
+
+def test_cli_can_plan_legacy_model_for_existing_result_reuse(
+    keyframe_workspace_factory, capsys
+) -> None:
+    workspace_path, _ = keyframe_workspace_factory([{}])
+
+    exit_code = main(
+        [
+            "analyze",
+            "--workspace",
+            str(workspace_path),
+            "--dry-run",
+            "--json",
+            "--clip-model",
+            LEGACY_CLIP_MODEL,
+        ]
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert report["configuration_fingerprint"] == (
+        "4046e8696c035f5753c3ec08aa0d71a8bf5e4821c7403c79d83813b308e890d1"
+    )
 
 
 def test_unavailable_source_is_reported_without_tool_work(

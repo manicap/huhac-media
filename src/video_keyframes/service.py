@@ -60,9 +60,14 @@ class RunResult:
     dry_run: bool
 
 
-def prepare_workspace(workspace_path: Path, config: KeyframeConfig) -> PreparedRun:
+def prepare_workspace(
+    workspace_path: Path,
+    config: KeyframeConfig,
+    *,
+    asset_ids: tuple[str, ...] | None = None,
+) -> PreparedRun:
     config.validate()
-    workspace = load_workspace(workspace_path)
+    workspace = load_workspace(workspace_path, asset_ids)
     fingerprint = configuration_fingerprint(config)
     plans: list[AssetPlan] = []
     for asset in workspace.assets:

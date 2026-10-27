@@ -56,7 +56,7 @@ scale=w='min(768,iw)':h='min(768,ih)':
   force_original_aspect_ratio=decrease:force_divisible_by=2
 ```
 
-Pillow then publishes a deterministic non-progressive JPEG with:
+Pillow then publishes a standardized non-progressive JPEG with:
 
 - sRGB representation and embedded sRGB profile;
 - EXIF orientation normalization where present;
@@ -72,10 +72,16 @@ The same representation is used for CLIP input and persistent keyframes.
 V1 uses OpenCLIP with:
 
 ```text
-model:      ViT-B-32
+model:      ViT-B-32-quickgelu
 pretrained: openai
 device:     CPU
 ```
+
+OpenCLIP 3.3.0 declares `quick_gelu: true` for the `openai` pretrained tag.
+The corrected default therefore uses the matching `ViT-B-32-quickgelu`
+architecture. It resolves to the same OpenAI checkpoint as `ViT-B-32`; no new
+weights are required. The earlier `ViT-B-32/openai` configuration remains
+available only for explicit reuse of legacy results.
 
 Embeddings are L2-normalized. Cosine similarity is therefore their scalar
 product. Model and pretrained identities, execution device, representation
@@ -137,7 +143,7 @@ The JSON uses the documented result envelope:
   },
   "model": {
     "framework": "OpenCLIP",
-    "name": "ViT-B-32",
+    "name": "ViT-B-32-quickgelu",
     "version": "openai",
     "pretrained": "openai",
     "device": "cpu"
@@ -172,6 +178,21 @@ The configuration fingerprint is SHA-256 over canonical JSON containing every
 v1 setting that changes result meaning. Asset SHA-256 supplies the input
 identity and output suffix.
 
+The corrected `ViT-B-32-quickgelu/openai` default has fingerprint
+`1b339d6eb4fd53c926338d2f93b0894afbbb473d7b0dd49d5f5b63b2b882783a` with
+otherwise default v1 settings. Legacy `ViT-B-32/openai` results retain their
+original fingerprint
+`4046e8696c035f5753c3ec08aa0d71a8bf5e4821c7403c79d83813b308e890d1`.
+Both remain isolated below their respective fingerprint directories and use
+the same public result schema and processor version.
+
+Once both configurations exist for an asset, downstream consumers deliberately
+require an explicit keyframe fingerprint instead of choosing one arbitrarily.
+For example, Media Desk, Vision, and Faces accept
+`--keyframe-fingerprint 1b339d6eb4fd53c926338d2f93b0894afbbb473d7b0dd49d5f5b63b2b882783a`
+for the corrected configuration. No Media Desk profile is changed
+automatically.
+
 An existing result is reused only when its schema, contract version, asset,
 processor, model, complete configuration, fingerprint, success status, and all
 referenced keyframe files validate. Reuse performs no source decode, ffprobe,
@@ -196,12 +217,33 @@ Analyze a workspace:
 video-keyframes analyze --workspace 'D:\Media\_processing'
 ```
 
+Select one or more explicit video assets by repeating `--asset-id`:
+
+```powershell
+video-keyframes analyze --workspace 'D:\Media\_processing' `
+  --asset-id 'sha256:<64 lowercase hex characters>' `
+  --asset-id 'sha256:<64 lowercase hex characters>'
+```
+
+The selector is optional. Without it, all available video assets retain the
+existing behavior. Repeated IDs are deduplicated and the selected assets are
+processed in deterministic SHA-256 order. Every selected ID must use the
+canonical lowercase `sha256:<64 hex>` form, exist in the public catalog, refer
+to a video, and be available. Invalid selections fail before processing or
+output creation. Selection does not enter the configuration fingerprint: it
+only limits which independently identified per-asset results are planned, so
+existing compatible results keep their normal reuse behavior.
+
 Read-only planning without FFmpeg, ffprobe, model loading, or CLIP inference:
 
 ```powershell
 video-keyframes analyze --workspace 'D:\Media\_processing' --dry-run
 video-keyframes analyze --workspace 'D:\Media\_processing' --dry-run --json
 ```
+
+`--asset-id` works identically with `--dry-run --json`, allowing a selected
+pilot set to be validated without FFmpeg, ffprobe, model loading, inference, or
+writes.
 
 Configure the v1 sampling and coverage parameters:
 
@@ -210,8 +252,18 @@ video-keyframes analyze --workspace 'D:\Media\_processing' `
   --sampling-interval-s 1.0 --coverage-similarity 0.85
 ```
 
-`--max-dimension`, `--jpeg-quality`, `--ffmpeg`, and `--ffprobe` are also
-available. `python -m video_keyframes` provides the same CLI.
+The matching QuickGELU architecture is the default. To inspect or reuse
+results made by the earlier mismatched configuration without overwriting them:
+
+```powershell
+video-keyframes analyze --workspace 'D:\Media\_processing' `
+  --clip-model ViT-B-32
+```
+
+`--max-dimension`, `--jpeg-quality`, `--clip-model`, `--ffmpeg`, and
+`--ffprobe` are also available. `python -m video_keyframes` provides the same
+CLI. `--clip-model` is intentionally limited to the corrected default and the
+legacy architecture; both use the `openai` pretrained tag.
 
 Exit codes follow the repository convention:
 
@@ -225,7 +277,8 @@ Exit codes follow the repository convention:
 
 - FFmpeg for timestamp-based frame decoding and orientation handling;
 - ffprobe for source duration;
-- OpenCLIP (`open_clip_torch`) with model `ViT-B-32`, pretrained `openai`;
+- OpenCLIP (`open_clip_torch`) with model `ViT-B-32-quickgelu`, pretrained
+  `openai`;
 - PyTorch with CPU execution supported and used by v1;
 - Pillow for standardized JPEG publication;
 - NumPy for normalized embeddings and deterministic selection.
@@ -243,3 +296,7 @@ long video. External tests exercise the real FFmpeg boundary separately.
 - No cross-video similarity or coverage.
 - No GPU/CUDA-specific installation or acceleration workflow.
 - No global retention/lifecycle manager or orchestration.
+- Pillow's generated sRGB ICC profile can differ byte-for-byte between runs
+  even when the decoded JPEG pixels at the same timestamp are identical. This
+  does not affect an already published result's reuse, but persistent JPEG
+  bytes are not currently reproducible across fresh processing runs.

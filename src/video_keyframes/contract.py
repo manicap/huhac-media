@@ -77,7 +77,27 @@ def _select_source(
     return None, "no_accessible_active_source"
 
 
-def load_workspace(workspace_path: Path) -> WorkspaceInput:
+def _selected_asset_ids(asset_ids: tuple[str, ...] | None) -> set[str] | None:
+    if asset_ids is None:
+        return None
+    selected: set[str] = set()
+    for asset_id in asset_ids:
+        if (
+            not asset_id.startswith("sha256:")
+            or len(asset_id) != 71
+            or any(character not in "0123456789abcdef" for character in asset_id[7:])
+        ):
+            raise ContractError(
+                f"Invalid selected asset ID: {asset_id!r}; expected sha256:<64 lowercase hex>"
+            )
+        selected.add(asset_id)
+    return selected
+
+
+def load_workspace(
+    workspace_path: Path, asset_ids: tuple[str, ...] | None = None
+) -> WorkspaceInput:
+    selected = _selected_asset_ids(asset_ids)
     workspace = workspace_path.resolve(strict=True)
     if not workspace.is_dir():
         raise ContractError(f"Workspace is not a directory: {workspace}")
@@ -111,6 +131,7 @@ def load_workspace(workspace_path: Path) -> WorkspaceInput:
         raise ContractError("Invalid asset catalog: assets must be an array")
 
     assets: list[VideoAsset] = []
+    entries_by_id: dict[str, dict[str, Any]] = {}
     seen: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict):
@@ -119,10 +140,32 @@ def load_workspace(workspace_path: Path) -> WorkspaceInput:
         if asset_id in seen:
             raise ContractError(f"Invalid asset catalog: duplicate asset_id {asset_id}")
         seen.add(asset_id)
+        entries_by_id[asset_id] = entry
+        if selected is not None and asset_id not in selected:
+            continue
         if entry.get("media_type") != "video" or entry.get("availability") != "available":
             continue
         source, issue = _select_source(source_root, entry.get("sources"), asset_id)
         assets.append(VideoAsset(asset_id, sha256, source, issue))
+
+    if selected is not None:
+        missing = sorted(selected - entries_by_id.keys())
+        if missing:
+            raise ContractError(f"Selected asset does not exist in catalog: {missing[0]}")
+        non_video = sorted(
+            asset_id
+            for asset_id in selected
+            if entries_by_id[asset_id].get("media_type") != "video"
+        )
+        if non_video:
+            raise ContractError(f"Selected asset is not a video: {non_video[0]}")
+        unavailable = sorted(
+            asset_id
+            for asset_id in selected
+            if entries_by_id[asset_id].get("availability") != "available"
+        )
+        if unavailable:
+            raise ContractError(f"Selected video asset is not available: {unavailable[0]}")
 
     assets.sort(key=lambda asset: asset.sha256)
     return WorkspaceInput(

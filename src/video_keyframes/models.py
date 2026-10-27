@@ -4,13 +4,17 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 
+DEFAULT_CLIP_MODEL = "ViT-B-32-quickgelu"
+LEGACY_CLIP_MODEL = "ViT-B-32"
+
+
 @dataclass(frozen=True)
 class KeyframeConfig:
     sampling_interval_s: float = 1.0
     coverage_similarity: float = 0.85
     max_dimension: int = 768
     jpeg_quality: int = 90
-    clip_model: str = "ViT-B-32"
+    clip_model: str = DEFAULT_CLIP_MODEL
     clip_pretrained: str = "openai"
     device: str = "cpu"
     sampling_recipe: str = "timestamp-seek-v1"

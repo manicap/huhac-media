@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image
 
 from video_keyframes.frames import sampling_timestamps, standardize_jpeg
-from video_keyframes.models import KeyframeConfig
+from video_keyframes.models import DEFAULT_CLIP_MODEL, KeyframeConfig
 from video_keyframes.tools import FFmpeg
 
 
@@ -65,6 +65,6 @@ def test_configuration_defaults_match_v1_contract() -> None:
     assert config.sampling_interval_s == 1.0
     assert config.coverage_similarity == 0.85
     assert config.max_dimension == 768
-    assert config.clip_model == "ViT-B-32"
+    assert config.clip_model == DEFAULT_CLIP_MODEL
     assert config.clip_pretrained == "openai"
     assert config.device == "cpu"

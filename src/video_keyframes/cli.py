@@ -6,7 +6,7 @@ from pathlib import Path
 
 from video_keyframes.contract import ContractError
 from video_keyframes.embedding import OpenClipEmbedder
-from video_keyframes.models import KeyframeConfig
+from video_keyframes.models import DEFAULT_CLIP_MODEL, LEGACY_CLIP_MODEL, KeyframeConfig
 from video_keyframes.service import execute_prepared, prepare_workspace
 from video_keyframes.tools import FFmpeg, FFprobe
 
@@ -27,10 +27,22 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--workspace", required=True, type=Path)
     analyze.add_argument("--dry-run", action="store_true")
     analyze.add_argument("--json", action="store_true", dest="json_output")
+    analyze.add_argument(
+        "--asset-id",
+        action="append",
+        dest="asset_ids",
+        help="process only this video asset ID; repeat to select multiple assets",
+    )
     analyze.add_argument("--sampling-interval-s", type=float, default=1.0)
     analyze.add_argument("--coverage-similarity", type=float, default=0.85)
     analyze.add_argument("--max-dimension", type=int, default=768)
     analyze.add_argument("--jpeg-quality", type=int, default=90)
+    analyze.add_argument(
+        "--clip-model",
+        choices=(DEFAULT_CLIP_MODEL, LEGACY_CLIP_MODEL),
+        default=DEFAULT_CLIP_MODEL,
+        help="OpenCLIP architecture; ViT-B-32 is retained for legacy result reuse",
+    )
     analyze.add_argument("--ffmpeg", default="ffmpeg")
     analyze.add_argument("--ffprobe", default="ffprobe")
     return parser
@@ -69,9 +81,14 @@ def main(argv: list[str] | None = None) -> int:
         coverage_similarity=args.coverage_similarity,
         max_dimension=args.max_dimension,
         jpeg_quality=args.jpeg_quality,
+        clip_model=args.clip_model,
     )
     try:
-        prepared = prepare_workspace(args.workspace, config)
+        prepared = prepare_workspace(
+            args.workspace,
+            config,
+            asset_ids=tuple(args.asset_ids) if args.asset_ids is not None else None,
+        )
     except (ContractError, OSError, ValueError) as exc:
         print(f"Contract/configuration error: {exc}")
         return USAGE_OR_CONTRACT
