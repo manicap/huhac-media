@@ -15,3 +15,9 @@ _processing/
 _processing_*/
 local-media/
 local-work/
+
+/.worktrees/
+/HUHAC-M1-TEST/
+/output/
+/config/launcher.toml
+/config/*.bak

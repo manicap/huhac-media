@@ -1,12 +1,12 @@
 # HUHÁČ Media Desk — roadmap po architektonickém auditu
 
-**Auditováno:** 2026-10-22
+**Auditováno:** 2026-10-27
 
-**Větev:** `mediadesk`
+**Větev:** `codex/media-desk-working-library-v1`
 
-**Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
+**Výchozí commit konsolidace:** `288b9e6221459c074d80016518a4fbaa8bc90aa4`
 
-**Roadmap aktualizována:** 2026-10-22 po architektonickém schválení
+**Roadmap aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2
 
 Tato roadmapa nenahrazuje historické M2–M5 novými významy. Popisuje jen bezpečnou
 posloupnost pro tři schválené provozní scénáře.
@@ -46,6 +46,13 @@ posloupnost pro tři schválené provozní scénáře.
    může obsahovat více intervalových akcí, ruční výjimky mají přednost a knihovna
    zachovává virtualizaci při zobrazení sbalitelných sekcí. Zápisy jsou atomické,
    revizně chráněné a zůstávají pouze v Media Desk-owned per-user JSON.
+4c. **HUHÁČ Launcher v0.2 — COMPLETE 2026-10-27.** Windows Tkinter wrapper
+   spravuje více explicitních workspace profilů s oddělenými user-data roots,
+   porty a validovanými Normalizer snapshoty, ale současně spouští pouze jeden
+   vlastněný Media Desk child na `127.0.0.1`. Readiness ověřuje přes `/health` a
+   cizí proces nikdy nepřebírá ani neukončuje. Nejde o orchestraci procesorů,
+   multi-workspace backend ani systémovou službu. Osobní profily jsou mimo Git;
+   čistý checkout je bezpečně inicializuje z neosobního distribučního příkladu.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

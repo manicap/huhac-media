@@ -88,6 +88,17 @@ python -m huhac_media ingest --input 'D:\Media' --dry-run
 python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
 ```
 
+### Windows launcher for Media Desk
+
+The repository includes **HUHÁČ Launcher v0.2**, a small Tkinter window for
+managing isolated workspace profiles, selecting an existing validated Normalizer
+snapshot, choosing a per-profile port, and starting or stopping Media Desk without
+PowerShell. After the project `.venv` is prepared, double-click
+`HUHAC-Launcher.cmd`. It never starts ingest or analysis processors. See
+[docs/launcher.md](docs/launcher.md) for operation and safety details. Personal
+profiles stay outside the checkout in `%LOCALAPPDATA%\HUHAC\Launcher`; the
+versioned `config/launcher.example.toml` is used only to seed a missing config.
+
 ## Documentation
 
 - [Media Ingest Tool v1](docs/media-ingest.md): behavior, CLI, metadata,
@@ -117,6 +128,8 @@ python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
 - [Media Desk M1–M1.3 + S2a–S2b](docs/media-desk/README.md): read-only local
   gallery, per-user workspace setup, host-local originals mapping, safe empty
   archive initialization, architecture, security, and limitations.
+- [HUHÁČ Launcher v0.2](docs/launcher.md): Windows profile/snapshot/port GUI for
+  one owned, loopback-only Media Desk child process.
 
 SQLite, logs, run state, locks, and ingest Python APIs are internal. Consumers
 start at `workspace.json`, follow `metadata/catalog.json`, and write only under

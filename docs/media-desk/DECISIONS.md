@@ -4,9 +4,9 @@
 
 **Větev:** `codex/media-desk-working-library-v1`
 
-**Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
+**Výchozí commit konsolidace:** `288b9e6221459c074d80016518a4fbaa8bc90aa4`
 
-**Rozhodnutí aktualizována:** 2026-10-27 po závěrečném auditu D-024
+**Rozhodnutí aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2 a D-027
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -39,6 +39,9 @@ schválení a **REJECTED** se nemá realizovat.
 | D-022 | Otevření originálu v Průzkumníku je lokální Windows POST akce bez klientské cesty. Použije pouze aktivní katalogový asset, request-scoped confinement/symlink kontrolu a stávající loopback/Host/Origin/CSRF hranici. | **ACCEPTED + IMPLEMENTED** | `POST /api/assets/{sha256}/reveal`; `tests/media_desk/test_working_library.py` |
 | D-023 | Session Grouper relace je pouze časový podklad; Media Desk může jednu relaci rozdělit do více uživatelských akcí pomocí intervalů `[start, end)`. Spolehlivý capture start určuje automatické přiřazení, ruční asset výjimka má přednost. | **ACCEPTED + IMPLEMENTED** | schema 2 v `user_data.py`; atomický split/posun sdílené hranice; revizní ochrana; cílené testy |
 | D-024 | Normalizer N3 je explicitní read-only startup projekce; fingerprintový výběr nikdy nepoužívá čas vytvoření a user store zůstává oddělený. | **ACCEPTED + IMPLEMENTED** | `normalizer_adapter.py`, `effective_view.py`, `test_normalizer_integration.py` |
+| D-025 | Launcher v0.1 ovládá pouze jeden jím vytvořený loopback Media Desk child proces. Readiness dokládá `/health`; obsazený port ani proces po restartu launcher nepřebírá a stop nikdy necílí podle názvu/portu. | **ACCEPTED + IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md`; schváleno TASK-LAUNCH-001 |
+| D-026 | Launcher v0.2 používá více explicitních profilů s odděleným workspace, Media Desk user-data rootem, portem a snapshoty; stále vlastní nejvýše jeden child. | **ACCEPTED + IMPLEMENTED** | TASK-LAUNCH-003; `src/huhac_launcher/config.py`, `snapshots.py` |
+| D-027 | Osobní Launcher konfigurace nepatří do Git historie. Aktivní schema 2 TOML je v host-local user configu; verzovaný neosobní příklad smí atomicky založit pouze chybějící konfiguraci a nikdy nepřepisuje existující profil. | **ACCEPTED + IMPLEMENTED** | TASK-GIT-001; `default_launcher_config_path`, `initialize_launcher_config`, `config/launcher.example.toml` |
 
 ## D-024 — Normalizer N3 is an explicit read-only startup projection
 
@@ -51,6 +54,29 @@ candidates are `ambiguous`. Failure safely degrades to source Media Desk data.
 Normalizer is the source/machine layer. Media Desk user data remains separate
 writer-owned schema 2 and overrides only effective names or events. Session is not
 an event. List API projections stay compact; full NormalizedAsset belongs to detail.
+
+## D-026 — Launcher v0.2 profiles and snapshot selection
+
+**ACCEPTED + IMPLEMENTED 2026-10-27 (TASK-LAUNCH-003).** Launcher configuration
+schema 2 is an atomically written host-local TOML containing multiple explicit
+profiles. A profile binds one workspace identity, one isolated Media Desk data root,
+one loopback port and explicit Keyframes/Normalizer selections. Launcher never
+chooses the newest snapshot or a random port. Normalizer discovery reads only the
+public immutable namespace and delegates validity to the existing Media Desk
+adapter. Removing a profile removes no workspace or Media Desk-owned data. The
+backend lifecycle remains one directly owned child; this is not processor
+orchestration or multi-workspace support inside one Media Desk process.
+
+## D-027 — Launcher profiles are host-local, not distribution state
+
+**ACCEPTED + IMPLEMENTED 2026-10-27 (TASK-GIT-001).** Aktivní konfigurace je na
+Windows v `%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml`. Distribuce obsahuje jen
+`config/launcher.example.toml` bez osobních cest. Pokud lokální soubor chybí,
+Launcher nejprve plně validuje příklad a pak jej uloží stejným atomickým zápisem
+jako běžné změny profilu. Existující nebo poškozený lokální soubor se ze šablony
+nikdy neopravuje ani nepřepisuje. Explicitní `--config` zůstává diagnostickou a
+testovací výjimkou. Workspace, Media Desk user data a processor-owned data tento
+mechanismus neotevírá k zápisu.
 
 ## Vyhodnocení otázek E1–E10
 

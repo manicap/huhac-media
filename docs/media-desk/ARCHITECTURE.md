@@ -4,9 +4,9 @@
 
 **Větev:** `codex/media-desk-working-library-v1`
 
-**Auditovaný commit:** `4397b9289de8689ed9282d9cbce842f3de4a60c2`
+**Výchozí commit konsolidace:** `288b9e6221459c074d80016518a4fbaa8bc90aa4`
 
-**Rozhodnutí aktualizována:** 2026-10-26 po dokončení Správy akcí v1.4
+**Rozhodnutí aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2 a D-027
 
 > **IMPLEMENTOVÁNO DNES** — běžící galerie je lokální read-only konzument jednoho
 > veřejného workspace v1. Výslovně potvrzené založení archivu orchestruje přes
@@ -29,6 +29,30 @@ missing, stale or ambiguous data only disables the projection.
 User names and manual/interval event assignments override only corresponding
 effective fields; source facts, machine candidates, sessions and provenance remain.
 User-store schema 2 is unchanged. Exact facet filters participate in cursor identity.
+
+## HUHÁČ Launcher v0.2 boundary — IMPLEMENTED
+
+`src/huhac_launcher` je samostatný host-local konzument veřejného Media Desk CLI,
+nikoli nový workspace writer ani orchestration framework. Z odděleného lokálního
+`%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml` spravuje více profilů. Git obsahuje
+jen neosobní `config/launcher.example.toml`, který se atomicky použije pouze při
+prvním startu bez lokální konfigurace. Každý profil váže
+právě jeden workspace contract v1, oddělený Media Desk user-data root, port,
+volitelný Keyframes fingerprint a přesnou dvojici Normalizer fingerprintů nebo
+explicitní provoz bez Normalizeru. Projektový interpreter odvozuje z `.venv`; na
+Windows používá její `pyvenv.cfg` k obejití redirector procesu, aby vlastněný
+`Popen` handle patřil skutečnému backendu.
+
+Launcher spouští jediný child proces argument listem bez shellu, připravenost
+potvrzuje přes `GET /health` a drží přímé vlastnictví jeho `Popen` handle. Stop
+nikdy nehledá proces podle jména nebo portu; cizí listener pouze zablokuje Start.
+Stdout/stderr se průběžně odvádějí do omezeného redigovaného bufferu v paměti.
+Tkinter operace start/stop a katalogizace snapshotů běží mimo GUI thread. Snapshoty
+enumeruje pouze ve veřejném Normalizer namespace a úplnou validaci deleguje
+Media Desk read adapteru; výběr podle data je zakázán. Launcher zapisuje atomicky
+jen vlastní profilový TOML. Workspace nezapisuje a případné host-local zápisy Media
+Desku zůstávají pod jeho existujícím ownership kontraktem v per-profile izolovaných
+`APPDATA` a `LOCALAPPDATA`.
 
 ## Pojmy a vlastnictví
 

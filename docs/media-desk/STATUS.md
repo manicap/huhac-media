@@ -32,6 +32,14 @@
 > exact-facet no-match p50 4.94 ms. Development measurement, not an SLA; see
 > [N3_PERFORMANCE.md](N3_PERFORMANCE.md).
 
+> **IMPLEMENTED 2026-10-27 — HUHÁČ Launcher v0.2.** Samostatné Tkinter okno
+> spravuje explicitní workspace profily, izolované user-data roots, per-profile
+> port a bezpečný výběr veřejného Normalizer snapshotu. Spouští pouze Media Desk
+> na pevném loopback bindu, ověřuje `/health`, vlastní přesně jeden child proces a
+> odmítá cizí listener. Osobní konfigurace je mimo checkout v
+> `%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml`; Git obsahuje pouze distribuční
+> příklad. 43 cílených launcher testů prošlo.
+
 ## Etapy
 
 | Etapa | Stav | Důkaz | Poznámka |
@@ -52,6 +60,7 @@
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Lokální uživatelská data (názvy a akce) | **IMPLEMENTED** | `src/media_desk/user_data.py` | Atomický per-workspace JSON mimo workspace; přenosné výběry, ratingy a kolekce zůstávají **ABSENT**. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
+| HUHÁČ Launcher v0.2 | **IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md` | Více host-local profilů mimo checkout, bezpečné první založení z distribučního příkladu a validovaný snapshot/port výběr; stále jen jeden vlastněný Media Desk child. |
 
 ## Konfigurace, která dnes skutečně platí
 

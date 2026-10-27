@@ -1,0 +1,12 @@
+schema_version = 2
+active_profile_id = "example"
+startup_timeout_seconds = 30
+shutdown_timeout_seconds = 8
+log_max_characters = 65536
+
+[[profiles]]
+id = "example"
+name = "Nastavit profil"
+workspace = "C:\\HUHAC\\workspace"
+profile = "C:\\HUHAC\\media-desk-profile"
+port = 8878
