@@ -20,12 +20,12 @@
 
 The isolated `studio/` React prototype is a static module orchestrator. It owns
 URL navigation and an ID-only working context; Projects and Media Library own
-their internal UI/domain behavior. V0.1 still uses synthetic in-memory data and does
-not read or write Media Desk user data, workspaces, catalogs, SQLite, Launcher
-profiles, or processor output. An isolated Project Core writer with its own
-host-local SQLite is **IMPLEMENTED** under `src/huhac_studio`, but is not yet
-connected to the React modules. Multi-workspace registry and Launcher hosting
-remain **ABSENT**. See `docs/studio/`.
+their internal UI/domain behavior. The React modules are connected to the
+`huhac_studio` Project Core API and its read-only workspace catalog projection;
+synthetic data remains test-only. Project Core owns a separate host-local SQLite
+and does not write Media Desk user data, workspaces, catalogs, Launcher profiles,
+or processor output. Multi-workspace registry and Launcher hosting remain
+**ABSENT**. See `docs/studio/`.
 
 ## Normalizer N3 boundary — IMPLEMENTED
 

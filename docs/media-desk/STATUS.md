@@ -55,6 +55,14 @@
 > používají skutečné API; syntetická data zůstávají pouze v testech. Media Desk,
 > workspace, mediální soubory a procesory nebyly změněny.
 
+> **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO 2026-10-28 — Studio adaptivní galerie a video.**
+> React knihovna zachovává poměr stran, zobrazuje technická metadata a nativně
+> přehrává nejvýše jeden explicitně vyžádaný katalogový video originál. Sdílená
+> hlasitost/mute je browser-local; přepnutí videa, datasetu, projektu, workspace
+> nebo modulu přehrávač uklidí. `huhac_studio` poskytuje pouze read-only opaque-token
+> video endpoint s HTTP Range a kontrolou source-root confinement; bez transcodování,
+> kopírování médií nebo zápisu do Media Desk/workspace.
+
 ## Etapy
 
 | Etapa | Stav | Důkaz | Poznámka |
@@ -77,6 +85,7 @@
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
 | HUHÁČ Launcher v0.2 | **IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md` | Více host-local profilů mimo checkout, bezpečné první založení z distribučního příkladu a validovaný snapshot/port výběr; stále jen jeden vlastněný Media Desk child. |
 | HUHÁČ Studio Project Core v1 | **IMPLEMENTED; EXPERIMENTAL UI CONNECTED** | `src/huhac_studio`, `studio/src`, `tests/studio`, `docs/studio/PROJECT_CONTRACT.md` | Oddělená SQLite a FastAPI writer; žádné zápisy do Media Desk/workspace. |
+| HUHÁČ Studio adaptivní galerie + video | **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO** | `studio/src/modules/media-library`, `src/huhac_studio/web.py`, `tests/studio/test_project_web.py` | Jeden lazy inline player, sdílená hlasitost, read-only Range stream; virtualizace a transcoding jsou absent. |
 
 ## Konfigurace, která dnes skutečně platí
 

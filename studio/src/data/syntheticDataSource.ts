@@ -71,8 +71,21 @@ export const syntheticProjects: readonly ProjectSummary[] = [
 
 type SyntheticMedia = MediaSummary & { readonly projectIds: readonly string[] };
 
+const mediaDefaults = {
+  originalUrl: null,
+  originalAvailable: false,
+  originalAccessState: "offline",
+  width: null,
+  height: null,
+  rotation: null,
+  durationSeconds: null,
+  mimeType: null,
+  sizeBytes: null,
+} as const;
+
 export const syntheticMedia: readonly SyntheticMedia[] = [
   {
+    ...mediaDefaults,
     id: "media-stage-wide",
     workspaceId: "workspace-main",
     projectIds: ["project-tour"],
@@ -80,9 +93,15 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "image",
     capturedAt: "2026-09-18T20:14:00Z",
     previewUrl: null,
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 1920,
+    height: 1080,
+    mimeType: "image/jpeg",
     availability: "available",
   },
   {
+    ...mediaDefaults,
     id: "media-backstage",
     workspaceId: "workspace-main",
     projectIds: ["project-tour"],
@@ -90,9 +109,17 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "video",
     capturedAt: "2026-09-18T21:42:00Z",
     previewUrl: null,
+    originalUrl: "/api/studio/originals/video-backstage",
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 1920,
+    height: 1080,
+    durationSeconds: 65.4,
+    mimeType: "video/mp4",
     availability: "available",
   },
   {
+    ...mediaDefaults,
     id: "media-crowd",
     workspaceId: "workspace-main",
     projectIds: ["project-tour"],
@@ -100,9 +127,15 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "image",
     capturedAt: "2026-09-18T22:05:00Z",
     previewUrl: null,
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 1080,
+    height: 1920,
+    mimeType: "image/jpeg",
     availability: "available",
   },
   {
+    ...mediaDefaults,
     id: "media-logo",
     workspaceId: "workspace-main",
     projectIds: ["project-tour", "project-campaign"],
@@ -110,9 +143,15 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "image",
     capturedAt: null,
     previewUrl: null,
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 1000,
+    height: 1000,
+    mimeType: "image/png",
     availability: "available",
   },
   {
+    ...mediaDefaults,
     id: "media-cover",
     workspaceId: "workspace-main",
     projectIds: ["project-campaign"],
@@ -120,9 +159,15 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "image",
     capturedAt: "2026-10-03T11:20:00Z",
     previewUrl: null,
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 3000,
+    height: 3000,
+    mimeType: "image/jpeg",
     availability: "available",
   },
   {
+    ...mediaDefaults,
     id: "media-reel",
     workspaceId: "workspace-main",
     projectIds: ["project-campaign"],
@@ -130,9 +175,17 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "video",
     capturedAt: "2026-10-04T16:08:00Z",
     previewUrl: null,
+    originalUrl: "/api/studio/originals/video-reel",
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 1080,
+    height: 1920,
+    durationSeconds: 14.2,
+    mimeType: "video/mp4",
     availability: "available",
   },
   {
+    ...mediaDefaults,
     id: "media-archive-poster",
     workspaceId: "workspace-archive",
     projectIds: ["project-archive"],
@@ -140,13 +193,23 @@ export const syntheticMedia: readonly SyntheticMedia[] = [
     kind: "image",
     capturedAt: null,
     previewUrl: null,
+    originalAvailable: true,
+    originalAccessState: "unchecked",
+    width: 1080,
+    height: 1920,
+    mimeType: "image/jpeg",
     availability: "available",
   },
 ];
 
 export const syntheticDataSource: StudioDataSource = {
-  async listWorkspaces() {
-    return syntheticWorkspaces;
+  async getSession() {
+    return {
+      runtimeId: "runtime-synthetic",
+      mode: "online" as const,
+      activeWorkspaceId: "workspace-main",
+      workspaces: syntheticWorkspaces,
+    };
   },
   async listProjects(workspaceId) {
     return syntheticProjects.filter((project) => project.workspaceId === workspaceId);

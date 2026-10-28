@@ -53,6 +53,20 @@ Studio je potom na `http://127.0.0.1:8878/` a FastAPI obsluhuje i `/api`.
 5. Write operace používají aktuální revision přes `If-Match`; konflikt 409 je
    zobrazen česky a nabízí načtení aktuální verze.
 6. Navigace sama neprovádí žádný doménový ani trvalý zápis.
+7. Karty zachovávají poměr stran média, zobrazují typ, rozlišení, délku a
+   stav katalogového odkazu na originál. Stav `Neověřený` je záměrně lazy:
+   skutečná dostupnost souboru se ověří až po Play. Video se potom přehrává
+   nativním HTML5 přehrávačem přímo v kartě; další Play předchozí přehrávač ukončí.
+8. Hlasitost a mute jsou sdílené mezi videi a ukládají se do `localStorage`;
+   výchozí hlasitost je 50 %. Odchod z knihovny, změna projektu/workspace nebo
+   přepnutí datasetu přehrávání ukončí.
+9. Galerie používá lehké justified flex řádky. Zdrojové i DOM pořadí je zároveň
+   vizuálním pořadím zleva doprava a následně shora dolů. Skutečný poměr stran
+   určuje šířku karty a náhled se neořezává; pohodlná a kompaktní hustota mění
+   cílovou výšku řádku a mezery, nikoli obsah na nečitelnou miniaturu.
+10. Po výběru médií je při scrollování trvale dostupná kontextová lišta s počtem,
+    přidáním/odebráním a zrušením výběru. Při aktivním videu se lišta přesune k
+    hornímu okraji pracovní plochy, aby nepřekryla nativní ovládání přehrávače.
 
 Panely registrovaných modulů zůstávají během navigace připojené, takže lokální
 UI stav (například filtr projektů nebo hustota knihovny) zůstane zachovaný.
@@ -65,6 +79,7 @@ studio/
   src/app/                  shell, statický registr, modulový kontrakt
   src/context/              Zustand store pracovního kontextu
   src/data/                 Project Core API adapter a syntetická testovací data
+  src/playback/             browser-local preference hlasitosti a mute
   src/modules/projects/     veřejný vstup, komponenta a testy Projektů
   src/modules/media-library/ veřejný vstup, komponenta a testy knihovny
   src/test/                 společný testovací harness
@@ -82,6 +97,13 @@ ověření jsou v [VERIFICATION.md](VERIFICATION.md).
 - **ABSENT:** více současně připojených workspace v jednom backendu;
 - **ABSENT:** autentizace, synchronizace, procesor orchestrace a realtime stavy;
 - **ABSENT:** detail média, pokročilé filtry, dynamický plugin loader a Scene Forge;
+- **ABSENT:** virtualizace velké galerie; implementované flex řádky záměrně
+  neměří DOM a nenačítají položky virtuálně. Chronologie je jednoznačná, ale
+  portrétní karta může dosáhnout minimální šířky 150 px a poslední řádek může
+  ponechat volné místo. Budoucí stránkování či virtualizace proto mohou vyžadovat
+  jiný lehký layout;
+- **ABSENT:** transcoding a fallback kodeky. Nepodporovaný formát/kodek hlásí
+  přehrávač uživateli; originál se nikdy nekopíruje ani nemění;
 - **ABSENT:** integrace Launcheru.
 
 ## Doporučená další etapa
@@ -106,8 +128,29 @@ celý život procesu. Připojený workspace čte veřejným Media Desk adaptére
 workspace ani Media Desk user data nezapisuje.
 
 Bez `--workspace` se backend spustí v bezpečném offline režimu. Existující
-projekty a vazby zůstanou čitelné s katalogovou diagnostikou, zatímco vytvoření
-projektu a přidání nové media link je odmítnuto, dokud není katalog připojen.
+projekty a vazby zůstanou uložené v SQLite, ale frontend žádný uložený workspace
+automaticky neaktivuje: nezobrazí katalog, aktivní projekt ani dočasný výběr.
+Session jej označí jako offline evidenci. Vytvoření projektu a přidání nové media
+link je odmítnuto, dokud není katalog připojen.
+
+Každý backendový proces má právě jeden autoritativní runtime profil. Bezpečné
+přepnutí proto znamená zastavit Studio, spustit je znovu s workspace vybraného
+profilu a otevřít port této instance. Hlavička vždy ukazuje `Online · <workspace_id>`
+nebo `Offline · bez aktivní knihovny`; hodnota pochází z
+`GET /api/studio/session`, ne z browserové preference. Produkční build má být
+hostován stejným FastAPI procesem přes `--frontend studio/dist`.
+
+Při samostatném Vite vývoji proxy standardně míří na `http://127.0.0.1:8878`.
+Jiný lokální Studio port musí být vybrán explicitně před startem Vite:
+
+```powershell
+$env:HUHAC_STUDIO_API_TARGET = 'http://127.0.0.1:<studio-port>'
+npm run dev
+```
+
+Proměnná přijímá pouze loopback HTTP URL. Bez tohoto nastavení by jedna Vite
+záložka nadále komunikovala s instancí na výchozím portu bez ohledu na to, který
+jiný profil byl spuštěn.
 
 Write API vyžaduje session CSRF token z `GET /api/studio/session`, shodný
 `X-CSRF-Token`, loopback Host, shodný Origin a pro změny existujícího agregátu

@@ -7,6 +7,7 @@ import type { StudioModuleDefinition } from "../app/moduleContract";
 import { createStudioStore, type StudioStore } from "../context/studioStore";
 import type { StudioDataSource } from "../data/contracts";
 import { syntheticDataSource } from "../data/syntheticDataSource";
+import type { PlaybackPreferencesStore } from "../playback/playbackPreferences";
 
 export function renderStudio({
   route = "/modules/projects",
@@ -14,12 +15,14 @@ export function renderStudio({
   dataSource,
   modules,
   capabilities,
+  playbackStore,
 }: {
   route?: string;
   store?: StudioStore;
   dataSource?: StudioDataSource;
   modules?: readonly StudioModuleDefinition[];
   capabilities?: ReadonlySet<string>;
+  playbackStore?: PlaybackPreferencesStore;
 } = {}) {
   return {
     store,
@@ -31,6 +34,7 @@ export function renderStudio({
           dataSource={dataSource ?? syntheticDataSource}
           modules={modules}
           capabilities={capabilities}
+          playbackStore={playbackStore}
         />
       </MemoryRouter>,
     ),

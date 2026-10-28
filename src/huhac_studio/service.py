@@ -150,6 +150,18 @@ class ProjectService:
                     "original_access_state": asset.original_access_state,
                     "display_name": asset.display_name or asset.source_name or asset.asset_id,
                     "capture_time": asset.capture_time,
+                    "width": asset.width,
+                    "height": asset.height,
+                    "rotation": asset.rotation,
+                    "duration_seconds": asset.duration_seconds,
+                    "mime_type": asset.mime_type,
+                    "size_bytes": asset.size_bytes,
+                    "original_available": asset.original_token is not None,
+                    "original_url": (
+                        f"/api/studio/originals/{asset.original_token}"
+                        if asset.media_type == "video" and asset.original_token
+                        else None
+                    ),
                     "preview_url": (
                         f"/api/studio/artifacts/{asset.preview_token}"
                         if asset.preview_token

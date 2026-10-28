@@ -3,9 +3,9 @@ import type {
   ProjectId,
   ProjectInput,
   ProjectSummary,
+  StudioSession,
   StudioDataSource,
   WorkspaceId,
-  WorkspaceSummary,
 } from "./contracts";
 
 type ApiProject = {
@@ -30,6 +30,15 @@ type ApiMedia = {
   display_name: string;
   capture_time: string | null;
   preview_url: string | null;
+  original_url: string | null;
+  original_available: boolean;
+  original_access_state: "unchecked" | "offline";
+  width: number | null;
+  height: number | null;
+  rotation: number | null;
+  duration_seconds: number | null;
+  mime_type: string | null;
+  size_bytes: number | null;
 };
 
 type ApiErrorBody = {
@@ -86,15 +95,29 @@ function mediaFromApi(workspaceId: string, media: ApiMedia): MediaSummary {
     kind: media.media_type,
     capturedAt: media.capture_time,
     previewUrl: media.preview_url,
+    originalUrl: media.original_url,
+    originalAvailable: media.original_available,
+    originalAccessState: media.original_access_state,
+    width: media.width,
+    height: media.height,
+    rotation: media.rotation,
+    durationSeconds: media.duration_seconds,
+    mimeType: media.mime_type,
+    sizeBytes: media.size_bytes,
     availability: media.availability,
   };
 }
 
 class ProjectApiDataSource implements StudioDataSource {
-  private sessionPromise: Promise<{
+  private async session(): Promise<{
     csrf_token: string;
+    runtime_id: string;
+    mode: "online" | "offline";
+    active_workspace_id: string | null;
     workspaces: { workspace_id: string; status: "ready" | "offline" }[];
-  }> | null = null;
+  }> {
+    return this.request("/api/studio/session", { cache: "no-store" });
+  }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(path, { credentials: "same-origin", ...init });
@@ -118,11 +141,6 @@ class ProjectApiDataSource implements StudioDataSource {
     return (await response.json()) as T;
   }
 
-  private session() {
-    this.sessionPromise ??= this.request("/api/studio/session");
-    return this.sessionPromise;
-  }
-
   private async write<T>(path: string, method: string, revision?: number, body?: unknown) {
     const session = await this.session();
     const headers: Record<string, string> = { "X-CSRF-Token": session.csrf_token };
@@ -135,13 +153,18 @@ class ProjectApiDataSource implements StudioDataSource {
     });
   }
 
-  async listWorkspaces(): Promise<readonly WorkspaceSummary[]> {
+  async getSession(): Promise<StudioSession> {
     const session = await this.session();
-    return session.workspaces.map((workspace) => ({
-      id: workspace.workspace_id,
-      title: workspace.workspace_id,
-      status: workspace.status,
-    }));
+    return {
+      runtimeId: session.runtime_id,
+      mode: session.mode,
+      activeWorkspaceId: session.active_workspace_id,
+      workspaces: session.workspaces.map((workspace) => ({
+        id: workspace.workspace_id,
+        title: workspace.workspace_id,
+        status: workspace.status,
+      })),
+    };
   }
 
   async listProjects(workspaceId: WorkspaceId) {
@@ -230,6 +253,15 @@ class ProjectApiDataSource implements StudioDataSource {
         kind: link.media_type ?? "image",
         capturedAt: null,
         previewUrl: null,
+        originalUrl: null,
+        originalAvailable: false,
+        originalAccessState: "offline" as const,
+        width: null,
+        height: null,
+        rotation: null,
+        durationSeconds: null,
+        mimeType: null,
+        sizeBytes: null,
         availability: "unavailable" as const,
       }),
       resolution: link.resolution,

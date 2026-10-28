@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { useStudioStore } from "../context/studioStore";
 import { useStudioData } from "../data/StudioDataProvider";
@@ -10,10 +10,17 @@ export function WorkspacePicker() {
   const projectId = useStudioStore((state) => state.projectId);
   const setWorkspace = useStudioStore((state) => state.setWorkspace);
   const setProject = useStudioStore((state) => state.setProject);
-  const { data: workspaces = [] } = useQuery({
-    queryKey: ["studio", "workspaces"],
-    queryFn: () => dataSource.listWorkspaces(),
+  const queryClient = useQueryClient();
+  const previousRuntimeId = useRef<string | null>(null);
+  const sessionQuery = useQuery({
+    queryKey: ["studio", "session"],
+    queryFn: () => dataSource.getSession(),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
+  const session = sessionQuery.data;
+  const workspaces = session?.workspaces ?? [];
   const projectsQuery = useQuery({
     queryKey: ["studio", "projects", workspaceId],
     queryFn: () => dataSource.listProjects(workspaceId!),
@@ -23,20 +30,34 @@ export function WorkspacePicker() {
   const activeProject = projects.find((project) => project.id === projectId);
 
   useEffect(() => {
-    if (!workspaces.length) return;
-    if (!workspaceId || !workspaces.some((workspace) => workspace.id === workspaceId)) {
-      setWorkspace(
-        workspaces.find((workspace) => workspace.status === "ready")?.id ?? workspaces[0].id,
-      );
+    if (!session) return;
+    const runtimeChanged = previousRuntimeId.current !== null
+      && previousRuntimeId.current !== session.runtimeId;
+    previousRuntimeId.current = session.runtimeId;
+    if (workspaceId !== session.activeWorkspaceId) {
+      setWorkspace(session.activeWorkspaceId);
     }
-  }, [setWorkspace, workspaceId, workspaces]);
+    if (runtimeChanged) {
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] === "studio" && query.queryKey[1] !== "session",
+      });
+    }
+  }, [queryClient, session, setWorkspace, workspaceId]);
+
+  useEffect(() => {
+    if (!sessionQuery.isError) return;
+    setWorkspace(null);
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] === "studio" && query.queryKey[1] !== "session",
+    });
+  }, [queryClient, sessionQuery.isError, setWorkspace]);
 
   useEffect(() => {
     if (
-      projectId &&
-      !projectsQuery.isPending &&
-      !projectsQuery.isFetching &&
-      (!activeProject || activeProject.status !== "active")
+      projectId
+      && !projectsQuery.isPending
+      && !projectsQuery.isFetching
+      && (!activeProject || activeProject.status !== "active")
     ) {
       setProject(null);
     }
@@ -44,21 +65,28 @@ export function WorkspacePicker() {
 
   return (
     <div className="context-strip" aria-label="Pracovní kontext">
-      <label className="workspace-picker">
-        <span>Workspace</span>
-        <select
-          aria-label="Aktivní workspace"
-          value={workspaceId ?? ""}
-          onChange={(event) => setWorkspace(event.target.value || null)}
-        >
-          <option value="">Bez workspace</option>
-          {workspaces.map((workspace) => (
-            <option key={workspace.id} value={workspace.id}>
-              {workspace.title}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div
+        className={`workspace-picker workspace-picker--${session?.mode ?? "loading"}`}
+        aria-live="polite"
+      >
+        <span>Pracovní prostředí</span>
+        <strong>
+          {sessionQuery.isPending
+            ? "Ověřuji backend…"
+            : sessionQuery.isError
+              ? "Backend není dostupný"
+              : session?.mode === "online"
+                ? `Online · ${session.activeWorkspaceId}`
+                : "Offline · bez aktivní knihovny"}
+        </strong>
+        {session?.mode === "offline" && workspaces.length ? (
+          <small>
+            {workspaces.length === 1
+              ? "1 uložený workspace je dostupný pouze jako offline evidence."
+              : `${workspaces.length} uložené workspace jsou dostupné pouze jako offline evidence.`}
+          </small>
+        ) : null}
+      </div>
       <div className="active-project" aria-live="polite">
         <span>Aktivní projekt</span>
         <strong>{activeProject?.title ?? "Žádný projekt"}</strong>

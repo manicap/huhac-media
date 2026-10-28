@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import hmac
 import ipaddress
+import os
+import re
 import secrets
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import BinaryIO, Iterator
 from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,9 +22,11 @@ from huhac_studio.config import default_project_database_path
 from huhac_studio.database import ProjectDatabase
 from huhac_studio.errors import ConflictError, NotFoundError, ProjectCoreError, ValidationError
 from huhac_studio.service import ProjectService
+from media_desk.originals import resolve_mapped_original
 
 _CSRF_COOKIE = "huhac_studio_csrf"
 _MAX_BODY_BYTES = 128 * 1024
+_RANGE = re.compile(r"bytes=(\d*)-(\d*)")
 
 
 class StrictModel(BaseModel):
@@ -83,6 +88,47 @@ def _revision(if_match: str | None) -> int:
     return int(value)
 
 
+def _range_error(size: int, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=416,
+        detail={"code": "invalid_byte_range", "message": message},
+        headers={"Accept-Ranges": "bytes", "Content-Range": f"bytes */{size}"},
+    )
+
+
+def _byte_range(value: str, size: int) -> tuple[int, int]:
+    match = _RANGE.fullmatch(value.strip())
+    if match is None or "," in value:
+        raise _range_error(size, "Only one byte range is supported")
+    start_text, end_text = match.groups()
+    if not start_text and not end_text:
+        raise _range_error(size, "Byte range is empty")
+    if not start_text:
+        length = int(end_text)
+        if length <= 0 or size <= 0:
+            raise _range_error(size, "Suffix range is outside the file")
+        return max(size - length, 0), size - 1
+    start = int(start_text)
+    end = int(end_text) if end_text else size - 1
+    if start >= size or end < start:
+        raise _range_error(size, "Byte range is outside the file")
+    return start, min(end, size - 1)
+
+
+def _stream_chunks(stream: BinaryIO, start: int, end: int) -> Iterator[bytes]:
+    try:
+        stream.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            block = stream.read(min(256 * 1024, remaining))
+            if not block:
+                break
+            remaining -= len(block)
+            yield block
+    finally:
+        stream.close()
+
+
 def create_app(
     *,
     database_path: Path | None = None,
@@ -106,6 +152,7 @@ def create_app(
     app.state.project_database = database
     app.state.project_service = service
     app.state.csrf_secret = secrets.token_urlsafe(32)
+    app.state.runtime_id = f"runtime-{uuid.uuid4().hex}"
     app.state.bind_host = bind_host
 
     @app.exception_handler(ProjectCoreError)
@@ -165,14 +212,18 @@ def create_app(
             path="/api/studio",
         )
         workspaces = service.list_workspaces()
+        active_workspace_id = next(
+            (item["workspace_id"] for item in workspaces if item["status"] == "ready"),
+            None,
+        )
+        response.headers["Cache-Control"] = "no-store"
         return {
             "csrf_token": token,
             "database_schema_version": 1,
+            "runtime_id": app.state.runtime_id,
+            "mode": "online" if active_workspace_id is not None else "offline",
             "workspaces": workspaces,
-            "active_workspace_id": next(
-                (item["workspace_id"] for item in workspaces if item["status"] == "ready"),
-                workspaces[0]["workspace_id"] if workspaces else None,
-            ),
+            "active_workspace_id": active_workspace_id,
         }
 
     @app.get("/api/studio/workspaces/{workspace_id}/media")
@@ -202,6 +253,60 @@ def create_app(
                 "ETag": f'"{token}"',
                 "Cache-Control": "public, max-age=31536000, immutable",
             },
+        )
+
+    @app.get("/api/studio/originals/{token}")
+    def catalog_video_original(token: str, request: Request):
+        selected = service.catalog.original(token)
+        if selected is None or selected.media_kind != "video":
+            raise HTTPException(status_code=404, detail={"code": "original_not_found"})
+        asset = service.catalog.asset(selected.workspace_id, selected.asset_id)
+        if (
+            asset is None
+            or asset.media_type != "video"
+            or asset.original_token != selected.token
+        ):
+            raise HTTPException(status_code=404, detail={"code": "original_not_found"})
+        resolved = resolve_mapped_original(selected.source_root, selected.relative_paths)
+        if resolved is None:
+            raise HTTPException(status_code=404, detail={"code": "original_unavailable"})
+        try:
+            stream = resolved.open("rb")
+            size = os.fstat(stream.fileno()).st_size
+        except OSError as exc:
+            raise HTTPException(
+                status_code=404, detail={"code": "original_unavailable"}
+            ) from exc
+        if selected.expected_size is not None and size != selected.expected_size:
+            stream.close()
+            raise HTTPException(status_code=404, detail={"code": "original_changed"})
+        common_headers = {
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-store",
+            "Content-Disposition": "inline",
+        }
+        try:
+            range_header = request.headers.get("range")
+            if range_header:
+                start, end = _byte_range(range_header, size)
+                status_code = 206
+                headers = {
+                    **common_headers,
+                    "Content-Range": f"bytes {start}-{end}/{size}",
+                    "Content-Length": str(end - start + 1),
+                }
+            else:
+                start, end = 0, max(0, size - 1)
+                status_code = 200
+                headers = {**common_headers, "Content-Length": str(size)}
+        except Exception:
+            stream.close()
+            raise
+        return StreamingResponse(
+            _stream_chunks(stream, start, end),
+            status_code=status_code,
+            media_type=selected.media_type,
+            headers=headers,
         )
 
     @app.get("/api/studio/workspaces/{workspace_id}/projects")

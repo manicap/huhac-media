@@ -8,6 +8,13 @@ export interface WorkspaceSummary {
   readonly status: "ready" | "offline";
 }
 
+export interface StudioSession {
+  readonly runtimeId: string;
+  readonly mode: "online" | "offline";
+  readonly activeWorkspaceId: WorkspaceId | null;
+  readonly workspaces: readonly WorkspaceSummary[];
+}
+
 export interface ProjectSummary {
   readonly id: ProjectId;
   readonly workspaceId: WorkspaceId;
@@ -37,12 +44,21 @@ export interface MediaSummary {
   readonly kind: "image" | "video";
   readonly capturedAt: string | null;
   readonly previewUrl: string | null;
+  readonly originalUrl: string | null;
+  readonly originalAvailable: boolean;
+  readonly originalAccessState: "unchecked" | "offline";
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly rotation: number | null;
+  readonly durationSeconds: number | null;
+  readonly mimeType: string | null;
+  readonly sizeBytes: number | null;
   readonly availability: "available" | "unavailable";
   readonly resolution?: "resolved" | "unresolved" | "original_offline" | "catalog_unavailable";
 }
 
 export interface StudioDataSource {
-  listWorkspaces(): Promise<readonly WorkspaceSummary[]>;
+  getSession(): Promise<StudioSession>;
   listProjects(workspaceId: WorkspaceId): Promise<readonly ProjectSummary[]>;
   getProject(projectId: ProjectId): Promise<ProjectSummary>;
   createProject(workspaceId: WorkspaceId, input: ProjectInput): Promise<ProjectSummary>;

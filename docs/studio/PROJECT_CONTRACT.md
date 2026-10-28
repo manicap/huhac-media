@@ -75,9 +75,10 @@ jednou. Revision je concurrency token, nikoli audit log nebo historie verzí.
 
 | Metoda a cesta | Účel |
 |---|---|
-| `GET /api/studio/session` | CSRF relace a dostupné workspace identity |
+| `GET /api/studio/session` | no-store CSRF relace, `runtime_id`, režim online/offline, autoritativní `active_workspace_id` a dostupné workspace identity |
 | `GET /api/studio/workspaces/{workspace_id}/media` | stránkovaná read-only projekce katalogu |
 | `GET /api/studio/artifacts/{token}` | autorizované immutable preview katalogu |
+| `GET /api/studio/originals/{token}` | autorizovaný read-only video originál s HTTP Range |
 | `GET /api/studio/workspaces/{workspace_id}/projects` | list active/archived projektů |
 | `POST /api/studio/workspaces/{workspace_id}/projects` | vytvořit active projekt |
 | `GET /api/studio/projects/{project_id}` | detail, tags, revision a odvozené počty |
@@ -93,6 +94,12 @@ jednou. Revision je concurrency token, nikoli audit log nebo historie verzí.
 API nepřijímá klientské ID projektu, timestampy, status při create, odvozené
 počty, filesystem paths ani SQL. Write endpointy jsou loopback-only a chráněné
 validací Host/Origin, omezením těla a CSRF tokenem.
+
+Origin-video token je neprůhledný, serverem odvozený z právě načtené katalogové
+reference; klient neposílá filesystem path. Endpoint obsluhuje jen katalogová
+videa, znovu ověřuje vazbu token–asset, resolve uvnitř povoleného source rootu a
+velikost otevřeného souboru. Podporuje 200, jednolitý byte range 206 a 416.
+Nejde o obecný file server ani o transcoding API.
 
 ## Odložené oblasti
 

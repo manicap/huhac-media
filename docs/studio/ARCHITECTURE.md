@@ -48,14 +48,18 @@ StudioShell -- statický ModuleRegistry -- ModuleErrorBoundary
                     |                    \          /
                     +------------- StudioDataSource
                                       |
-                            syntetický read-only adapter
+                     Project Core FastAPI + read-only katalog
+                                      |
+                     Studio SQLite   workspace contract v1
 ```
 
 - **React + TypeScript + Vite:** izolovaný frontend a produkční build.
 - **React Router:** adresovatelná navigace `/modules/<id>`.
 - **Zustand:** malý store s atomickými invarianty resetu; neobsahuje katalogové objekty.
 - **TanStack Query:** jednotná asynchronní hranice dat, cache klíče podle workspace a
-  projektu, loading/error stavy a snadno vyměnitelný budoucí HTTP adapter.
+  projektu, loading/error stavy a snadno vyměnitelný budoucí HTTP adapter. Session
+  se načítá bez HTTP cache a znovu při focusu; změna serverového `runtime_id`
+  odstraní ostatní Studio query cache.
 - **Statický registr:** žádné dynamické načítání kódu ani mikrofrontend runtime.
 
 Shell zná pouze metadata modulů, jejich dostupnost a společný ID kontext. Nezná
@@ -76,6 +80,13 @@ Implementovaný store obsahuje `workspaceId`, `projectId`, `selectedMediaIds` a
 Velké katalogové objekty a lokální UI stav ve store nejsou. Projektový filtr a
 hustota knihovny patří příslušným modulům.
 
+Autoritativní aktivní workspace nastavuje session backendu, nikoliv klientský
+picker. Online proces vrací právě připojený katalog jako `active_workspace_id`.
+Offline proces vrací `active_workspace_id: null`, i když Studio SQLite obsahuje
+projekty jiných workspace; frontend tím atomicky smaže projekt i výběr a uložené
+workspace označí pouze jako offline evidenci. Jeden proces nadále nepřepíná
+workspace za běhu.
+
 ## Stav rozhodnutí
 
 - **ACCEPTED/TARGET:** statický modulární orchestrátor, ID-only společný kontext,
@@ -87,7 +98,28 @@ hustota knihovny patří příslušným modulům.
   archive/restore a katalogové media links bez kopírování obsahu.
 - **IMPLEMENTED:** `src/huhac_studio` poskytuje versioned SQLite, host-level
   single-writer lock, Project service, read-only katalogovou projekci, bezpečné
-  preview, loopback/CSRF chráněné API, konzistentní SQLite backup a volitelné
-  hostování buildu Studia ze stejného originu.
+  preview a origin-video streamy, loopback/CSRF chráněné API, konzistentní SQLite
+  backup a volitelné hostování buildu Studia ze stejného originu.
+- **IMPLEMENTED:** session rozlišuje `online`/`offline`, nese unikátní runtime ID,
+  zakazuje HTTP cache a aktivuje pouze skutečně připojený katalog. Shell zobrazuje
+  workspace ID a při změně runtime nebo workspace ruší stale query data, aktivní
+  projekt, dočasný výběr a playback.
+- **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO:** knihovna zachovává skutečný poměr stran
+  katalogových médií, zobrazuje technická metadata a přehrává nejvýše jedno
+  explicitně vyžádané video v kartě. Hlasitost a mute jsou browser-local preference;
+  přehrávač se ruší při přepnutí videa, datasetu, projektu, workspace nebo modulu.
+  Dostupnost katalogového originálu zůstává do prvního lazy požadavku neověřená.
+  Originál je zpřístupněn jen neprůhledným katalogovým tokenem a HTTP Range
+  endpointem; Studio netranscoduje a nepřijímá filesystem path od klienta.
+- **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO:** adaptivní galerie skládá karty do justified
+  CSS flex řádků. Zdrojové pole, DOM pořadí, React klíče a ID zůstávají stabilní
+  a vizuálně se čtou zleva doprava a následně shora dolů. Poměr média předaný jako
+  CSS custom property určuje flex basis bez DOM měření; změna hustoty upraví jen
+  cílovou výšku řádku a mezery. Výběr nadále vlastní jediný Zustand
+  `selectedMediaIds` kontext. Při neprázdném výběru modul vykreslí pevnou kontextovou
+  lištu nad obsahem; běžně je u spodního okraje viewportu, při aktivním videu u
+  horního, aby nepřekryla ovládání. Výplň posledního řádku brání nepřirozenému
+  roztažení jeho karet; na mobilu se layout přepne do jednoho sloupce. Řešení
+  neprovádí DOM měření ani virtualizaci.
 - **ABSENT:** registry více současně připojených workspace v jednom procesu,
-  persistence GUI kontextu a integrace Launcheru.
+  virtualizace velké galerie, persistence GUI kontextu a integrace Launcheru.

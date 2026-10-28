@@ -1,35 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useStudioStore } from "../../context/studioStore";
 import { errorMessage, StudioApiError } from "../../data/apiDataSource";
 import { useStudioData } from "../../data/StudioDataProvider";
-import type { MediaSummary, ProjectSummary } from "../../data/contracts";
-
-const kindLabels: Record<MediaSummary["kind"], string> = {
-  image: "Fotografie",
-  video: "Video",
-};
-
-function formatDate(value: string | null): string {
-  if (!value) return "Bez data";
-  return new Intl.DateTimeFormat("cs-CZ", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Europe/Prague",
-  }).format(new Date(value));
-}
+import type { ProjectSummary } from "../../data/contracts";
+import { MediaCard } from "./MediaCard";
 
 export function MediaLibraryModule() {
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
   const [view, setView] = useState<"all" | "project">("project");
   const [notice, setNotice] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const workspaceId = useStudioStore((state) => state.workspaceId);
   const projectId = useStudioStore((state) => state.projectId);
   const selectedMediaIds = useStudioStore((state) => state.selectedMediaIds);
   const toggleMedia = useStudioStore((state) => state.toggleMedia);
   const clearSelection = useStudioStore((state) => state.clearSelection);
+  const activeModuleId = useStudioStore((state) => state.activeModuleId);
   const dataSource = useStudioData();
   const queryClient = useQueryClient();
   const projectQuery = useQuery({
@@ -50,6 +39,20 @@ export function MediaLibraryModule() {
     enabled: view === "all" && workspaceId !== null && projectId !== null,
   });
   const linkedIds = new Set((linkedMediaQuery.data ?? []).map((media) => media.id));
+
+  useEffect(() => setActiveVideoId(null), [projectId, workspaceId]);
+  useEffect(() => {
+    if (activeModuleId !== "media-library") setActiveVideoId(null);
+  }, [activeModuleId]);
+  useEffect(() => {
+    if (
+      activeVideoId !== null
+      && mediaQuery.data
+      && !mediaQuery.data.some((media) => media.id === activeVideoId)
+    ) {
+      setActiveVideoId(null);
+    }
+  }, [activeVideoId, mediaQuery.data]);
 
   const refreshAfterLinks = (project: ProjectSummary, message: string) => {
     queryClient.setQueryData(["studio", "project", project.id], project);
@@ -75,13 +78,19 @@ export function MediaLibraryModule() {
   });
 
   const switchView = (next: "all" | "project") => {
+    setActiveVideoId(null);
     clearSelection();
     setView(next);
     setNotice(null);
   };
 
+  const selectionActionDisabled = !projectId
+    || !projectQuery.data
+    || addMutation.isPending
+    || removeMutation.isPending;
+
   return (
-    <div className="module-page media-library-module">
+    <div className={`module-page media-library-module${selectedMediaIds.length ? " media-library-module--selection" : ""}${activeVideoId ? " media-library-module--playing" : ""}`}>
       <header className="module-heading">
         <div>
           <p className="eyebrow">Veřejný workspace katalog</p>
@@ -102,18 +111,6 @@ export function MediaLibraryModule() {
             <div className="segmented-control" role="group" aria-label="Pohled knihovny">
               <button type="button" aria-pressed={view === "all"} onClick={() => switchView("all")}>Všechna média</button>
               <button type="button" aria-pressed={view === "project"} disabled={!projectId} onClick={() => switchView("project")}>Média projektu</button>
-            </div>
-            <div className="library-actions">
-              <span>{selectedMediaIds.length} vybráno</span>
-              {view === "all" ? (
-                <button className="button button--primary" type="button" disabled={!projectId || !selectedMediaIds.length || addMutation.isPending} onClick={() => addMutation.mutate()}>
-                  Přidat do projektu
-                </button>
-              ) : (
-                <button className="button button--danger" type="button" disabled={!projectId || !selectedMediaIds.length || removeMutation.isPending} onClick={() => removeMutation.mutate()}>
-                  Odebrat z projektu
-                </button>
-              )}
             </div>
           </div>
 
@@ -138,20 +135,54 @@ export function MediaLibraryModule() {
                 const selected = selectedMediaIds.includes(media.id);
                 const alreadyLinked = view === "all" && linkedIds.has(media.id);
                 return (
-                  <article className={selected ? "media-card media-card--selected" : "media-card"} key={media.id}>
-                    <div className={`media-card__preview media-card__preview--${media.kind}`}>
-                      {media.previewUrl ? <img src={media.previewUrl} alt="" loading="lazy" /> : null}
-                      <span>{kindLabels[media.kind]}</span>
-                    </div>
-                    <div className="media-card__body">
-                      <div><strong>{media.title}</strong><span>{formatDate(media.capturedAt)}</span>{alreadyLinked ? <small>Už je v projektu</small> : null}{media.resolution && media.resolution !== "resolved" ? <small>Médium je momentálně nedostupné</small> : null}</div>
-                      <label className="media-select"><input type="checkbox" checked={selected} disabled={alreadyLinked} onChange={() => toggleMedia(media.id)} /><span className="sr-only">Vybrat {media.title}</span></label>
-                    </div>
-                  </article>
+                  <MediaCard
+                    key={media.id}
+                    media={media}
+                    selected={selected}
+                    selectionDisabled={alreadyLinked}
+                    selectionHint={alreadyLinked ? "Už je v projektu" : undefined}
+                    playerActive={activeVideoId === media.id}
+                    onToggleSelection={() => toggleMedia(media.id)}
+                    onActivatePlayer={() => setActiveVideoId(media.id)}
+                    onClosePlayer={() => setActiveVideoId(null)}
+                  />
                 );
               })}
             </div>
           )}
+
+          {selectedMediaIds.length ? (
+            <section className="selection-action-bar" aria-label="Hromadné operace" role="region">
+              <div className="selection-action-bar__summary" aria-live="polite">
+                <strong>{selectedMediaIds.length} vybráno</strong>
+                {!projectId ? <span>Pro projektovou akci nejprve vyberte aktivní projekt.</span> : null}
+              </div>
+              <div className="selection-action-bar__actions">
+                {view === "all" ? (
+                  <button
+                    className="button button--primary"
+                    type="button"
+                    disabled={selectionActionDisabled}
+                    onClick={() => addMutation.mutate()}
+                  >
+                    Přidat do projektu
+                  </button>
+                ) : (
+                  <button
+                    className="button button--danger"
+                    type="button"
+                    disabled={selectionActionDisabled}
+                    onClick={() => removeMutation.mutate()}
+                  >
+                    Odebrat z projektu
+                  </button>
+                )}
+                <button className="button button--secondary" type="button" onClick={clearSelection}>
+                  Zrušit výběr
+                </button>
+              </div>
+            </section>
+          ) : null}
         </>
       )}
     </div>
