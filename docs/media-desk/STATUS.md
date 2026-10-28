@@ -40,12 +40,20 @@
 > `%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml`; Git obsahuje pouze distribuční
 > příklad. 43 cílených launcher testů prošlo.
 
-> **EXPERIMENTALLY IMPLEMENTED 2026-10-27 — HUHÁČ Studio v0.1.** Isolated
+> **HISTORICAL BASELINE 2026-10-27 — HUHÁČ Studio v0.1.** Isolated
 > React/TypeScript/Vite shell with static Projects and Media Library modules,
 > Zustand ID context, React Router navigation, TanStack Query data boundary and
-> synthetic data only. Project persistence, Media Desk replacement, processor
-> orchestration and Launcher integration remain **ABSENT**. Evidence and startup
-> instructions: `docs/studio/` and `studio/src/`.
+> synthetic data only. This baseline is superseded by the connected workflow
+> described below; processor orchestration and Launcher integration remain
+> **ABSENT**. Evidence and startup instructions: `docs/studio/` and `studio/src/`.
+
+> **IMPLEMENTED 2026-10-28 — Project Core v1 + Studio Project workflow.** Samostatný `huhac_studio`
+> FastAPI writer vlastní host-local versioned SQLite, host-level single-writer
+> lock, projekty jednoho workspace, ploché tags, archive/restore, revision
+> conflicts a transakční media links na katalogové `asset_id`. Vazby přežijí
+> nedostupný katalog nebo originál. React moduly Projekty a Mediální knihovna
+> používají skutečné API; syntetická data zůstávají pouze v testech. Media Desk,
+> workspace, mediální soubory a procesory nebyly změněny.
 
 ## Etapy
 
@@ -68,6 +76,7 @@
 | Lokální uživatelská data (názvy a akce) | **IMPLEMENTED** | `src/media_desk/user_data.py` | Atomický per-workspace JSON mimo workspace; přenosné výběry, ratingy a kolekce zůstávají **ABSENT**. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
 | HUHÁČ Launcher v0.2 | **IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md` | Více host-local profilů mimo checkout, bezpečné první založení z distribučního příkladu a validovaný snapshot/port výběr; stále jen jeden vlastněný Media Desk child. |
+| HUHÁČ Studio Project Core v1 | **IMPLEMENTED; EXPERIMENTAL UI CONNECTED** | `src/huhac_studio`, `studio/src`, `tests/studio`, `docs/studio/PROJECT_CONTRACT.md` | Oddělená SQLite a FastAPI writer; žádné zápisy do Media Desk/workspace. |
 
 ## Konfigurace, která dnes skutečně platí
 

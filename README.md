@@ -137,10 +137,13 @@ their own `analysis/<processor>/` namespace.
 
 ### Experimental HUHÁČ Studio prototype
 
-An isolated React/TypeScript orchestrator prototype is available under
-[`studio/`](studio/) on the Studio development branch. It uses synthetic data
-only and does not replace or modify Media Desk, Launcher profiles, workspaces,
-or processor outputs. See [docs/studio/README.md](docs/studio/README.md).
+An isolated React/TypeScript orchestrator is available under [`studio/`](studio/)
+on the Studio development branch. Its Projects and Media Library modules use the
+Project Core v1 loopback API; synthetic data remains only in frontend tests.
+Project Core lives under `src/huhac_studio` and writes only its isolated
+host-local SQLite. It does not replace or modify Media Desk, Launcher profiles,
+workspaces, media files, or processor outputs. See
+[docs/studio/README.md](docs/studio/README.md).
 
 ## Clean runtime bundle
 

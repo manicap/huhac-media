@@ -55,9 +55,17 @@ posloupnost pro tři schválené provozní scénáře.
    čistý checkout je bezpečně inicializuje z neosobního distribučního příkladu.
 4d. **HUHÁČ Studio shell v0.1 — EXPERIMENTAL 2026-10-27.** An isolated static
 React module shell validates project-to-library context behavior with synthetic
-data. The next gate is an approved project-data ownership/persistence decision,
-followed by a narrow read-only FastAPI adapter. This stage does not change Media
-Desk, Launcher, workspace contract v1, or any processor.
+data. This stage does not change Media Desk, Launcher, workspace contract v1, or
+any processor.
+4e. **Project Core v1 — COMPLETE 2026-10-28.** D-029 zavádí samostatnou
+Studio-owned SQLite a jediný loopback FastAPI writer pro project metadata, tags,
+archive/restore, revision conflicts a katalogové media links. Backend má
+versioned schema, integrity checks, host-level writer lock a SQLite backup API.
+4f. **Studio Project workflow — COMPLETE 2026-10-28.** React moduly Projekty a
+Mediální knihovna používají úzký Project Core adapter, TanStack Query pro
+serverová data a Zustand pouze pro ID pracovního kontextu. Single-origin FastAPI
+hostuje volitelný Vite build i API. External resources, working directories,
+portable JSON a Launcher integrace zůstávají v dalších etapách.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

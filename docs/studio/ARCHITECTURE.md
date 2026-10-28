@@ -80,6 +80,14 @@ hustota knihovny patří příslušným modulům.
 
 - **ACCEPTED/TARGET:** statický modulární orchestrátor, ID-only společný kontext,
   zachování existujících backendových ownership hranic.
-- **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO:** React shell, syntetický adapter a dva moduly.
-- **PROPOSED:** projektový kontrakt v sousedním dokumentu.
-- **ABSENT:** produkční backend, persistence a integrace Launcheru.
+- **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO:** React shell a dva moduly napojené přes úzký
+  TypeScript adapter na skutečný Project Core; syntetický adapter zůstává testovací.
+- **ACCEPTED + IMPLEMENTED:** Project Core v1 podle D-029: samostatná Studio-owned
+  SQLite, jeden FastAPI writer, jeden workspace na projekt, revision conflicts,
+  archive/restore a katalogové media links bez kopírování obsahu.
+- **IMPLEMENTED:** `src/huhac_studio` poskytuje versioned SQLite, host-level
+  single-writer lock, Project service, read-only katalogovou projekci, bezpečné
+  preview, loopback/CSRF chráněné API, konzistentní SQLite backup a volitelné
+  hostování buildu Studia ze stejného originu.
+- **ABSENT:** registry více současně připojených workspace v jednom procesu,
+  persistence GUI kontextu a integrace Launcheru.

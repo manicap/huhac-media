@@ -8,16 +8,16 @@ import {
 } from "../context/studioStore";
 import { StudioDataProvider } from "../data/StudioDataProvider";
 import type { StudioDataSource } from "../data/contracts";
-import { syntheticDataSource } from "../data/syntheticDataSource";
+import { apiDataSource } from "../data/apiDataSource";
 import type { StudioModuleDefinition } from "./moduleContract";
 import { studioModuleRegistry } from "./moduleRegistry";
 import { StudioShell } from "./StudioShell";
 
-const defaultCapabilities = new Set(["synthetic-projects", "synthetic-library"]);
+const defaultCapabilities = new Set(["projects", "media-library"]);
 
 export function StudioApp({
   store: providedStore,
-  dataSource = syntheticDataSource,
+  dataSource = apiDataSource,
   modules = studioModuleRegistry,
   capabilities = defaultCapabilities,
 }: {

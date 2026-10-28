@@ -6,7 +6,7 @@
 
 **Výchozí commit konsolidace:** `288b9e6221459c074d80016518a4fbaa8bc90aa4`
 
-**Rozhodnutí aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2 a D-028
+**Rozhodnutí aktualizována:** 2026-10-28 po schválení Project Core v1 a D-029
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -43,6 +43,21 @@ schválení a **REJECTED** se nemá realizovat.
 | D-026 | Launcher v0.2 používá více explicitních profilů s odděleným workspace, Media Desk user-data rootem, portem a snapshoty; stále vlastní nejvýše jeden child. | **ACCEPTED + IMPLEMENTED** | TASK-LAUNCH-003; `src/huhac_launcher/config.py`, `snapshots.py` |
 | D-027 | Osobní Launcher konfigurace nepatří do Git historie. Aktivní schema 2 TOML je v host-local user configu; verzovaný neosobní příklad smí atomicky založit pouze chybějící konfiguraci a nikdy nepřepisuje existující profil. | **ACCEPTED + IMPLEMENTED** | TASK-GIT-001; `default_launcher_config_path`, `initialize_launcher_config`, `config/launcher.example.toml` |
 | D-028 | Studio v0.1 je statický React modulární shell s ID-only kontextem a zachovává ownership Media Desk, workspace a procesorů; produkční projektový writer ani multi-workspace backend nejsou schváleny. | **ACCEPTED TARGET + EXPERIMENTALLY IMPLEMENTED** | TASK-STUDIO-002; `studio/src`, `docs/studio` |
+| D-029 | Project v1 je Studio-owned agregát v samostatné host-local SQLite. Jediný FastAPI writer spravuje ploché projekty jednoho workspace, tags, archive/restore, integer revision a odkazy na katalogové `asset_id`; nikdy nezapisuje Media Desk store ani workspace. | **ACCEPTED + IMPLEMENTED** | TASK-STUDIO-004; `src/huhac_studio`, `tests/studio`, `docs/studio/PROJECT_CONTRACT.md` |
+
+## D-029 — Project Core v1 uses an isolated Studio-owned SQLite
+
+**ACCEPTED + IMPLEMENTED 2026-10-28 (TASK-STUDIO-004).** Source of truth je samostatná
+SQLite v host-local Studio profile data rootu a zapisuje ji jediný FastAPI
+Project service. Projekt patří právě jednomu workspace, má serverové stabilní
+`project-<uuid4 hex>`, neunikátní title, ploché tags, stav active/archived a
+integer revision pro optimistic concurrency. Hard delete v1 není.
+
+Media links odkazují pouze existující katalogové `asset_id` s rolemi `source`,
+`reference` a `deliverable`. Pozdější nedostupnost katalogu, assetu nebo originálu
+vazbu nemaže. Project service nesmí zapisovat Media Desk user-data schema 2,
+workspace, ingest SQLite ani processor-owned analysis. External resources,
+working directories a portable JSON export/import jsou explicitně odloženy.
 
 ## D-028 — Studio shell preserves existing ownership boundaries
 

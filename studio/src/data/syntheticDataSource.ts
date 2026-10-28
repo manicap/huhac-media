@@ -17,7 +17,13 @@ export const syntheticProjects: readonly ProjectSummary[] = [
     title: "Podzimní turné",
     description: "Koncertní fotografie, krátká videa a propagační podklady.",
     mediaCount: 4,
-    accent: "#6d5dfc",
+    notes: "",
+    tags: ["turné"],
+    status: "active",
+    revision: 1,
+    createdAt: "2026-09-01T10:00:00Z",
+    updatedAt: "2026-09-01T10:00:00Z",
+    archivedAt: null,
   },
   {
     id: "project-campaign",
@@ -25,7 +31,13 @@ export const syntheticProjects: readonly ProjectSummary[] = [
     title: "Kampaň k singlu",
     description: "Sdílené logo, cover art a vertikální video pro vydání singlu.",
     mediaCount: 3,
-    accent: "#e0673b",
+    notes: "",
+    tags: ["kampaň"],
+    status: "active",
+    revision: 1,
+    createdAt: "2026-09-02T10:00:00Z",
+    updatedAt: "2026-09-02T10:00:00Z",
+    archivedAt: null,
   },
   {
     id: "project-empty",
@@ -33,7 +45,13 @@ export const syntheticProjects: readonly ProjectSummary[] = [
     title: "Nový projekt",
     description: "Prázdný projekt ověřující bezpečný stav knihovny.",
     mediaCount: 0,
-    accent: "#2b9b79",
+    notes: "",
+    tags: [],
+    status: "active",
+    revision: 1,
+    createdAt: "2026-09-03T10:00:00Z",
+    updatedAt: "2026-09-03T10:00:00Z",
+    archivedAt: null,
   },
   {
     id: "project-archive",
@@ -41,11 +59,19 @@ export const syntheticProjects: readonly ProjectSummary[] = [
     title: "Vizuální archiv",
     description: "Oddělený syntetický kontext druhého workspace.",
     mediaCount: 1,
-    accent: "#3e7ba8",
+    notes: "",
+    tags: [],
+    status: "active",
+    revision: 1,
+    createdAt: "2026-09-04T10:00:00Z",
+    updatedAt: "2026-09-04T10:00:00Z",
+    archivedAt: null,
   },
 ];
 
-export const syntheticMedia: readonly MediaSummary[] = [
+type SyntheticMedia = MediaSummary & { readonly projectIds: readonly string[] };
+
+export const syntheticMedia: readonly SyntheticMedia[] = [
   {
     id: "media-stage-wide",
     workspaceId: "workspace-main",
@@ -53,7 +79,8 @@ export const syntheticMedia: readonly MediaSummary[] = [
     title: "Pódium – široký záběr",
     kind: "image",
     capturedAt: "2026-09-18T20:14:00Z",
-    accent: "linear-gradient(135deg, #392f66, #b86c9d)",
+    previewUrl: null,
+    availability: "available",
   },
   {
     id: "media-backstage",
@@ -62,7 +89,8 @@ export const syntheticMedia: readonly MediaSummary[] = [
     title: "Backstage moment",
     kind: "video",
     capturedAt: "2026-09-18T21:42:00Z",
-    accent: "linear-gradient(135deg, #1d5e68, #67b4a5)",
+    previewUrl: null,
+    availability: "available",
   },
   {
     id: "media-crowd",
@@ -71,25 +99,28 @@ export const syntheticMedia: readonly MediaSummary[] = [
     title: "Publikum pod světly",
     kind: "image",
     capturedAt: "2026-09-18T22:05:00Z",
-    accent: "linear-gradient(135deg, #7c3f25, #e6a643)",
+    previewUrl: null,
+    availability: "available",
   },
   {
     id: "media-logo",
     workspaceId: "workspace-main",
     projectIds: ["project-tour", "project-campaign"],
     title: "HUHÁČ logo – světlé",
-    kind: "graphic",
+    kind: "image",
     capturedAt: null,
-    accent: "linear-gradient(135deg, #282c38, #6b7180)",
+    previewUrl: null,
+    availability: "available",
   },
   {
     id: "media-cover",
     workspaceId: "workspace-main",
     projectIds: ["project-campaign"],
     title: "Cover singlu – finále",
-    kind: "graphic",
+    kind: "image",
     capturedAt: "2026-10-03T11:20:00Z",
-    accent: "linear-gradient(135deg, #64233f, #f07167)",
+    previewUrl: null,
+    availability: "available",
   },
   {
     id: "media-reel",
@@ -98,16 +129,18 @@ export const syntheticMedia: readonly MediaSummary[] = [
     title: "Vertikální teaser",
     kind: "video",
     capturedAt: "2026-10-04T16:08:00Z",
-    accent: "linear-gradient(135deg, #224c71, #59a5d8)",
+    previewUrl: null,
+    availability: "available",
   },
   {
     id: "media-archive-poster",
     workspaceId: "workspace-archive",
     projectIds: ["project-archive"],
     title: "Plakát – koncept 01",
-    kind: "graphic",
+    kind: "image",
     capturedAt: null,
-    accent: "linear-gradient(135deg, #304a3c, #8fba74)",
+    previewUrl: null,
+    availability: "available",
   },
 ];
 
@@ -118,10 +151,36 @@ export const syntheticDataSource: StudioDataSource = {
   async listProjects(workspaceId) {
     return syntheticProjects.filter((project) => project.workspaceId === workspaceId);
   },
-  async listMedia(workspaceId, projectId) {
+  async getProject(projectId) {
+    const project = syntheticProjects.find((item) => item.id === projectId);
+    if (!project) throw new Error("Projekt nebyl nalezen.");
+    return project;
+  },
+  async createProject() {
+    throw new Error("Syntetický adapter je pouze pro testy čtení.");
+  },
+  async updateProject() {
+    throw new Error("Syntetický adapter je pouze pro testy čtení.");
+  },
+  async archiveProject() {
+    throw new Error("Syntetický adapter je pouze pro testy čtení.");
+  },
+  async restoreProject() {
+    throw new Error("Syntetický adapter je pouze pro testy čtení.");
+  },
+  async listWorkspaceMedia(workspaceId) {
+    return syntheticMedia.filter((media) => media.workspaceId === workspaceId);
+  },
+  async listProjectMedia(workspaceId, projectId) {
     return syntheticMedia.filter(
       (media) =>
         media.workspaceId === workspaceId && media.projectIds.includes(projectId),
     );
+  },
+  async addMediaLinks() {
+    throw new Error("Syntetický adapter je pouze pro testy čtení.");
+  },
+  async removeMediaLinks() {
+    throw new Error("Syntetický adapter je pouze pro testy čtení.");
   },
 };

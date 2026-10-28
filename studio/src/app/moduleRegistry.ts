@@ -10,7 +10,7 @@ export const studioModuleRegistry = defineModuleRegistry([
     navigationOrder: 10,
     icon: ProjectsIcon,
     component: ProjectsModule,
-    requiredCapabilities: ["synthetic-projects"],
+    requiredCapabilities: ["projects"],
   },
   {
     id: "media-library",
@@ -18,6 +18,6 @@ export const studioModuleRegistry = defineModuleRegistry([
     navigationOrder: 20,
     icon: LibraryIcon,
     component: MediaLibraryModule,
-    requiredCapabilities: ["synthetic-library"],
+    requiredCapabilities: ["media-library"],
   },
 ]);

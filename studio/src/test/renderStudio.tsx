@@ -6,6 +6,7 @@ import { StudioApp } from "../app/StudioApp";
 import type { StudioModuleDefinition } from "../app/moduleContract";
 import { createStudioStore, type StudioStore } from "../context/studioStore";
 import type { StudioDataSource } from "../data/contracts";
+import { syntheticDataSource } from "../data/syntheticDataSource";
 
 export function renderStudio({
   route = "/modules/projects",
@@ -27,7 +28,7 @@ export function renderStudio({
       <MemoryRouter initialEntries={[route]}>
         <StudioApp
           store={store}
-          dataSource={dataSource}
+          dataSource={dataSource ?? syntheticDataSource}
           modules={modules}
           capabilities={capabilities}
         />

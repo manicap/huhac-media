@@ -26,7 +26,7 @@ export function createStudioStore(
   initial: Partial<Pick<StudioState, "workspaceId" | "projectId" | "activeModuleId">> = {},
 ): StudioStore {
   return createStore<StudioState>((set) => ({
-    workspaceId: initial.workspaceId ?? "workspace-main",
+    workspaceId: initial.workspaceId ?? null,
     projectId: initial.projectId ?? null,
     selectedMediaIds: [],
     activeModuleId: initial.activeModuleId ?? "projects",
