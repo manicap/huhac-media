@@ -44,6 +44,18 @@ huhac-studio --workspace 'D:\Media\_processing' --frontend studio/dist
 
 Studio je potom na `http://127.0.0.1:8878/` a FastAPI obsluhuje i `/api`.
 
+### Spuštění přes HUHÁČ Launcher v0.2
+
+Po ručním `npm run build` lze v `HUHAC-Launcher.cmd` zvolit **HUHÁČ Studio** a
+existující pracovní profil. Launcher předá jeho workspace a port, spustí projektový
+Python entry point bez globálního příkazu a čeká na online session se shodným
+`active_workspace_id`. Přepnutí profilu nebo aplikace vyžaduje nejprve Stop.
+
+Launcher Studio build nevytváří a při chybějícím `studio/dist/index.html` ukáže
+opravnou instrukci. Media Desk fingerprinty ani jeho izolovaný user-data root pro
+Studio nepoužívá; Project Core dál otevírá `%LOCALAPPDATA%\HUHAC\Studio\projects.sqlite3`.
+Offline Studio není v současném profilovém GUI nabízeno.
+
 ## Funkční scénář
 
 1. Modul Projekty vytváří, vybírá, upravuje, archivuje a obnovuje skutečné projekty.
@@ -104,11 +116,12 @@ ověření jsou v [VERIFICATION.md](VERIFICATION.md).
   jiný lehký layout;
 - **ABSENT:** transcoding a fallback kodeky. Nepodporovaný formát/kodek hlásí
   přehrávač uživateli; originál se nikdy nekopíruje ani nemění;
-- **ABSENT:** integrace Launcheru.
+- **IMPLEMENTED:** integrace do existujícího Launcheru v0.2 pro online workspace
+  profily; offline volba a současný běh obou backendů zůstávají absent.
 
 ## Doporučená další etapa
 
-Multi-workspace registry, Launcher integrace a rozšířené katalogové filtry
+Multi-workspace registry, offline profil Launcheru a rozšířené katalogové filtry
 zůstávají samostatnými dalšími etapami.
 
 ## Project Core v1

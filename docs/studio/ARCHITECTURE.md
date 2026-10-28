@@ -11,7 +11,7 @@ Audit byl proveden nad commitem `9b4d8ca284a7b2814061ba13c94243f813ad6ca3`.
 | User data | Media Desk atomicky vlastní lokální JSON schema 2 pro názvy, události, intervaly a ruční přiřazení. | Projekt není událost. Prototyp tento store nečte ani nemění. |
 | Sessions a Normalizer | Session je machine-generated časová relace; Normalizer je explicitní immutable read-only startup projekce. | Projekt se z nich automaticky nevytváří a analytická data zůstávají processor-owned. |
 | Veřejný workspace | `workspace.json` a katalog v1 jsou hranice mezi ingestem, procesory a konzumenty; asset má stabilní identitu. | Budoucí knihovna může použít existující asset ID bez kopie média a bez změny kontraktu v1. |
-| Launcher v0.2 | Profily spouštějí nejvýše jeden přímo vlastněný loopback Media Desk child; cizí proces nepřebírají. | Prototyp Launcher nemění. Budoucí start Studia vyžaduje samostatné rozhodnutí o host procesu. |
+| Launcher v0.2 | Profily spouštějí nejvýše jeden přímo vlastněný loopback Media Desk nebo Studio child; cizí proces nepřebírají. | Studio používá stejný workspace/port, vlastní SQLite a session readiness s přesnou identitou workspace. |
 
 ### Co lze převzít beze změn
 
@@ -104,6 +104,12 @@ workspace za běhu.
   zakazuje HTTP cache a aktivuje pouze skutečně připojený katalog. Shell zobrazuje
   workspace ID a při změně runtime nebo workspace ruší stale query data, aktivní
   projekt, dočasný výběr a playback.
+- **IMPLEMENTED:** Launcher v0.2 vybírá Media Desk nebo Studio nad existujícími
+  profily, drží jediný owned-child lifecycle a Studio readiness uzná pouze pro
+  session se shodným `active_workspace_id`. Studio nepřebírá Media Desk profile
+  root ani fingerprinty a vyžaduje předem vytvořený `studio/dist`. Aplikační
+  Python prostředí jsou oddělená: Studio používá vlastní worktree venv a Media
+  Desk bezpečně detekovaný nebo explicitně nakonfigurovaný venv.
 - **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO:** knihovna zachovává skutečný poměr stran
   katalogových médií, zobrazuje technická metadata a přehrává nejvýše jedno
   explicitně vyžádané video v kartě. Hlasitost a mute jsou browser-local preference;
@@ -122,4 +128,4 @@ workspace za běhu.
   roztažení jeho karet; na mobilu se layout přepne do jednoho sloupce. Řešení
   neprovádí DOM měření ani virtualizaci.
 - **ABSENT:** registry více současně připojených workspace v jednom procesu,
-  virtualizace velké galerie, persistence GUI kontextu a integrace Launcheru.
+  virtualizace velké galerie, persistence GUI kontextu a offline volba v Launcheru.

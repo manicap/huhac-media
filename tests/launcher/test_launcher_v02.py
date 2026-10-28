@@ -14,6 +14,7 @@ from huhac_launcher.config import (
     LauncherProfile,
     LauncherSettings,
     LauncherStore,
+    application_python,
     default_launcher_config_path,
     initialize_launcher_config,
     load_launcher_settings,
@@ -21,7 +22,7 @@ from huhac_launcher.config import (
     parse_port,
     save_launcher_settings,
 )
-from huhac_launcher.controller import BackendController, LauncherState
+from huhac_launcher.controller import BackendController, LauncherApplication, LauncherState
 from huhac_launcher.gui import LauncherWindow
 from huhac_launcher.snapshots import scan_normalizer_snapshots, validate_profile_selection
 from media_desk.contract import ContractError
@@ -188,6 +189,66 @@ def test_profiles_keep_separate_user_data_roots_and_runtime_values(tmp_path: Pat
     assert settings.runtime(two).port == 8102
 
 
+def test_optional_application_pythons_round_trip_without_changing_profiles(
+    tmp_path: Path,
+) -> None:
+    profile = _profile(tmp_path)
+    media_python = (tmp_path / "media-env" / "Scripts" / "python.exe").resolve()
+    studio_python = (tmp_path / "studio-env" / "Scripts" / "python.exe").resolve()
+    settings = replace(
+        _settings(profile),
+        media_desk_python=media_python,
+        studio_python=studio_python,
+    )
+    path = tmp_path / "launcher.toml"
+
+    save_launcher_settings(path, settings)
+    loaded = load_launcher_settings(path)
+
+    assert loaded.profiles == (profile,)
+    assert loaded.media_desk_python == media_python
+    assert loaded.studio_python == studio_python
+
+
+def test_old_schema_two_config_defaults_application_pythons_to_detection(
+    tmp_path: Path,
+) -> None:
+    profile = _profile(tmp_path)
+    path = tmp_path / "launcher.toml"
+    save_launcher_settings(path, _settings(profile))
+
+    loaded = load_launcher_settings(path)
+
+    assert loaded.media_desk_python is None
+    assert loaded.studio_python is None
+
+
+def test_media_desk_python_is_detected_from_linked_main_worktree(tmp_path: Path) -> None:
+    main = tmp_path / "huhac-media"
+    studio = tmp_path / "huhac-studio-dev"
+    git_directory = main / ".git" / "worktrees" / "huhac-studio-dev"
+    git_directory.mkdir(parents=True)
+    studio.mkdir()
+    (studio / ".git").write_text(f"gitdir: {git_directory}\n", encoding="utf-8")
+    (main / "pyproject.toml").write_text("[project]\nname='huhac'\n", encoding="utf-8")
+    (main / "src" / "media_desk").mkdir(parents=True)
+    media_python = main / ".venv" / "Scripts" / "python.exe"
+    media_python.parent.mkdir(parents=True)
+    media_python.write_bytes(b"python")
+    studio_python = studio / ".venv" / "Scripts" / "python.exe"
+    studio_python.parent.mkdir(parents=True)
+    studio_python.write_bytes(b"python")
+
+    assert application_python(studio, "media-desk") == media_python
+    assert application_python(studio, "studio") == studio_python
+
+
+def test_configured_application_python_overrides_safe_detection(tmp_path: Path) -> None:
+    configured = (tmp_path / "custom" / "Scripts" / "python.exe").resolve()
+
+    assert application_python(tmp_path, "media-desk", configured) == configured
+
+
 def test_corrupt_toml_is_rejected_without_rewrite(tmp_path: Path) -> None:
     path = tmp_path / "launcher.toml"
     path.write_text("schema_version = [", encoding="utf-8")
@@ -311,6 +372,40 @@ def test_running_window_locks_profile_snapshot_and_port() -> None:
     assert window._locked()
 
 
+def test_window_reconfigures_controller_for_selected_application(tmp_path: Path) -> None:
+    profile = _profile(tmp_path)
+    window = LauncherWindow.__new__(LauncherWindow)
+
+    class Variable:
+        value = LauncherApplication.STUDIO.title
+
+        @classmethod
+        def get(cls) -> str:
+            return cls.value
+
+    class Controller:
+        owns_process = False
+
+    class Store:
+        settings = _settings(profile)
+
+    window.application_var = Variable()
+    window.controller = Controller()
+    window.store = Store()
+    window.project_root = tmp_path
+
+    window._set_controller(profile)
+
+    assert window.controller.application is LauncherApplication.STUDIO
+    assert window.controller._command()[1:3] == ["-m", "huhac_studio.cli"]
+
+    Variable.value = LauncherApplication.MEDIA_DESK.title
+    window._set_controller(profile)
+
+    assert window.controller.application is LauncherApplication.MEDIA_DESK
+    assert window.controller._command()[1:3] == ["-m", "media_desk"]
+
+
 def test_snapshot_scan_starts_in_background(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     profile = _profile(tmp_path)
     window = LauncherWindow.__new__(LauncherWindow)
@@ -343,8 +438,10 @@ def test_open_ui_uses_only_owned_running_loopback_url() -> None:
     class Controller:
         state = LauncherState.RUNNING
         owns_process = True
-        config = LauncherConfig(Path("C:/w"), Path("C:/p"), "127.0.0.1", 9123, None, None, None)
+        browser_url = "http://127.0.0.1:9123/?launcher_app=media-desk&launcher_run=one"
     window.controller = Controller()
     window.browser_opener = opened.append
     window._open_ui()
-    assert opened == ["http://127.0.0.1:9123"]
+    assert opened == [
+        "http://127.0.0.1:9123/?launcher_app=media-desk&launcher_run=one"
+    ]

@@ -64,8 +64,13 @@ versioned schema, integrity checks, host-level writer lock a SQLite backup API.
 4f. **Studio Project workflow — COMPLETE 2026-10-28.** React moduly Projekty a
 Mediální knihovna používají úzký Project Core adapter, TanStack Query pro
 serverová data a Zustand pouze pro ID pracovního kontextu. Single-origin FastAPI
-hostuje volitelný Vite build i API. External resources, working directories,
-portable JSON a Launcher integrace zůstávají v dalších etapách.
+hostuje volitelný Vite build i API. External resources, working directories a
+portable JSON zůstávají v dalších etapách; Launcher integrace je dokončena v 4g.
+4g. **Studio integration in Launcher v0.2 — COMPLETE 2026-10-28.** Jeden přepínač
+   volí Media Desk nebo HUHÁČ Studio nad existujícími profily. Launcher vlastní
+   nejvýše jeden loopback child, ověřuje aplikačně specifickou HTTP readiness a
+   nemění profilové schema, Media Desk fingerprinty ani Studio-owned SQLite.
+   Offline Studio a současný běh obou backendů zůstávají mimo tuto etapu.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

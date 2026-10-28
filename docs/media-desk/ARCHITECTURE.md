@@ -43,19 +43,26 @@ User-store schema 2 is unchanged. Exact facet filters participate in cursor iden
 
 ## HUHÁČ Launcher v0.2 boundary — IMPLEMENTED
 
-`src/huhac_launcher` je samostatný host-local konzument veřejného Media Desk CLI,
+`src/huhac_launcher` je samostatný host-local spouštěč Media Desk a HUHÁČ Studia,
 nikoli nový workspace writer ani orchestration framework. Z odděleného lokálního
 `%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml` spravuje více profilů. Git obsahuje
 jen neosobní `config/launcher.example.toml`, který se atomicky použije pouze při
 prvním startu bez lokální konfigurace. Každý profil váže
 právě jeden workspace contract v1, oddělený Media Desk user-data root, port,
 volitelný Keyframes fingerprint a přesnou dvojici Normalizer fingerprintů nebo
-explicitní provoz bez Normalizeru. Projektový interpreter odvozuje z `.venv`; na
-Windows používá její `pyvenv.cfg` k obejití redirector procesu, aby vlastněný
-`Popen` handle patřil skutečnému backendu.
+explicitní provoz bez Normalizeru. Media Desk a Studio mohou mít samostatný
+aplikační Python. Nepovinné schema 2 cesty mají přednost; jinak Studio používá
+`.venv` aktivního worktree a Media Desk v linked-worktree instalaci bezpečně
+odvodí `.venv` hlavního worktree z Git metadata. Na Windows používá vybrané
+`pyvenv.cfg` k obejití redirector procesu a současně skládá `VIRTUAL_ENV`, `PATH`
+a `site-packages` z téhož prostředí, aby vlastněný `Popen` handle patřil skutečnému
+backendu bez smíchání závislostí.
 
-Launcher spouští jediný child proces argument listem bez shellu, připravenost
-potvrzuje přes `GET /health` a drží přímé vlastnictví jeho `Popen` handle. Stop
+Launcher spouští jediný vybraný child proces argument listem bez shellu a drží
+přímé vlastnictví jeho `Popen` handle. Media Desk zachovává původní izolovaný
+environment, fingerprinty a `/health` readiness. Studio používá stejný profilový
+workspace/port, ale host-local Studio SQLite, produkční `studio/dist` a session
+readiness s přesnou shodou `active_workspace_id`. Stop
 nikdy nehledá proces podle jména nebo portu; cizí listener pouze zablokuje Start.
 Stdout/stderr se průběžně odvádějí do omezeného redigovaného bufferu v paměti.
 Tkinter operace start/stop a katalogizace snapshotů běží mimo GUI thread. Snapshoty
@@ -63,7 +70,8 @@ enumeruje pouze ve veřejném Normalizer namespace a úplnou validaci deleguje
 Media Desk read adapteru; výběr podle data je zakázán. Launcher zapisuje atomicky
 jen vlastní profilový TOML. Workspace nezapisuje a případné host-local zápisy Media
 Desku zůstávají pod jeho existujícím ownership kontraktem v per-profile izolovaných
-`APPDATA` a `LOCALAPPDATA`.
+`APPDATA` a `LOCALAPPDATA`. Studio do těchto Media Desk roots nezapisuje a Launcher
+nevytváří další profilovou evidenci ani runtime multi-workspace.
 
 ## Pojmy a vlastnictví
 

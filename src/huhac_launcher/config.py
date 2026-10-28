@@ -27,7 +27,8 @@ _PROFILE_KEYS = {
 }
 _ROOT_KEYS = {
     "schema_version", "active_profile_id", "startup_timeout_seconds",
-    "shutdown_timeout_seconds", "log_max_characters", "profiles",
+    "shutdown_timeout_seconds", "log_max_characters", "media_desk_python",
+    "studio_python", "profiles",
 }
 
 
@@ -85,6 +86,8 @@ class LauncherSettings:
     shutdown_timeout_seconds: float = 8.0
     log_max_characters: int = 65_536
     migrated_from_v1: bool = False
+    media_desk_python: Path | None = None
+    studio_python: Path | None = None
 
     @property
     def active_profile(self) -> LauncherProfile:
@@ -123,6 +126,12 @@ def _absolute(values: dict[str, object], key: str) -> Path:
     if not value.is_absolute():
         raise LauncherConfigurationError(f"Hodnota {key} musí být absolutní cesta")
     return value
+
+
+def _optional_absolute(values: dict[str, object], key: str) -> Path | None:
+    if values.get(key) is None:
+        return None
+    return _absolute(values, key)
 
 
 def _optional_fingerprint(values: dict[str, object], key: str) -> str | None:
@@ -246,7 +255,15 @@ def load_launcher_settings(path: Path) -> LauncherSettings:
     if active not in identifiers:
         raise LauncherConfigurationError("Aktivní profil v konfiguraci neexistuje")
     startup, shutdown, log_limit = _limits(payload)
-    return LauncherSettings(profiles, active, startup, shutdown, log_limit)
+    return LauncherSettings(
+        profiles,
+        active,
+        startup,
+        shutdown,
+        log_limit,
+        media_desk_python=_optional_absolute(payload, "media_desk_python"),
+        studio_python=_optional_absolute(payload, "studio_python"),
+    )
 
 
 def load_launcher_config(path: Path) -> LauncherConfig:
@@ -258,10 +275,18 @@ def _render(settings: LauncherSettings) -> str:
     lines = [
         "schema_version = 2",
         f"active_profile_id = {json.dumps(settings.active_profile_id, ensure_ascii=False)}",
+    ]
+    for key, value in (
+        ("media_desk_python", settings.media_desk_python),
+        ("studio_python", settings.studio_python),
+    ):
+        if value is not None:
+            lines.append(f"{key} = {json.dumps(str(value), ensure_ascii=False)}")
+    lines.extend((
         f"startup_timeout_seconds = {settings.startup_timeout_seconds:g}",
         f"shutdown_timeout_seconds = {settings.shutdown_timeout_seconds:g}",
         f"log_max_characters = {settings.log_max_characters}",
-    ]
+    ))
     for profile in settings.profiles:
         lines.extend(("", "[[profiles]]"))
         for key, value in (
@@ -298,6 +323,22 @@ def save_launcher_settings(path: Path, settings: LauncherSettings) -> None:
         startup,
         shutdown,
         log_limit,
+        media_desk_python=(
+            _optional_absolute(
+                {"media_desk_python": str(settings.media_desk_python)},
+                "media_desk_python",
+            )
+            if settings.media_desk_python is not None
+            else None
+        ),
+        studio_python=(
+            _optional_absolute(
+                {"studio_python": str(settings.studio_python)},
+                "studio_python",
+            )
+            if settings.studio_python is not None
+            else None
+        ),
     )
     identifiers = [profile.id for profile in validated.profiles]
     if len(set(identifiers)) != len(identifiers):
@@ -445,12 +486,60 @@ def project_python(project_root: Path) -> Path:
     return root / ".venv" / "bin" / "python"
 
 
-def process_python(project_root: Path) -> Path:
-    root = Path(project_root)
-    project = project_python(root)
-    if project.parent.name.casefold() != "scripts":
+def _linked_main_worktree_root(project_root: Path) -> Path | None:
+    marker = Path(project_root).resolve() / ".git"
+    if not marker.is_file():
+        return None
+    try:
+        prefix, raw_path = marker.read_text(encoding="utf-8").strip().split(":", 1)
+    except (OSError, UnicodeDecodeError, ValueError):
+        return None
+    if prefix.casefold() != "gitdir":
+        return None
+    git_directory = Path(raw_path.strip())
+    if not git_directory.is_absolute():
+        git_directory = (marker.parent / git_directory).resolve()
+    if git_directory.parent.name.casefold() != "worktrees":
+        return None
+    candidate = git_directory.parent.parent.parent
+    if not (candidate / "pyproject.toml").is_file():
+        return None
+    if not (candidate / "src" / "media_desk").is_dir():
+        return None
+    return candidate
+
+
+def application_python(
+    project_root: Path,
+    application: str,
+    configured: Path | None = None,
+) -> Path:
+    if configured is not None:
+        return Path(configured).expanduser()
+    root = Path(project_root).resolve()
+    if application == "media-desk":
+        main_worktree = _linked_main_worktree_root(root)
+        if main_worktree is not None:
+            candidate = project_python(main_worktree)
+            if candidate.is_file():
+                return candidate
+    return project_python(root)
+
+
+def virtual_environment_for_python(python: Path) -> Path | None:
+    interpreter = Path(python)
+    if interpreter.parent.name.casefold() not in {"scripts", "bin"}:
+        return None
+    candidate = interpreter.parent.parent
+    return candidate if (candidate / "pyvenv.cfg").is_file() else None
+
+
+def process_python_for(interpreter: Path) -> Path:
+    project = Path(interpreter)
+    environment = virtual_environment_for_python(project)
+    if environment is None or project.parent.name.casefold() != "scripts":
         return project
-    configuration = root / ".venv" / "pyvenv.cfg"
+    configuration = environment / "pyvenv.cfg"
     try:
         values = dict(
             (key.strip(), value.strip())
@@ -463,3 +552,7 @@ def process_python(project_root: Path) -> Path:
     executable = values.get("executable", "")
     candidate = Path(executable) if executable else project
     return candidate if candidate.is_absolute() else project
+
+
+def process_python(project_root: Path) -> Path:
+    return process_python_for(project_python(project_root))

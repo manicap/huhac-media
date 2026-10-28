@@ -88,16 +88,20 @@ python -m huhac_media ingest --input 'D:\Media' --dry-run
 python -m session_grouper analyze --workspace 'D:\Media\_processing' --dry-run
 ```
 
-### Windows launcher for Media Desk
+### Windows launcher for Media Desk and HUHÁČ Studio
 
 The repository includes **HUHÁČ Launcher v0.2**, a small Tkinter window for
-managing isolated workspace profiles, selecting an existing validated Normalizer
-snapshot, choosing a per-profile port, and starting or stopping Media Desk without
-PowerShell. After the project `.venv` is prepared, double-click
+managing isolated workspace profiles, selecting Media Desk or HUHÁČ Studio,
+choosing a per-profile port, and starting or stopping the selected backend without
+PowerShell. Media Desk retains its validated Normalizer snapshot selection; Studio
+uses the same workspace with its own host-local project database. After the project
+`.venv` is prepared, double-click
 `HUHAC-Launcher.cmd`. It never starts ingest or analysis processors. See
 [docs/launcher.md](docs/launcher.md) for operation and safety details. Personal
 profiles stay outside the checkout in `%LOCALAPPDATA%\HUHAC\Launcher`; the
 versioned `config/launcher.example.toml` is used only to seed a missing config.
+Media Desk and Studio may use separate detected or explicitly configured Python
+virtual environments while retaining the same owned-process safety model.
 
 ## Documentation
 
@@ -129,7 +133,7 @@ versioned `config/launcher.example.toml` is used only to seed a missing config.
   gallery, per-user workspace setup, host-local originals mapping, safe empty
   archive initialization, architecture, security, and limitations.
 - [HUHÁČ Launcher v0.2](docs/launcher.md): Windows profile/snapshot/port GUI for
-  one owned, loopback-only Media Desk child process.
+  one owned, loopback-only Media Desk or HUHÁČ Studio child process.
 
 SQLite, logs, run state, locks, and ingest Python APIs are internal. Consumers
 start at `workspace.json`, follow `metadata/catalog.json`, and write only under

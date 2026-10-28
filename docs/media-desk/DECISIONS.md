@@ -44,6 +44,28 @@ schválení a **REJECTED** se nemá realizovat.
 | D-027 | Osobní Launcher konfigurace nepatří do Git historie. Aktivní schema 2 TOML je v host-local user configu; verzovaný neosobní příklad smí atomicky založit pouze chybějící konfiguraci a nikdy nepřepisuje existující profil. | **ACCEPTED + IMPLEMENTED** | TASK-GIT-001; `default_launcher_config_path`, `initialize_launcher_config`, `config/launcher.example.toml` |
 | D-028 | Studio v0.1 je statický React modulární shell s ID-only kontextem a zachovává ownership Media Desk, workspace a procesorů; produkční projektový writer ani multi-workspace backend nejsou schváleny. | **ACCEPTED TARGET + EXPERIMENTALLY IMPLEMENTED** | TASK-STUDIO-002; `studio/src`, `docs/studio` |
 | D-029 | Project v1 je Studio-owned agregát v samostatné host-local SQLite. Jediný FastAPI writer spravuje ploché projekty jednoho workspace, tags, archive/restore, integer revision a odkazy na katalogové `asset_id`; nikdy nezapisuje Media Desk store ani workspace. | **ACCEPTED + IMPLEMENTED** | TASK-STUDIO-004; `src/huhac_studio`, `tests/studio`, `docs/studio/PROJECT_CONTRACT.md` |
+| D-030 | Launcher v0.2 může nad existujícími profily spustit buď Media Desk, nebo HUHÁČ Studio, vždy nejvýše jako jeden přímo vlastněný loopback child. Studio používá profilový workspace/port, vlastní host-local SQLite a readiness identity ze session; Media Desk profilové roots a fingerprinty zůstávají beze změny. | **ACCEPTED + IMPLEMENTED** | TASK-STUDIO-010; `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md` |
+
+## D-030 — One Launcher selects Media Desk or HUHÁČ Studio
+
+**ACCEPTED + IMPLEMENTED 2026-10-28 (TASK-STUDIO-010).** Existující Launcher schema 2
+a host-local profilová evidence se nerozšiřují o druhou databázi ani destruktivní
+migraci. Volba aplikace je stav GUI; workspace a port pocházejí z aktivního profilu.
+Launcher nadále vlastní nejvýše jeden child, cizí listener nepřebírá a Stop nikdy
+necílí podle názvu nebo portu.
+
+Media Desk zachovává původní příkaz, izolované `APPDATA`/`LOCALAPPDATA`, fingerprinty
+a `/health` readiness. Studio se spouští projektovým Python entry pointem nad ručně
+sestaveným `studio/dist`, nepřebírá Media Desk environment a readiness uzná pouze
+online session s přesným `active_workspace_id`. Project Core proto dál používá
+jedinou Studio-owned SQLite v host-local data rootu. Offline Studio není v této
+etapě v GUI vystaveno a jeden backend nadále znamená jeden workspace.
+
+TASK-STUDIO-010a doplnil aplikačně oddělené Python prostředí bez změny profilového
+schema: nepovinné kořenové cesty v schema 2 mohou prostředí určit explicitně,
+jinak se Media Desk linked worktree odvodí z Git metadata a Studio používá aktivní
+worktree. Procesní Python i `site-packages` vždy pocházejí z jednoho vybraného venv;
+výběr se neprovádí podle přítomnosti `jinja2` ani jiného jednotlivého balíčku.
 
 ## D-029 — Project Core v1 uses an isolated Studio-owned SQLite
 

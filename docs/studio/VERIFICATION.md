@@ -131,3 +131,74 @@ karet a hlavní profil nepřevzal testovací výběr ani projekty. Offline UI uk
 `Offline · bez aktivní knihovny`, nula vybraných médií a žádné karty. Po ověření
 byly všechny tři testovací procesy zastaveny. Hash, délka a mtime obou manifestů,
 katalogů a Media Desk user dat zůstaly před a po scénáři shodné.
+
+## TASK-STUDIO-010 — integrace do Launcheru v0.2
+
+**Ověřeno:** 2026-10-28 na větvi `feature/studio-shell`.
+
+| Kontrola | Výsledek |
+|---|---|
+| Launcher cílené testy | **PASS:** 50 testů |
+| Python compileall | **PASS:** `src/huhac_launcher` |
+| Studio testovací profil | **PASS:** online workspace `5f3f16d1-5ff0-44ae-b8c2-ffc60a2ffe27`, 16 médií |
+| Studio hlavní profil | **PASS:** online workspace `37604dde-e37d-4940-8d4c-63955f610cfe`, 85 médií |
+| Single-origin browser HTTP smoke | **PASS:** built Studio root HTTP 200 |
+| Ochrana workspace souborů | **PASS:** hash, délka a mtime obou manifestů a katalogů beze změny |
+| Praktický Media Desk start | **BLOCKED ENVIRONMENT:** uložené fingerprinty jsou stale; izolovaný start bez snapshotu navíc postrádá lokální `jinja2` |
+| Praktický Tk smoke | **BLOCKED ENVIRONMENT:** lokální Python distribuce nemá použitelný Tcl `init.tcl` |
+
+Testy pokrývají nezměněný Media Desk příkaz a lifecycle, přesný Studio příkaz,
+session URL, přepnutí workspace, odmítnutí cizího portu bez ukončení procesu,
+chybějící frontend build, oddělení Studio a Media Desk environmentu, staré schema 1
+i aktivní schema 2 Launcher TOML. Praktický Studio smoke použil skutečné veřejné
+workspace, ale dočasný host-local datový root, protože sandbox neměl oprávnění k
+provozní Studio SQLite. Žádná osobní konfigurace, projektová data, Media Desk user
+store ani workspace soubory nebyly změněny.
+
+## TASK-STUDIO-010a — samostatné Python prostředí Media Desk
+
+**Ověřeno:** 2026-10-28 na větvi `feature/studio-shell`.
+
+| Kontrola | Výsledek |
+|---|---|
+| Launcher cílené testy | **PASS:** 55 testů |
+| Původní Media Desk venv | **PASS:** `pip check` bez chyb; Media Desk CLI, FastAPI, Uvicorn a Jinja2 3.1.6 dostupné |
+| Automatický výběr prostředí | **PASS:** Media Desk hlavní worktree venv; Studio aktivní worktree venv |
+| Media Desk praktický start/stop | **PASS:** testovací workspace, `/health` ok |
+| Studio praktický start/stop | **PASS:** online session testovacího workspace, built root HTTP 200 |
+| Ochrana pracovních dat | **PASS:** hash, délka a mtime manifestu, katalogu a existujících Media Desk user dat beze změny |
+
+Launcher na Windows dál spouští základní executable z `pyvenv.cfg`, aby přímý
+`Popen` handle vlastnil skutečný backend, ale `VIRTUAL_ENV`, `PATH` a
+`site-packages` nyní odvozuje ze samostatně vybraného prostředí aplikace. Existující
+schema 2 TOML bez nových volitelných cest zůstává čitelné; explicitní
+`media_desk_python` a `studio_python` mají přednost před bezpečnou detekcí.
+
+Uložený testovací profil stále blokuje neplatný Normalizer snapshot a hlavní profil
+nekompatibilní Video Keyframes fingerprint. Praktický Media Desk smoke proto použil
+pouze in-memory variantu **Bez Normalizeru** a bez Keyframes fingerprintu; osobní
+TOML nebyl přepsán. Bezpečný uživatelský postup je v Launcheru zvolit platný snapshot
+nebo **Bez Normalizeru** a v úpravě profilu odstranit nekompatibilní Keyframes
+fingerprint. Launcher tyto hodnoty nikdy neopravuje automaticky.
+
+## TASK-STUDIO-010b — jednoznačné otevření vybrané aplikace
+
+**Ověřeno:** 2026-10-28 na větvi `feature/studio-shell`.
+
+| Kontrola | Výsledek |
+|---|---|
+| Launcher cílené testy | **PASS:** 57 testů |
+| Media Desk skutečný proces a endpointy | **PASS:** příkaz `python -m media_desk`, `/health` s hlavním workspace, Studio session 404 |
+| Studio skutečný proces a endpointy | **PASS:** příkaz `python -m huhac_studio.cli`, online session hlavního workspace, Media Desk health 404 |
+| Browser Media Desk | **PASS:** title `Přehled · Huháč`, navigace `HUHÁČ Media Desk` |
+| Browser Studio | **PASS:** title `HUHÁČ Studio`, moduly Projekty a Mediální knihovna |
+| Směr Media Desk → Studio → Media Desk | **PASS:** oba přechody s novým aplikačním a run ID |
+| Praktické Tk okno | **BLOCKED ENVIRONMENT:** lokální Tcl `init.tcl` není použitelné; GUI přenos volby je ověřen cíleným testem |
+
+Příčinou nebyl chybný backend: controller sestavil správný příkaz, vlastnil správné
+PID a aplikačně specifický endpoint identitu potvrdil. Obě aplikace však používaly
+stejnou kořenovou URL a výchozí `webbrowser.open` mohl pouze aktivovat existující
+záložku. Browser pak držel starý Studio dokument i v době, kdy na portu již správně
+běžel Media Desk. Launcher nyní otevírá novou záložku s `launcher_app` a jedinečným
+`launcher_run`; stav GUI uvádí identitu vlastněné aplikace. Readiness test výslovně
+odmítá HTTP 200 payload druhé aplikace.

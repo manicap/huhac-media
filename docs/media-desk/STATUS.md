@@ -10,7 +10,7 @@
 
 **Implementační commity S2b:** `88b94fb`, `9e65e47`, `52d7b00`, `d64b0a3`, `fd6f51f`, `da416df`
 
-**Stav aktualizován:** 2026-10-26; Správa akcí a časová navigace v1.4 implementována
+**Stav aktualizován:** 2026-10-28; Studio integrováno do Launcheru v0.2
 
 > **IMPLEMENTOVÁNO DNES** — M1 až M1.3, S2a, S2a.1 a S2b: read-only galerie nad
 > jedním workspace v1, virtualizovaná knihovna, kalendář a časová navigace, branding a
@@ -34,18 +34,18 @@
 
 > **IMPLEMENTED 2026-10-27 — HUHÁČ Launcher v0.2.** Samostatné Tkinter okno
 > spravuje explicitní workspace profily, izolované user-data roots, per-profile
-> port a bezpečný výběr veřejného Normalizer snapshotu. Spouští pouze Media Desk
+> port a bezpečný výběr veřejného Normalizer snapshotu. Původní režim spouští Media Desk
 > na pevném loopback bindu, ověřuje `/health`, vlastní přesně jeden child proces a
 > odmítá cizí listener. Osobní konfigurace je mimo checkout v
 > `%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml`; Git obsahuje pouze distribuční
-> příklad. 43 cílených launcher testů prošlo.
+> příklad.
 
 > **HISTORICAL BASELINE 2026-10-27 — HUHÁČ Studio v0.1.** Isolated
 > React/TypeScript/Vite shell with static Projects and Media Library modules,
 > Zustand ID context, React Router navigation, TanStack Query data boundary and
 > synthetic data only. This baseline is superseded by the connected workflow
-> described below; processor orchestration and Launcher integration remain
-> **ABSENT**. Evidence and startup instructions: `docs/studio/` and `studio/src/`.
+> described below; at this historical baseline processor orchestration and Launcher
+> integration were **ABSENT**. The later Launcher integration is recorded below.
 
 > **IMPLEMENTED 2026-10-28 — Project Core v1 + Studio Project workflow.** Samostatný `huhac_studio`
 > FastAPI writer vlastní host-local versioned SQLite, host-level single-writer
@@ -62,6 +62,16 @@
 > nebo modulu přehrávač uklidí. `huhac_studio` poskytuje pouze read-only opaque-token
 > video endpoint s HTTP Range a kontrolou source-root confinement; bez transcodování,
 > kopírování médií nebo zápisu do Media Desk/workspace.
+
+> **IMPLEMENTED 2026-10-28 — HUHÁČ Studio v Launcheru v0.2.** Stejné Tkinter okno
+> volí Media Desk nebo Studio nad existujícími profily a stále vlastní nejvýše jeden
+> child. Studio používá profilový workspace/port, vyžaduje ručně vytvořený Vite build
+> a readiness potvrzuje pouze session se shodným `active_workspace_id`. Media Desk
+> environment, fingerprinty i schema 2 launcher TOML zůstaly beze změny; Studio dál
+> používá vlastní host-local SQLite. TASK-STUDIO-010a navíc oddělil Python prostředí
+> obou aplikací při zachování stejného owned-process modelu. TASK-STUDIO-010b přidal
+> run-qualified browser URL proti stale frontendu a identitu aplikace ve stavovém
+> řádku. 57 cílených Launcher testů prošlo.
 
 ## Etapy
 
@@ -83,7 +93,7 @@
 | Běžný opakovaný start | **IMPLEMENTED** | `src/media_desk/config.py:100`, `src/media_desk/web.py:204`, `tests/media_desk/test_settings.py:73` | Nedostupná cesta nezpůsobí zápis ani automatickou opravu. |
 | Lokální uživatelská data (názvy a akce) | **IMPLEMENTED** | `src/media_desk/user_data.py` | Atomický per-workspace JSON mimo workspace; přenosné výběry, ratingy a kolekce zůstávají **ABSENT**. |
 | Více workspace v jednom procesu | **ABSENT** | `src/media_desk/config.py:71` | Jeden `Settings.workspace` a jeden startup snapshot. |
-| HUHÁČ Launcher v0.2 | **IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md` | Více host-local profilů mimo checkout, bezpečné první založení z distribučního příkladu a validovaný snapshot/port výběr; stále jen jeden vlastněný Media Desk child. |
+| HUHÁČ Launcher v0.2 | **IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md` | Více host-local profilů mimo checkout, volba Media Desk/Studio, oddělená Python prostředí, aplikačně specifická readiness a run-qualified browser URL proti stale frontendu; stále jen jeden vlastněný child. |
 | HUHÁČ Studio Project Core v1 | **IMPLEMENTED; EXPERIMENTAL UI CONNECTED** | `src/huhac_studio`, `studio/src`, `tests/studio`, `docs/studio/PROJECT_CONTRACT.md` | Oddělená SQLite a FastAPI writer; žádné zápisy do Media Desk/workspace. |
 | HUHÁČ Studio adaptivní galerie + video | **EXPERIMENTÁLNĚ IMPLEMENTOVÁNO** | `studio/src/modules/media-library`, `src/huhac_studio/web.py`, `tests/studio/test_project_web.py` | Jeden lazy inline player, sdílená hlasitost, read-only Range stream; virtualizace a transcoding jsou absent. |
 

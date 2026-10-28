@@ -17,7 +17,13 @@ from huhac_launcher.config import (
     LauncherConfigurationError,
     load_launcher_config,
 )
-from huhac_launcher.controller import BackendController, LauncherState
+from huhac_launcher.controller import (
+    BackendController,
+    LauncherApplication,
+    LauncherState,
+    http_readiness,
+    studio_http_readiness,
+)
 from huhac_launcher.gui import LauncherWindow
 
 
@@ -144,6 +150,40 @@ def _controller(
     return controller, factory, child, clock
 
 
+def _studio_controller(
+    tmp_path: Path,
+    process: FakeProcess | None = None,
+    *,
+    ready: bool = True,
+    port_free: bool = True,
+) -> tuple[BackendController, ProcessFactory, FakeProcess, FakeClock, list[str]]:
+    root, config = _runtime(tmp_path)
+    frontend = root / "studio" / "dist"
+    frontend.mkdir(parents=True)
+    (frontend / "index.html").write_text("<html></html>", encoding="utf-8")
+    child = process or FakeProcess()
+    factory = ProcessFactory(child)
+    clock = FakeClock()
+    readiness_urls: list[str] = []
+
+    def readiness(url: str) -> tuple[bool, str]:
+        readiness_urls.append(url)
+        return (True, "") if ready else (False, "čeká")
+
+    controller = BackendController(
+        config,
+        root,
+        application=LauncherApplication.STUDIO,
+        process_factory=factory,
+        readiness_probe=readiness,
+        port_checker=lambda _host, _port: port_free,
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+        runtime_validator=lambda _config: "workspace-test",
+    )
+    return controller, factory, child, clock, readiness_urls
+
+
 def _wait_for(predicate, timeout: float = 1.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -164,6 +204,183 @@ def test_successful_start_uses_list_command_and_health(tmp_path: Path) -> None:
     assert command[0] == str(tmp_path / "base-python.exe")
     assert command[1:] == ["-m", "media_desk", "--host", "127.0.0.1", "--port", "8878"]
     assert kwargs["shell"] is False
+
+
+def test_browser_url_identifies_application_and_each_launch(tmp_path: Path) -> None:
+    controller, _factory, _process, _clock = _controller(tmp_path)
+
+    assert controller.start().ok
+    first_url = controller.browser_url
+    assert "launcher_app=media-desk" in first_url
+    assert "launcher_run=" in first_url
+    assert controller.stop().ok
+
+    controller._process_factory = ProcessFactory(FakeProcess())
+    assert controller.start().ok
+    assert controller.browser_url != first_url
+    controller.stop()
+
+
+def test_studio_start_uses_profile_workspace_build_and_session_readiness(tmp_path: Path) -> None:
+    controller, factory, _process, _clock, readiness_urls = _studio_controller(tmp_path)
+
+    result = controller.start()
+
+    assert result.ok
+    command, kwargs = factory.calls[0]
+    assert command == [
+        str(tmp_path / "base-python.exe"),
+        "-m",
+        "huhac_studio.cli",
+        "--workspace",
+        str(controller.config.workspace),
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8878",
+        "--frontend",
+        str(controller.frontend_dir),
+    ]
+    assert readiness_urls == ["http://127.0.0.1:8878/api/studio/session"]
+    assert kwargs["shell"] is False
+    controller.stop()
+
+
+def test_studio_missing_frontend_build_fails_before_spawn(tmp_path: Path) -> None:
+    controller, factory, _process, _clock, _readiness_urls = _studio_controller(tmp_path)
+    (controller.frontend_dir / "index.html").unlink()
+
+    result = controller.start()
+
+    assert not result.ok
+    assert "Build Studia chybí" in result.message
+    assert "npm run build" in result.message
+    assert not factory.calls
+
+
+def test_studio_foreign_port_is_never_adopted_or_stopped(tmp_path: Path) -> None:
+    controller, factory, process, _clock, _readiness_urls = _studio_controller(
+        tmp_path,
+        port_free=False,
+    )
+
+    result = controller.start()
+
+    assert not result.ok
+    assert not factory.calls
+    assert process.terminate_calls == process.kill_calls == 0
+    assert controller.stop().ok
+    assert process.terminate_calls == process.kill_calls == 0
+
+
+def test_studio_environment_preserves_host_data_root_and_removes_media_overrides(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APPDATA", str(tmp_path / "host-roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "host-local"))
+    monkeypatch.setenv("MEDIA_DESK_WORKSPACE", "foreign-workspace")
+    monkeypatch.setenv("MEDIA_DESK_KEYFRAME_FINGERPRINT", FINGERPRINT)
+    controller, factory, _process, _clock, _readiness_urls = _studio_controller(tmp_path)
+
+    assert controller.start().ok
+
+    environment = factory.calls[0][1]["env"]
+    assert isinstance(environment, dict)
+    assert environment["APPDATA"] == str(tmp_path / "host-roaming")
+    assert environment["LOCALAPPDATA"] == str(tmp_path / "host-local")
+    assert not any(key.startswith("MEDIA_DESK_") for key in environment)
+    controller.stop()
+
+
+def test_studio_profile_restart_uses_new_workspace(tmp_path: Path) -> None:
+    first, first_factory, _process, _clock, _urls = _studio_controller(tmp_path / "first")
+    assert first.start().ok
+    assert first.stop().ok
+
+    second, second_factory, _process, _clock, _urls = _studio_controller(tmp_path / "second")
+    second_workspace = second.config.workspace
+    assert second.start().ok
+    assert second.stop().ok
+
+    assert first_factory.calls[0][0][4] != second_factory.calls[0][0][4]
+    assert second_factory.calls[0][0][4] == str(second_workspace)
+
+
+def test_studio_readiness_requires_exact_online_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Response:
+        status = 200
+
+        def __init__(self, workspace_id: str) -> None:
+            self.workspace_id = workspace_id
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _maximum: int) -> bytes:
+            return json.dumps({
+                "runtime_id": "runtime-one",
+                "mode": "online",
+                "active_workspace_id": self.workspace_id,
+            }).encode("utf-8")
+
+    monkeypatch.setattr(
+        "huhac_launcher.controller.urlopen",
+        lambda _request, timeout: Response("workspace-one"),
+    )
+    assert studio_http_readiness("http://127.0.0.1/session", "workspace-one")[0]
+    ready, message = studio_http_readiness(
+        "http://127.0.0.1/session",
+        "workspace-two",
+    )
+    assert not ready
+    assert "jinému workspace" in message
+
+
+def test_readiness_rejects_other_application_payload_on_http_200(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Response:
+        status = 200
+
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, _maximum: int) -> bytes:
+            return json.dumps(self.payload).encode("utf-8")
+
+    studio_payload = {
+        "runtime_id": "runtime-one",
+        "mode": "online",
+        "active_workspace_id": "workspace-one",
+    }
+    media_payload = {"status": "ok", "workspace_id": "workspace-one"}
+
+    monkeypatch.setattr(
+        "huhac_launcher.controller.urlopen",
+        lambda _request, timeout: Response(studio_payload),
+    )
+    assert not http_readiness("http://127.0.0.1/health")[0]
+
+    monkeypatch.setattr(
+        "huhac_launcher.controller.urlopen",
+        lambda _request, timeout: Response(media_payload),
+    )
+    assert not studio_http_readiness(
+        "http://127.0.0.1/api/studio/session",
+        "workspace-one",
+    )[0]
 
 
 def test_successful_stop_terminates_only_owned_process(tmp_path: Path) -> None:
@@ -327,6 +544,42 @@ def test_child_environment_is_isolated_and_complete(tmp_path: Path) -> None:
     assert environment["MEDIA_DESK_NORMALIZER_CONFIGURATION_FINGERPRINT"] == "b" * 64
     assert environment["MEDIA_DESK_NORMALIZER_INPUT_SET_FINGERPRINT"] == "c" * 64
     assert dict(os.environ) == before
+    controller.stop()
+
+
+def test_media_desk_can_use_a_separate_virtual_environment(tmp_path: Path) -> None:
+    root, config = _runtime(tmp_path)
+    media_environment = tmp_path / "media-environment"
+    media_python = media_environment / "Scripts" / "python.exe"
+    media_python.parent.mkdir(parents=True)
+    media_python.write_bytes(b"python")
+    media_base = tmp_path / "media-base-python.exe"
+    media_base.write_bytes(b"python")
+    (media_environment / "pyvenv.cfg").write_text(
+        f"executable = {media_base}\n",
+        encoding="utf-8",
+    )
+    process = FakeProcess()
+    factory = ProcessFactory(process)
+    controller = BackendController(
+        config,
+        root,
+        application_python_path=media_python,
+        process_factory=factory,
+        readiness_probe=lambda _url: (True, ""),
+        port_checker=lambda _host, _port: True,
+        runtime_validator=lambda _config: "workspace-test",
+    )
+
+    assert controller.start().ok
+
+    command, kwargs = factory.calls[0]
+    environment = kwargs["env"]
+    assert command[0] == str(media_base)
+    assert isinstance(environment, dict)
+    assert environment["VIRTUAL_ENV"] == str(media_environment)
+    assert str(media_environment / "Lib" / "site-packages") in environment["PYTHONPATH"]
+    assert str(root / ".venv" / "Lib" / "site-packages") not in environment["PYTHONPATH"]
     controller.stop()
 
 
