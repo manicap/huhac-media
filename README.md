@@ -135,6 +135,13 @@ SQLite, logs, run state, locks, and ingest Python APIs are internal. Consumers
 start at `workspace.json`, follow `metadata/catalog.json`, and write only under
 their own `analysis/<processor>/` namespace.
 
+### Experimental HUHÁČ Studio prototype
+
+An isolated React/TypeScript orchestrator prototype is available under
+[`studio/`](studio/) on the Studio development branch. It uses synthetic data
+only and does not replace or modify Media Desk, Launcher profiles, workspaces,
+or processor outputs. See [docs/studio/README.md](docs/studio/README.md).
+
 ## Clean runtime bundle
 
 Create a portable runtime ZIP without tests, development dependencies, Git

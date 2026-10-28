@@ -53,6 +53,11 @@ posloupnost pro tři schválené provozní scénáře.
    cizí proces nikdy nepřebírá ani neukončuje. Nejde o orchestraci procesorů,
    multi-workspace backend ani systémovou službu. Osobní profily jsou mimo Git;
    čistý checkout je bezpečně inicializuje z neosobního distribučního příkladu.
+4d. **HUHÁČ Studio shell v0.1 — EXPERIMENTAL 2026-10-27.** An isolated static
+React module shell validates project-to-library context behavior with synthetic
+data. The next gate is an approved project-data ownership/persistence decision,
+followed by a narrow read-only FastAPI adapter. This stage does not change Media
+Desk, Launcher, workspace contract v1, or any processor.
 5. **Shared storage resolver — DEFERRED / UNNUMBERED.** Dříve byl pracovně
    označen jako S2b. Po provozním ověření se teprve rozhodne, zda společnou
    abstrakci potřebují Video Keyframes/ingest; contract v2 ani migrace nejsou

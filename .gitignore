@@ -19,5 +19,7 @@ local-work/
 /.worktrees/
 /HUHAC-M1-TEST/
 /output/
+/studio/node_modules/
+/studio/dist/
 /config/launcher.toml
 /config/*.bak

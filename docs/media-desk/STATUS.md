@@ -40,6 +40,13 @@
 > `%LOCALAPPDATA%\HUHAC\Launcher\launcher.toml`; Git obsahuje pouze distribuční
 > příklad. 43 cílených launcher testů prošlo.
 
+> **EXPERIMENTALLY IMPLEMENTED 2026-10-27 — HUHÁČ Studio v0.1.** Isolated
+> React/TypeScript/Vite shell with static Projects and Media Library modules,
+> Zustand ID context, React Router navigation, TanStack Query data boundary and
+> synthetic data only. Project persistence, Media Desk replacement, processor
+> orchestration and Launcher integration remain **ABSENT**. Evidence and startup
+> instructions: `docs/studio/` and `studio/src/`.
+
 ## Etapy
 
 | Etapa | Stav | Důkaz | Poznámka |

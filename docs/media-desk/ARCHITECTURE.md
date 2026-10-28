@@ -16,6 +16,15 @@
 > **NADÁLE NEIMPLEMENTOVÁNO** — import z webu, orchestrace procesorů, obecný
 > storage lifecycle, síťový workspace writer a cílová přenosná metadata.
 
+## HUHÁČ Studio v0.1 boundary — EXPERIMENTAL
+
+The isolated `studio/` React prototype is a static module orchestrator. It owns
+URL navigation and an ID-only working context; Projects and Media Library own
+their internal UI/domain behavior. V0.1 uses synthetic in-memory data and does
+not read or write Media Desk user data, workspaces, catalogs, SQLite, Launcher
+profiles, or processor output. Project persistence, multi-workspace backend and
+Launcher hosting are **ABSENT** and require later decisions. See `docs/studio/`.
+
 ## Normalizer N3 boundary — IMPLEMENTED
 
 At application creation, a public read-only adapter selects an exact

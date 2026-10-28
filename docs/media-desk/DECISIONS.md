@@ -6,7 +6,7 @@
 
 **Výchozí commit konsolidace:** `288b9e6221459c074d80016518a4fbaa8bc90aa4`
 
-**Rozhodnutí aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2 a D-027
+**Rozhodnutí aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2 a D-028
 
 Stavy: **ACCEPTED** je závazná hranice, **IMPLEMENTED** je doložená skutečnost,
 **TARGET** je odsouhlasený výsledek bez hotové implementace, **PROPOSED** čeká na
@@ -42,6 +42,18 @@ schválení a **REJECTED** se nemá realizovat.
 | D-025 | Launcher v0.1 ovládá pouze jeden jím vytvořený loopback Media Desk child proces. Readiness dokládá `/health`; obsazený port ani proces po restartu launcher nepřebírá a stop nikdy necílí podle názvu/portu. | **ACCEPTED + IMPLEMENTED** | `src/huhac_launcher`, `tests/launcher`, `docs/launcher.md`; schváleno TASK-LAUNCH-001 |
 | D-026 | Launcher v0.2 používá více explicitních profilů s odděleným workspace, Media Desk user-data rootem, portem a snapshoty; stále vlastní nejvýše jeden child. | **ACCEPTED + IMPLEMENTED** | TASK-LAUNCH-003; `src/huhac_launcher/config.py`, `snapshots.py` |
 | D-027 | Osobní Launcher konfigurace nepatří do Git historie. Aktivní schema 2 TOML je v host-local user configu; verzovaný neosobní příklad smí atomicky založit pouze chybějící konfiguraci a nikdy nepřepisuje existující profil. | **ACCEPTED + IMPLEMENTED** | TASK-GIT-001; `default_launcher_config_path`, `initialize_launcher_config`, `config/launcher.example.toml` |
+| D-028 | Studio v0.1 je statický React modulární shell s ID-only kontextem a zachovává ownership Media Desk, workspace a procesorů; produkční projektový writer ani multi-workspace backend nejsou schváleny. | **ACCEPTED TARGET + EXPERIMENTALLY IMPLEMENTED** | TASK-STUDIO-002; `studio/src`, `docs/studio` |
+
+## D-028 — Studio shell preserves existing ownership boundaries
+
+**ACCEPTED TARGET + EXPERIMENTALLY IMPLEMENTED 2026-10-27
+(TASK-STUDIO-002).** HUHÁČ Studio starts as a static React/TypeScript module
+orchestrator. The shell owns navigation and an ID-only working context; modules
+own their UI and domain logic and communicate only through public context/data
+contracts. The v0.1 implementation uses synthetic in-memory data. It does not
+rename Sessions or Events, introduce project persistence, write a workspace, or
+change Media Desk/Launcher. A production project writer, multi-workspace backend,
+and Launcher integration each require a later explicit decision.
 
 ## D-024 — Normalizer N3 is an explicit read-only startup projection
 
