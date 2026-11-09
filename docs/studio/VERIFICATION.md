@@ -202,3 +202,21 @@ záložku. Browser pak držel starý Studio dokument i v době, kdy na portu ji�
 běžel Media Desk. Launcher nyní otevírá novou záložku s `launcher_app` a jedinečným
 `launcher_run`; stav GUI uvádí identitu vlastněné aplikace. Readiness test výslovně
 odmítá HTTP 200 payload druhé aplikace.
+
+## Konsolidační ověření před integrací — 2026-11-09
+
+Ověření proběhlo nad `feature/studio-shell@543d3d6` před fast-forward integrací do
+`codex/media-desk-working-library-v1`. Každá Python sada běžela v prostředí své
+aplikace; nebyla otevřena ani migrována provozní Studio SQLite nebo Media Desk data.
+
+| Kontrola | Výsledek |
+|---|---|
+| Studio backend | **PASS:** 25 testů, 1 platformní symlink skip |
+| Launcher | **PASS:** 57 testů |
+| Media Desk regrese | **PASS:** 95 testů, 6 platformních skipů |
+| Studio frontend | **PASS:** 6 souborů, 27 testů |
+| Produkční TypeScript/Vite build | **PASS:** 87 modulů, výstup `studio/dist/` |
+
+Media Desk sada používala Media Desk vývojové prostředí s `jinja2`; Studio a
+Launcher používaly oddělené Studio prostředí. Toto rozdělení potvrzuje deklarovanou
+runtime izolaci a není změnou veřejného workspace kontraktu ani databázových schémat.

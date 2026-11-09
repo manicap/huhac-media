@@ -83,14 +83,15 @@ working directories a portable JSON export/import jsou explicitně odloženy.
 
 ## D-028 — Studio shell preserves existing ownership boundaries
 
-**ACCEPTED TARGET + EXPERIMENTALLY IMPLEMENTED 2026-10-27
-(TASK-STUDIO-002).** HUHÁČ Studio starts as a static React/TypeScript module
+**HISTORICAL BASELINE — ACCEPTED TARGET + EXPERIMENTALLY IMPLEMENTED 2026-10-27
+(TASK-STUDIO-002).** HUHÁČ Studio started as a static React/TypeScript module
 orchestrator. The shell owns navigation and an ID-only working context; modules
 own their UI and domain logic and communicate only through public context/data
-contracts. The v0.1 implementation uses synthetic in-memory data. It does not
-rename Sessions or Events, introduce project persistence, write a workspace, or
-change Media Desk/Launcher. A production project writer, multi-workspace backend,
-and Launcher integration each require a later explicit decision.
+contracts. This baseline used synthetic in-memory data and did not rename Sessions
+or Events, introduce project persistence, write a workspace, or change Media Desk
+or Launcher. D-029 later approved and implemented Project Core persistence; D-030
+later approved and implemented Launcher integration. The navigation and ownership
+boundaries from D-028 remain in force, while multi-workspace support remains absent.
 
 ## D-024 — Normalizer N3 is an explicit read-only startup projection
 

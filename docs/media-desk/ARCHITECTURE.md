@@ -1,12 +1,14 @@
 # HUHÁČ Media Pipeline / Media Desk — aktuální architektura
 
-**Auditováno:** 2026-10-27
+**Auditováno:** 2026-11-09
 
-**Větev:** `codex/media-desk-working-library-v1`
+**Větev:** `feature/studio-shell` — integrační kandidát pro
+`codex/media-desk-working-library-v1`
 
-**Výchozí commit konsolidace:** `288b9e6221459c074d80016518a4fbaa8bc90aa4`
+**Výchozí commit Studio série:** `9b4d8ca284a7b2814061ba13c94243f813ad6ca3`
 
-**Rozhodnutí aktualizována:** 2026-10-27 po konsolidaci Launcheru v0.2 a D-027
+**Rozhodnutí aktualizována:** 2026-11-09 po implementaci Project Core v1,
+integraci Studia do Launcheru v0.2 a D-029/D-030
 
 > **IMPLEMENTOVÁNO DNES** — běžící galerie je lokální read-only konzument jednoho
 > veřejného workspace v1. Výslovně potvrzené založení archivu orchestruje přes
@@ -24,8 +26,9 @@ their internal UI/domain behavior. The React modules are connected to the
 `huhac_studio` Project Core API and its read-only workspace catalog projection;
 synthetic data remains test-only. Project Core owns a separate host-local SQLite
 and does not write Media Desk user data, workspaces, catalogs, Launcher profiles,
-or processor output. Multi-workspace registry and Launcher hosting remain
-**ABSENT**. See `docs/studio/`.
+or processor output. Multi-workspace registry remains **ABSENT**. Launcher hosting
+is **IMPLEMENTED** for one selected online workspace/profile and one owned child;
+offline Studio remains absent from the Launcher GUI. See `docs/studio/` and D-030.
 
 ## Normalizer N3 boundary — IMPLEMENTED
 
